@@ -60,9 +60,17 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
     if (thumbnail.getNumChannels() > 0)
     {
-        g.setColour(juce::Colours::cyan);
-        thumbnail.drawChannel(g, layer1Area.reduced(2), 0.0, thumbnail.getTotalLength(), 0, 1.0f);
+        // --- CÁLCULOS DE TIEMPO VISIBLE ---
+        double totalAudioSeconds = thumbnail.getTotalLength();
+        double visibleSeconds = totalAudioSeconds / zoomFactor;
+        double startTime = viewStartRatio * totalAudioSeconds;
+        double endTime = startTime + visibleSeconds;
 
+        g.setColour(juce::Colours::cyan);
+        // ¡La magia de JUCE! Le pasamos startTime y endTime y él solo recorta la onda
+        thumbnail.drawChannel(g, layer1Area.reduced(2), startTime, endTime, 0, 1.0f);
+
+        // --- DIBUJAR CURSOR Y GRANO ---
         auto positionParam = audioProcessor.apvts.getRawParameterValue("POSITION");
         auto grainSizeParam = audioProcessor.apvts.getRawParameterValue("GRAIN_SIZE");
 
@@ -70,11 +78,18 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         {
             float currentPosition = positionParam->load();
             float grainSizeSeconds = grainSizeParam->load();
-            double totalAudioSeconds = thumbnail.getTotalLength();
-            float cursorX = layer1Area.getX() + (currentPosition * layer1Area.getWidth());
-            float grainWidthPixels = (grainSizeSeconds / totalAudioSeconds) * layer1Area.getWidth();
+
+            // Tiempo exacto en segundos donde está el cursor
+            double cursorTimeSeconds = currentPosition * totalAudioSeconds;
+
+            // Mapeamos ese tiempo a un píxel en la pantalla (teniendo en cuenta el Zoom)
+            float cursorX = layer1Area.getX() + ((cursorTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
+
+            // Calculamos el ancho del grano en pantalla (ahora se verá más grande al hacer zoom)
+            float grainWidthPixels = (grainSizeSeconds / visibleSeconds) * layer1Area.getWidth();
             grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
 
+            // Dibujamos la ventana de Hann azul
             juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f),
                 layer1Area.getY(),
                 grainWidthPixels,
@@ -83,6 +98,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.setColour(juce::Colours::cyan.withAlpha(0.3f));
             g.fillRect(grainWindow);
 
+            // Dibujamos la línea central
             g.setColour(juce::Colours::white.withAlpha(0.9f));
             g.drawLine(cursorX, layer1Area.getY(), cursorX, layer1Area.getBottom(), 3.0f);
         }
@@ -229,5 +245,82 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
 void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
 {
     repaint(); // Audio listo, actualiza pantalla
+}
+
+// ==============================================================================
+// --- CONTROL DE RATÓN UNIFICADO: ZOOM Y CURSOR ---
+
+void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+{
+    if (thumbnail.getTotalLength() > 0.0)
+    {
+        // 1. Recreamos el área de la onda para saber si el ratón está dentro
+        auto bounds = getLocalBounds();
+        bounds.removeFromBottom(300);
+        bounds.removeFromRight(350);
+        auto layer1Area = bounds.removeFromTop(bounds.getHeight() / 4);
+
+        if (layer1Area.contains(event.getPosition()))
+        {
+            // 2. ¿En qué píxel relativo de la caja azul está el ratón?
+            double mouseX = event.getPosition().x - layer1Area.getX();
+
+            // ¿Qué porcentaje de la pantalla (0.0 a 1.0) es ese píxel?
+            double mouseRatioInView = mouseX / (double)layer1Area.getWidth();
+
+            // 3. MAGIA: ¿Qué porcentaje del audio TOTAL está debajo del ratón AHORA MISMO?
+            double timeUnderMouse = viewStartRatio + (mouseRatioInView / zoomFactor);
+
+            // 4. Calculamos el nuevo nivel de Zoom
+            double zoomMultiplier = (wheel.deltaY > 0) ? 1.2 : 1.0 / 1.2;
+            double newZoomFactor = juce::jlimit(1.0, 50.0, zoomFactor * zoomMultiplier);
+
+            // 5. Ajustamos el inicio de la vista para que 'timeUnderMouse' siga bajo el ratón
+            viewStartRatio = timeUnderMouse - (mouseRatioInView / newZoomFactor);
+
+            // 6. Limitamos para no salirnos por los bordes izquierdo (0.0) o derecho
+            viewStartRatio = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactor), viewStartRatio);
+
+            // Aplicamos el zoom definitivo y redibujamos
+            zoomFactor = newZoomFactor;
+            repaint();
+        }
+    }
+}
+
+void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
+{
+    auto bounds = getLocalBounds();
+    bounds.removeFromBottom(300);
+    bounds.removeFromRight(350);
+    auto layer1Area = bounds.removeFromTop(bounds.getHeight() / 4);
+
+    if (layer1Area.contains(event.getPosition()))
+    {
+        // 1. ¿En qué pixel de la pantalla hemos hecho clic?
+        float clickX = event.getPosition().x - layer1Area.getX();
+
+        // 2. ¿Qué porcentaje de la pantalla representa ese pixel? (De 0.0 a 1.0)
+        float ratioInView = clickX / (float)layer1Area.getWidth();
+
+        // 3. MAGIA: Convertimos ese clic en pantalla a la posición real del audio,
+        // teniendo en cuenta el nivel de Zoom y el desplazamiento actual.
+        float visibleRatio = 1.0f / zoomFactor;
+        float normalizedPos = viewStartRatio + (ratioInView * visibleRatio);
+
+        normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
+
+        // 4. Actualizamos el knob y el motor de audio
+        if (auto* posParam = audioProcessor.apvts.getParameter("POSITION"))
+        {
+            posParam->setValueNotifyingHost(normalizedPos);
+        }
+    }
+}
+
+void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
+{
+    // Al arrastrar, llamamos exactamente a la misma lógica que al hacer clic
+    mouseDown(event);
 }
 

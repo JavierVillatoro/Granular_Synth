@@ -28,6 +28,9 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDrag(const juce::MouseEvent& event) override;
     
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -43,6 +46,10 @@ public:
         }
     }
 
+    void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
+    //void mouseDown(const juce::MouseEvent& event) override;
+    //void mouseDrag(const juce::MouseEvent& event) override;
+
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
@@ -56,6 +63,11 @@ private:
 
     EngineModule engineModule{ audioProcessor.apvts };
     ScanModule scanModule{ audioProcessor.apvts };
+
+    // --- VARIABLES DE ZOOM Y NAVEGACIÓN ---
+    double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10
+    double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qué parte del audio está a la izquierda de la pantalla
+    int lastDragX = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessorEditor)
 };
