@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "GranularVoice.h"
 
 //==============================================================================
 /**
@@ -56,14 +57,19 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    juce::AudioProcessorValueTreeState apvts;
+
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
     //==============================================================================
-    juce::AudioProcessorValueTreeState apvts;
+    //juce::AudioProcessorValueTreeState apvts;
     juce::AudioFormatManager formatManager;
-    juce::AudioSampleBuffer audioBuffer;
+    juce::AudioBuffer<float> audioBuffer;
     //==============================================================================
+
+    juce::Synthesiser synth;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
 };

@@ -12,18 +12,29 @@
 //==============================================================================
 Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       ),
+    : AudioProcessor(BusesProperties()
+#if ! JucePlugin_IsMidiEffect
+#if ! JucePlugin_IsSynth
+        .withInput("Input", juce::AudioChannelSet::stereo(), true)
+#endif
+        .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+#endif
+    ),
     apvts(*this, nullptr, "Parameters", createParameters())
 #endif
 {
     formatManager.registerBasicFormats();
+
+    // --- INICIALIZAR EL SINTETIZADOR MIDI ---
+
+    // 1. Le damos a la orquesta la partitura (nuestra clase Sound que permite tocar cualquier nota)
+    synth.addSound(new GranularSound());
+
+    // 2. Contratamos a 8 "Voces" 
+    for (int i = 0; i < 8; ++i)
+    {
+        synth.addVoice(new GranularVoice(&audioBuffer, &apvts));
+    }
 }
 
 Granular_SynthAudioProcessor::~Granular_SynthAudioProcessor()
@@ -97,6 +108,7 @@ void Granular_SynthAudioProcessor::prepareToPlay (double sampleRate, int samples
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    synth.setCurrentPlaybackSampleRate(sampleRate);
 }
 
 void Granular_SynthAudioProcessor::releaseResources()
@@ -131,33 +143,14 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 }
 #endif
 
-void Granular_SynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    // 1. Limpiamos los altavoces por si había ruido viejo
+    buffer.clear();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+    // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
+    // Él leerá el MIDI, verá qué teclas has pulsado, y le dirá a las Voces que rellenen el buffer de audio.
+    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 }
 
 //==============================================================================
@@ -194,22 +187,20 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor::createParameters()
 {
-    // Vector  para guardar parámetros temporalmente
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // 1. GRAIN SIZE (Tamaño del grano en milisegundos: de 1ms a 500ms)
+    // 1. SOLO UN PARÁMETRO DE POSITION
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(1.0f, 500.0f, 1.0f, 0.5f), 50.0f));
+        "POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
-    // 2. SPRAY (Aleatoriedad de posición: de 0 a 1)
+    // 2. SOLO UN PARÁMETRO DE GRAIN SIZE
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SPRAY", "Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+        "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.01f, 2.0f, 0.001f), 0.1f)); //Cambiar rango de grain size a 2 sec
 
-    // 3. SPIKE (Afilado de la envolvente: de 0 a 1)
+    // SCAN SPEED: -2.0 a 2.0 (negativo es reverse, 0 es parado, 1 es velocidad real)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SPIKE", "Spike", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+        "SCAN_SPEED", "Scan Speed", juce::NormalisableRange<float>(-2.0f, 2.0f, 0.01f), 0.0f));
 
-    // Devolvemos la lista completa al APVTS
     return { params.begin(), params.end() };
 }
 

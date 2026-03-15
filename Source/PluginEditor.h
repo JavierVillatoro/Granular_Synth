@@ -10,13 +10,16 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "ScanModule.h"
+#include "EngineModule.h"
 
 //==============================================================================
 /**
 */
 class Granular_SynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
                                             public juce::FileDragAndDropTarget,
-                                            public juce::ChangeListener
+                                            public juce::ChangeListener,
+                                            public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     Granular_SynthAudioProcessorEditor (Granular_SynthAudioProcessor&);
@@ -31,13 +34,28 @@ public:
 
     void changeListenerCallback(juce::ChangeBroadcaster* source) override; // Cuando audio listo para dibujarse
 
+    void parameterChanged(const juce::String& parameterID, float newValue) override
+    {
+        // Si cambia la posición O el tamaño del grano, redibujamos
+        if (parameterID == "POSITION" || parameterID == "GRAIN_SIZE")
+        {
+            juce::MessageManager::callAsync([this] { repaint(); });
+        }
+    }
+
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     Granular_SynthAudioProcessor& audioProcessor;
 
     juce::AudioThumbnailCache thumbnailCache; 
-    juce::AudioThumbnail thumbnail;           
+    juce::AudioThumbnail thumbnail;
+    //juce::Slider positionKnob;
+
+    //std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
+
+    EngineModule engineModule{ audioProcessor.apvts };
+    ScanModule scanModule{ audioProcessor.apvts };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessorEditor)
 };
