@@ -194,12 +194,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
         "POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
     // 2. SOLO UN PARÁMETRO DE GRAIN SIZE
+    //params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        //"GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.01f, 2.0f, 0.001f), 0.1f)); //Cambiar rango de grain size a 2 sec
+    // GRAIN SIZE: Ahora va de 0.0 (0%) a 1.0 (100% del archivo), con curva para mayor precisión al inicio
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.01f, 2.0f, 0.001f), 0.1f)); //Cambiar rango de grain size a 2 sec
+        "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 0.3f), 0.1f));
 
     // SCAN SPEED: -2.0 a 2.0 (negativo es reverse, 0 es parado, 1 es velocidad real)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SCAN_SPEED", "Scan Speed", juce::NormalisableRange<float>(-2.0f, 2.0f, 0.01f), 0.0f));
+
+    // SPRAY POSITION: 0.0 (Preciso) a 1.0 (Aleatorio por todo el archivo)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "SPRAY_POS", "Position Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
 
     return { params.begin(), params.end() };
 }

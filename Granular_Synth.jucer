@@ -4,6 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="rIKO8T" name="Granular_Synth">
     <GROUP id="{849B0228-6809-FA67-5837-53AAF84891E6}" name="Source">
+      <FILE id="rXmYdp" name="Spraymodule.cpp" compile="1" resource="0" file="Source/Spraymodule.cpp"/>
+      <FILE id="AVfRys" name="Spraymodule.h" compile="0" resource="0" file="Source/Spraymodule.h"/>
       <FILE id="vRyRt4" name="EngineModule.cpp" compile="1" resource="0"
             file="Source/EngineModule.cpp"/>
       <FILE id="UrPh5r" name="EngineModule.h" compile="0" resource="0" file="Source/EngineModule.h"/>

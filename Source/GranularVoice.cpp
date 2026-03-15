@@ -63,63 +63,73 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     // 1. LEER PARÁMETROS
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
-    float grainSizeSeconds = apvts->getRawParameterValue("GRAIN_SIZE")->load();
+
+    // --- NUEVO: TAMAÑO DE GRANO PROPORCIONAL ---
+    float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
+    float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
+    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * totalAudioSeconds);
+    // -------------------------------------------
+
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
+    float sprayPos = apvts->getRawParameterValue("SPRAY_POS")->load();
 
+    // Calculamos la longitud en samples usando los nuevos segundos calculados
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
-    int overlapOffset = grainLength / 2; // El segundo grano nace a mitad del primero
+    int overlapOffset = grainLength / 2;
 
-    // 2. PROCESAR CADA SAMPLE
     for (int s = 0; s < numSamples; ++s)
     {
-        // El cursor "fantasma" avanza siempre según el Scan Speed
         autoScanOffset += (double)scanSpeed / getSampleRate();
         float currentTargetPos = positionKnob + (float)autoScanOffset;
 
-        // Loop del cursor (0.0 a 1.0)
         while (currentTargetPos > 1.0f) currentTargetPos -= 1.0f;
         while (currentTargetPos < 0.0f) currentTargetPos += 1.0f;
 
         float totalSampleSum = 0.0f;
 
         // --- LÓGICA GRANO 1 ---
-        if (currentReadPosition1 == 0.0) // ¡Foto del punto de inicio al nacer!
-            grainStartSample1 = (int)(currentTargetPos * (audioBuffer->getNumSamples() - 1));
+        if (currentReadPosition1 == 0.0)
+        {
+            float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
+            float finalPos1 = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+            grainStartSample1 = (int)(finalPos1 * (audioBuffer->getNumSamples() - 1));
+        }
 
-        // Envolvente de Hann: $$w(n) = 0.5 \left(1 - \cos\left(\frac{2\pi n}{N-1}\right)\right)$$
         float win1 = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (currentReadPosition1 / grainLength)));
         int read1 = grainStartSample1 + (int)(currentReadPosition1 * pitchRatio);
-
         if (read1 >= 0 && read1 < audioBuffer->getNumSamples())
             totalSampleSum += audioBuffer->getReadPointer(0)[read1] * win1;
 
-        // --- LÓGICA GRANO 2 (Solo si el grano 1 ya ha recorrido la mitad) ---
+        // --- LÓGICA GRANO 2 ---
         if (!secondGrainActive && currentReadPosition1 >= overlapOffset) {
             secondGrainActive = true;
             currentReadPosition2 = 0.0;
         }
 
-        if (secondGrainActive) {
-            if (currentReadPosition2 == 0.0) // Foto del punto de inicio para el segundo grano
-                grainStartSample2 = (int)(currentTargetPos * (audioBuffer->getNumSamples() - 1));
+        if (secondGrainActive)
+        {
+            if (currentReadPosition2 == 0.0)
+            {
+                float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
+                float finalPos2 = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+                grainStartSample2 = (int)(finalPos2 * (audioBuffer->getNumSamples() - 1));
+            }
 
             float win2 = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (currentReadPosition2 / grainLength)));
             int read2 = grainStartSample2 + (int)(currentReadPosition2 * pitchRatio);
-
             if (read2 >= 0 && read2 < audioBuffer->getNumSamples())
                 totalSampleSum += audioBuffer->getReadPointer(0)[read2] * win2;
         }
 
-        // --- ENVIAR A SALIDA ---
+        // --- ENVIAR A SALIDA Y ACTUALIZAR ---
         for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch)
             outputBuffer.addSample(ch, startSample + s, totalSampleSum * currentVelocity);
 
-        // --- ACTUALIZAR POSICIONES ---
         currentReadPosition1 += 1.0;
         if (secondGrainActive) currentReadPosition2 += 1.0;
 
-        // Reinicio de los granos al terminar su vida
         if (currentReadPosition1 >= grainLength) currentReadPosition1 = 0.0;
         if (currentReadPosition2 >= grainLength) currentReadPosition2 = 0.0;
     }
 }
+

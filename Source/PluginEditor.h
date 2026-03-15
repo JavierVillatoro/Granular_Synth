@@ -12,6 +12,7 @@
 #include "PluginProcessor.h"
 #include "ScanModule.h"
 #include "EngineModule.h"
+#include "SprayModule.h"
 
 //==============================================================================
 /**
@@ -63,6 +64,7 @@ private:
 
     EngineModule engineModule{ audioProcessor.apvts };
     ScanModule scanModule{ audioProcessor.apvts };
+    SprayModule sprayModule{ audioProcessor.apvts };
 
     // --- VARIABLES DE ZOOM Y NAVEGACIÓN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10

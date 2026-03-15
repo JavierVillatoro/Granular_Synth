@@ -23,6 +23,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     // 1. Hacemos visible nuestro nuevo módulo independiente
     addAndMakeVisible(scanModule);
     addAndMakeVisible(engineModule);
+    addAndMakeVisible(sprayModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -77,17 +78,18 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         if (positionParam != nullptr && grainSizeParam != nullptr)
         {
             float currentPosition = positionParam->load();
-            float grainSizeSeconds = grainSizeParam->load();
+            float sizeRatio = grainSizeParam->load(); // ¡Ahora es un ratio!
 
-            // Tiempo exacto en segundos donde está el cursor
             double cursorTimeSeconds = currentPosition * totalAudioSeconds;
 
-            // Mapeamos ese tiempo a un píxel en la pantalla (teniendo en cuenta el Zoom)
+            // Calculamos los segundos reales del grano para el dibujo
+            float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * (float)totalAudioSeconds);
+
             float cursorX = layer1Area.getX() + ((cursorTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
 
-            // Calculamos el ancho del grano en pantalla (ahora se verá más grande al hacer zoom)
+            // El ancho en píxeles depende del Zoom y del tamaño real del grano
             float grainWidthPixels = (grainSizeSeconds / visibleSeconds) * layer1Area.getWidth();
-            grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
+            grainWidthPixels = juce::jmax(3.0f, grainWidthPixels); // Mínimo 3 píxeles de ancho (la línea blanca)
 
             // Dibujamos la ventana de Hann azul
             juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f),
@@ -199,6 +201,10 @@ void Granular_SynthAudioProcessorEditor::resized()
         bottomModulesArea.getY(),
         moduleWidth,
         moduleHeight);
+    
+    // SPRAY  (Columna 2)
+    juce::Rectangle<int> module3Rect(bottomModulesArea.getX() + (moduleWidth * 2), bottomModulesArea.getY(), moduleWidth, moduleHeight);
+    sprayModule.setBounds(module3Rect);
 
     // Colocamos nuestra rueda de Posición en el centro de ese módulo, con un poco de margen (reduced)
     //positionKnob.setBounds(module2Rect.reduced(20));
