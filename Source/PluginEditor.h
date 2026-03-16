@@ -40,8 +40,8 @@ public:
 
     void parameterChanged(const juce::String& parameterID, float newValue) override
     {
-        // Si cambia la posición O el tamaño del grano, redibujamos
-        if (parameterID == "POSITION" || parameterID == "GRAIN_SIZE")
+        // Añadimos "SHAPE" a la condición
+        if (parameterID == "POSITION" || parameterID == "GRAIN_SIZE" || parameterID == "SHAPE")
         {
             juce::MessageManager::callAsync([this] { repaint(); });
         }

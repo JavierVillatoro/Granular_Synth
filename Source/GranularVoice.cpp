@@ -23,27 +23,6 @@ bool GranularVoice::canPlaySound(juce::SynthesiserSound* sound)
     return dynamic_cast<GranularSound*>(sound) != nullptr;
 }
 
-// 3. TECLA PULSADA (Note On)
-void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition)
-{
-    isPlaying = true;
-    currentVelocity = velocity;
-
-    // 1. Cálculo del tono (Pitch)
-    // std::pow requiere incluir <cmath>, pero JUCE ya lo incluye de serie.
-    pitchRatio = std::pow(2.0, (midiNoteNumber - 60) / 12.0);
-
-    // 2. RESET DEL MOTOR DE DOBLE GRANO
-    // Sustituimos 'currentReadPosition = 0.0' por estas nuevas:
-    currentReadPosition1 = 0.0;
-    currentReadPosition2 = 0.0;
-
-    // El segundo grano debe nacer desactivado (esperará al relevo del primero)
-    secondGrainActive = false;
-
-    // El escaneo automático siempre empieza desde donde diga el knob 'Position'
-    autoScanOffset = 0.0;
-}
 
 // 4. TECLA SOLTADA (Note Off)
 void GranularVoice::stopNote(float velocity, bool allowTailOff)
@@ -56,80 +35,119 @@ void GranularVoice::stopNote(float velocity, bool allowTailOff)
 void GranularVoice::pitchWheelMoved(int newPitchWheelValue) {}
 void GranularVoice::controllerMoved(int controllerNumber, int newControllerValue) {}
 
-// 5. LAS MATEMÁTICAS DEL AUDIO
+void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition)
+{
+    isPlaying = true;
+    currentVelocity = velocity;
+    pitchRatio = std::pow(2.0, (midiNoteNumber - 60) / 12.0);
+
+    // 1. Apagamos a todos los soldados para empezar en limpio
+    for (auto& grain : grains) {
+        grain.isActive = false;
+    }
+
+    // 2. Reiniciamos temporizadores
+    samplesUntilNextGrain = 0.0; // Que dispare un grano inmediatamente
+    autoScanOffset = 0.0;
+}
+
+// --------------------------------------------------------------------------
+
 void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
     if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
 
-    // 1. LEER PARÁMETROS
+    // --- 1. LEER PARÁMETROS ---
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
-
-    // --- NUEVO: TAMAÑO DE GRANO PROPORCIONAL ---
     float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
-    float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
-    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * totalAudioSeconds);
-    // -------------------------------------------
-
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
     float sprayPos = apvts->getRawParameterValue("SPRAY_POS")->load();
+    float density = apvts->getRawParameterValue("DENSITY")->load();
+    float shapeParam = apvts->getRawParameterValue("SHAPE")->load();
+    float sprayPan = apvts->getRawParameterValue("SPRAY_PAN")->load();
+    float sprayPitch = apvts->getRawParameterValue("SPRAY_PITCH")->load(); // <--- NUEVO
 
-    // Calculamos la longitud en samples usando los nuevos segundos calculados
+    float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
+    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * totalAudioSeconds);
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
-    int overlapOffset = grainLength / 2;
+    double samplesBetweenGrains = getSampleRate() / juce::jmax(0.1f, density);
 
     for (int s = 0; s < numSamples; ++s)
     {
         autoScanOffset += (double)scanSpeed / getSampleRate();
-        float currentTargetPos = positionKnob + (float)autoScanOffset;
+        float currentTargetPos = juce::jlimit(0.0f, 1.0f, positionKnob + (float)autoScanOffset);
 
-        while (currentTargetPos > 1.0f) currentTargetPos -= 1.0f;
-        while (currentTargetPos < 0.0f) currentTargetPos += 1.0f;
-
-        float totalSampleSum = 0.0f;
-
-        // --- LÓGICA GRANO 1 ---
-        if (currentReadPosition1 == 0.0)
+        // --- 2. SCHEDULER (NACIMIENTO DE GRANOS) ---
+        samplesUntilNextGrain -= 1.0;
+        if (samplesUntilNextGrain <= 0.0)
         {
-            float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
-            float finalPos1 = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
-            grainStartSample1 = (int)(finalPos1 * (audioBuffer->getNumSamples() - 1));
-        }
-
-        float win1 = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (currentReadPosition1 / grainLength)));
-        int read1 = grainStartSample1 + (int)(currentReadPosition1 * pitchRatio);
-        if (read1 >= 0 && read1 < audioBuffer->getNumSamples())
-            totalSampleSum += audioBuffer->getReadPointer(0)[read1] * win1;
-
-        // --- LÓGICA GRANO 2 ---
-        if (!secondGrainActive && currentReadPosition1 >= overlapOffset) {
-            secondGrainActive = true;
-            currentReadPosition2 = 0.0;
-        }
-
-        if (secondGrainActive)
-        {
-            if (currentReadPosition2 == 0.0)
+            for (auto& grain : grains)
             {
-                float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
-                float finalPos2 = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
-                grainStartSample2 = (int)(finalPos2 * (audioBuffer->getNumSamples() - 1));
-            }
+                if (!grain.isActive)
+                {
+                    grain.isActive = true;
+                    grain.currentPosition = 0.0;
 
-            float win2 = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * (currentReadPosition2 / grainLength)));
-            int read2 = grainStartSample2 + (int)(currentReadPosition2 * pitchRatio);
-            if (read2 >= 0 && read2 < audioBuffer->getNumSamples())
-                totalSampleSum += audioBuffer->getReadPointer(0)[read2] * win2;
+                    // Spray de Posición
+                    float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
+                    float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+                    grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
+
+                    // --- LÓGICA DE PITCH SPRAY (NUEVO) ---
+                    float pitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
+                    grain.pitchRandomRatio = std::pow(2.0f, pitchRand / 12.0f);
+
+                    // Spray de Pan (Estéreo)
+                    float randomPan = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPan;
+                    grain.panL = std::cos(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
+                    grain.panR = std::sin(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
+
+                    break;
+                }
+            }
+            samplesUntilNextGrain += samplesBetweenGrains;
         }
 
-        // --- ENVIAR A SALIDA Y ACTUALIZAR ---
-        for (int ch = 0; ch < outputBuffer.getNumChannels(); ++ch)
-            outputBuffer.addSample(ch, startSample + s, totalSampleSum * currentVelocity);
+        // --- 3. PROCESAMIENTO DE AUDIO ---
+        float totalL = 0.0f;
+        float totalR = 0.0f;
+        int activeCount = 0;
 
-        currentReadPosition1 += 1.0;
-        if (secondGrainActive) currentReadPosition2 += 1.0;
+        for (auto& grain : grains)
+        {
+            if (grain.isActive)
+            {
+                activeCount++;
+                float progress = (float)(grain.currentPosition / grainLength);
 
-        if (currentReadPosition1 >= grainLength) currentReadPosition1 = 0.0;
-        if (currentReadPosition2 >= grainLength) currentReadPosition2 = 0.0;
+                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                float square = (progress < 0.02f) ? progress / 0.02f : (progress > 0.98f ? (1.0f - progress) / 0.02f : 1.0f);
+                float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
+
+                // --- POSICIÓN DE LECTURA (¡Aquí multiplicamos por el nuevo ratio!) ---
+                int readPos = grain.startSample + (int)(grain.currentPosition * pitchRatio * grain.pitchRandomRatio); // <--- NUEVO
+
+                if (readPos >= 0 && readPos < audioBuffer->getNumSamples())
+                {
+                    float sample = audioBuffer->getReadPointer(0)[readPos] * window;
+                    totalL += sample * grain.panL;
+                    totalR += sample * grain.panR;
+                }
+
+                grain.currentPosition += 1.0;
+                if (grain.currentPosition >= grainLength) grain.isActive = false;
+            }
+        }
+
+        // --- 4. SALIDA ---
+        if (activeCount > 0) {
+            float gainScale = 1.0f / std::sqrt((float)activeCount);
+            totalL = std::tanh(totalL * gainScale);
+            totalR = std::tanh(totalR * gainScale);
+        }
+
+        outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);
+        outputBuffer.addSample(1, startSample + s, totalR * currentVelocity);
     }
 }
 

@@ -10,6 +10,7 @@
 
 #pragma once
 #include <JuceHeader.h>
+#include <array>
 
 // ==============================================================================
 // 1. LA CLASE SOUND
@@ -36,24 +37,33 @@ public:
     void renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override;
 
 private:
-    // --- Posiciones de lectura (avanzan de 0 a grainLength) ---
-    double currentReadPosition1 = 0.0;
-    double currentReadPosition2 = 0.0;
+    
+    struct Grain
+    {
+        bool isActive = false;      // ¿Está sonando o está en la reserva?
+        double currentPosition = 0; // Por dónde va leyendo el audio (de 0 a grainLength)
+        int startSample = 0;        // La "foto" de dónde empezó a leer en el archivo
+        //float randomPan = 0.5f;     // SPRAY de paneo
+        float randomPitch = 1.0f;
+        float pitchRandomRatio = 1.0f;// SPRAY_PITCH
+        float panL = 1.0f; 
+        float panR = 1.0f;
+    };
 
-    // --- "Fotos" de la posición en el archivo (para evitar chirridos) ---
-    int grainStartSample1 = 0;
-    int grainStartSample2 = 0;
+    // --- EL EJÉRCITO ---
+    static constexpr int maxGrains = 128;
+    std::array<Grain, maxGrains> grains;
 
-    // --- Control del motor ---
-    bool secondGrainActive = false;
-    //double autoScanOffset = 0.0;
+    // --- TEMPORIZADOR PARA DISPARAR GRANOS (DENSITY) ---
+    double samplesUntilNextGrain = 0.0;
+
+    // --- VARIABLES GLOBALES DEL MOTOR ---
+    bool isPlaying = false;
+    double autoScanOffset = 0.0;
+    float currentVelocity = 0.0f;
+    float pitchRatio = 1.0f;
+
     // Aquí guardamos las llaves para usarlas luego en la cocina
     juce::AudioBuffer<float>* audioBuffer;
     juce::AudioProcessorValueTreeState* apvts;
-
-    bool isPlaying = false;
-    float currentVelocity = 0.0f;
-    double currentReadPosition = 0.0; 
-    double pitchRatio = 1.0;
-    double autoScanOffset = 0.0;
 };

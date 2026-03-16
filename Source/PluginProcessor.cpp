@@ -189,24 +189,36 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // 1. SOLO UN PARÁMETRO DE POSITION
+    // 1. POSITION
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
 
-    // 2. SOLO UN PARÁMETRO DE GRAIN SIZE
-    //params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        //"GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.01f, 2.0f, 0.001f), 0.1f)); //Cambiar rango de grain size a 2 sec
-    // GRAIN SIZE: Ahora va de 0.0 (0%) a 1.0 (100% del archivo), con curva para mayor precisión al inicio
+    // 2. GRAIN SIZE (De 0.0 a 1.0 del archivo)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 0.3f), 0.1f));
 
-    // SCAN SPEED: -2.0 a 2.0 (negativo es reverse, 0 es parado, 1 es velocidad real)
+    // 3. SCAN SPEED
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SCAN_SPEED", "Scan Speed", juce::NormalisableRange<float>(-2.0f, 2.0f, 0.01f), 0.0f));
 
-    // SPRAY POSITION: 0.0 (Preciso) a 1.0 (Aleatorio por todo el archivo)
+    // 4. SPRAY POSITION
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SPRAY_POS", "Position Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+
+    // 5. DENSITY
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DENSITY", "Density", juce::NormalisableRange<float>(1.0f, 120.0f, 0.1f, 0.5f), 20.0f));
+
+    // 6. SHAPE (¡ESTE ES EL QUE FALTABA!)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "SHAPE", "Shape", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
+    // SPRAY PAN: 0.0 (Todo al centro) a 1.0 (Repartido por todo el estéreo)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "SPRAY_PAN", "Pan Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "SPRAY_PITCH", "Pitch Spray", juce::NormalisableRange<float>(0.0f, 12.0f, 0.01f), 0.0f));
 
     return { params.begin(), params.end() };
 }

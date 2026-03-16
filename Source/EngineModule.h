@@ -15,14 +15,16 @@ class EngineModule : public juce::Component
 {
 public:
     EngineModule(juce::AudioProcessorValueTreeState& apvts);
-    ~EngineModule() override;
-
-    void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
-    juce::Slider grainSizeKnob;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> grainSizeAttachment;
+    juce::Slider sizeKnob;
+    juce::Slider densityKnob;
+    juce::Slider shapeKnob;
+
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sizeAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> densityAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> shapeAttach;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EngineModule)
 };

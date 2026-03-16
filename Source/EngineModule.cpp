@@ -12,23 +12,33 @@
 
 EngineModule::EngineModule(juce::AudioProcessorValueTreeState& apvts)
 {
-    grainSizeKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    grainSizeKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    addAndMakeVisible(grainSizeKnob);
+    // --- SIZE (Izquierda) ---
+    sizeKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    sizeKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    addAndMakeVisible(sizeKnob);
+    sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GRAIN_SIZE", sizeKnob);
 
-    // Conectamos el cable del knob al parámetro "GRAIN_SIZE"
-    grainSizeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GRAIN_SIZE", grainSizeKnob);
-}
+    // --- DENSITY (Centro) ---
+    densityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    densityKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    addAndMakeVisible(densityKnob);
+    densityAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "DENSITY", densityKnob);
 
-EngineModule::~EngineModule() {}
-
-void EngineModule::paint(juce::Graphics& g)
-{
-    g.setColour(juce::Colours::white.withAlpha(0.1f));
-    g.drawRect(getLocalBounds(), 1);
+    // --- SHAPE (Derecha) ---
+    shapeKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    shapeKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    addAndMakeVisible(shapeKnob);
+    shapeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SHAPE", shapeKnob);
 }
 
 void EngineModule::resized()
 {
-    grainSizeKnob.setBounds(getLocalBounds().reduced(20));
+    auto area = getLocalBounds().reduced(10);
+    int widthUnit = area.getWidth() / 3; // Dividimos la caja en 3 trozos iguales
+
+    // Colocamos cada knob de izquierda a derecha. 
+    // removeFromLeft va cortando el rectángulo como si fuera una barra de pan.
+    sizeKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
+    densityKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
+    shapeKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
 }

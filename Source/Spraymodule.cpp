@@ -12,22 +12,34 @@
 
 SprayModule::SprayModule(juce::AudioProcessorValueTreeState& apvts)
 {
-    // Configuramos el knob de Spray Position
-    sprayPosKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    sprayPosKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0); // Sin números
-    addAndMakeVisible(sprayPosKnob);
+    // Esta pequeña función interna nos ayuda a no repetir código para cada botón
+    auto setupKnob = [this](juce::Slider& k) {
+        k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        k.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        addAndMakeVisible(k);
+        };
 
-    // Lo conectamos al parámetro "SPRAY_POS" que creamos en el Processor
-    sprayPosAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPRAY_POS", sprayPosKnob);
+    // Configuramos los 3 botones
+    setupKnob(posSprayKnob);
+    setupKnob(pitchSprayKnob);
+    setupKnob(panSprayKnob);
+
+    // Conectamos cada botón a su parámetro correspondiente en el procesador
+    posSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPRAY_POS", posSprayKnob);
+    pitchSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPRAY_PITCH", pitchSprayKnob);
+    panSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPRAY_PAN", panSprayKnob);
 }
 
 void SprayModule::resized()
 {
+    // Quitamos 10 píxeles de margen para que los botones no peguen con el borde
     auto area = getLocalBounds().reduced(10);
-    auto widthUnit = area.getWidth() / 3; // Dividimos el pastel en 3
 
-    // El primer tercio es para el Spray de Posición
-    sprayPosKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
+    // Dividimos el ancho total en 3 columnas iguales
+    int widthUnit = area.getWidth() / 3;
 
-    // Los otros dos tercios quedan vacíos por ahora (para Pitch y Pan en el futuro)
+    // Repartimos los botones de izquierda a derecha
+    posSprayKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));   // Columna 1: Position
+    pitchSprayKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5)); // Columna 2: Pitch
+    panSprayKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));   // Columna 3: Pan
 }

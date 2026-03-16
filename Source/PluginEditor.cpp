@@ -29,12 +29,14 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     // (para que sepa cuándo tiene que mover la línea blanca)
     audioProcessor.apvts.addParameterListener("POSITION", this);
     audioProcessor.apvts.addParameterListener("GRAIN_SIZE", this);
+    audioProcessor.apvts.addParameterListener("SHAPE", this);
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 {
     audioProcessor.apvts.removeParameterListener("POSITION", this);
     audioProcessor.apvts.removeParameterListener("GRAIN_SIZE", this);
+    audioProcessor.apvts.removeParameterListener("SHAPE", this);
     thumbnail.removeChangeListener(this);
 }
 
@@ -61,48 +63,69 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
     if (thumbnail.getNumChannels() > 0)
     {
-        // --- CÁLCULOS DE TIEMPO VISIBLE ---
         double totalAudioSeconds = thumbnail.getTotalLength();
         double visibleSeconds = totalAudioSeconds / zoomFactor;
         double startTime = viewStartRatio * totalAudioSeconds;
         double endTime = startTime + visibleSeconds;
 
         g.setColour(juce::Colours::cyan);
-        // ¡La magia de JUCE! Le pasamos startTime y endTime y él solo recorta la onda
         thumbnail.drawChannel(g, layer1Area.reduced(2), startTime, endTime, 0, 1.0f);
 
-        // --- DIBUJAR CURSOR Y GRANO ---
+        // --- DIBUJAR CURSOR Y FORMA DEL GRANO ---
         auto positionParam = audioProcessor.apvts.getRawParameterValue("POSITION");
         auto grainSizeParam = audioProcessor.apvts.getRawParameterValue("GRAIN_SIZE");
+        auto shapeParamVal = audioProcessor.apvts.getRawParameterValue("SHAPE");
 
-        if (positionParam != nullptr && grainSizeParam != nullptr)
+        if (positionParam != nullptr && grainSizeParam != nullptr && shapeParamVal != nullptr)
         {
             float currentPosition = positionParam->load();
-            float sizeRatio = grainSizeParam->load(); // ¡Ahora es un ratio!
+            float sizeRatio = grainSizeParam->load();
+            float shapeValue = shapeParamVal->load(); // Leemos el Shape actual
 
             double cursorTimeSeconds = currentPosition * totalAudioSeconds;
-
-            // Calculamos los segundos reales del grano para el dibujo
             float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * (float)totalAudioSeconds);
-
             float cursorX = layer1Area.getX() + ((cursorTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
 
-            // El ancho en píxeles depende del Zoom y del tamaño real del grano
             float grainWidthPixels = (grainSizeSeconds / visibleSeconds) * layer1Area.getWidth();
-            grainWidthPixels = juce::jmax(3.0f, grainWidthPixels); // Mínimo 3 píxeles de ancho (la línea blanca)
+            grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
 
-            // Dibujamos la ventana de Hann azul
+            // Definimos el contenedor del grano
             juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f),
                 layer1Area.getY(),
                 grainWidthPixels,
                 layer1Area.getHeight());
 
-            g.setColour(juce::Colours::cyan.withAlpha(0.3f));
-            g.fillRect(grainWindow);
+            // --- AQUÍ EMPIEZA EL DIBUJO DINÁMICO DEL SHAPE ---
+            juce::Path grainPath;
+            grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
 
-            // Dibujamos la línea central
+            for (float x = 0; x <= grainWindow.getWidth(); x += 1.0f)
+            {
+                float progress = x / grainWindow.getWidth();
+
+                // Hann (Campana)
+                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                // Square (Trapecio con mini-fade de 5% para que no sea un bloque puro)
+                float square = (progress < 0.05f) ? progress / 0.05f : (progress > 0.95f ? (1.0f - progress) / 0.05f : 1.0f);
+
+                float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
+                float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
+
+                grainPath.lineTo(grainWindow.getX() + x, yPos);
+            }
+
+            grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
+            grainPath.closeSubPath();
+
+            g.setColour(juce::Colours::cyan.withAlpha(0.3f));
+            g.fillPath(grainPath);
+            g.setColour(juce::Colours::cyan.withAlpha(0.8f));
+            g.strokePath(grainPath, juce::PathStrokeType(1.5f));
+            // --------------------------------------------------
+
+            // Dibujamos la línea central blanca
             g.setColour(juce::Colours::white.withAlpha(0.9f));
-            g.drawLine(cursorX, layer1Area.getY(), cursorX, layer1Area.getBottom(), 3.0f);
+            g.drawLine(cursorX, layer1Area.getY(), cursorX, layer1Area.getBottom(), 2.0f);
         }
     }
     else
