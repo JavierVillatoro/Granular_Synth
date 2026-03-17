@@ -22,12 +22,15 @@ public:
     void resized() override;
 
 private:
-    // ¡Nos traemos el knob de Posición aquí!
-    juce::Slider positionKnob;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
+    // --- LOS 3 BOTONES ---
+    juce::Slider posKnob;
+    juce::Slider speedKnob;
+    juce::Slider dirKnob;
 
-    juce::Slider scanSpeedKnob;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> scanSpeedAttachment;
+    // --- LOS 3 CABLES --- (Nombres corregidos para que coincidan con tu .cpp)
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> posAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dirAttach;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ScanModule)
 };

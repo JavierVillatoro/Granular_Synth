@@ -10,50 +10,47 @@
 
 #include "ScanModule.h"
 
-// 1. CONSTRUCTOR: Configuramos el knob y lo conectamos al cerebro
+// 1. CONSTRUCTOR: Configuramos los knobs y los conectamos al cerebro
 ScanModule::ScanModule(juce::AudioProcessorValueTreeState& apvts)
 {
-    positionKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    //positionKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    positionKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    addAndMakeVisible(positionKnob);
+    // Función rápida para configurar el estilo visual de los knobs y no repetir código
+    auto setupKnob = [this](juce::Slider& k) {
+        k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+        k.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        addAndMakeVisible(k);
+        };
 
-    // Conectamos el cable
-    positionAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "POSITION", positionKnob);
+    setupKnob(posKnob);
+    setupKnob(speedKnob);
+    setupKnob(dirKnob);
 
-    scanSpeedKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    //scanSpeedKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
-    scanSpeedKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    addAndMakeVisible(scanSpeedKnob);
-
-    scanSpeedAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SCAN_SPEED", scanSpeedKnob);
+    // Conectamos a los parámetros del Processor usando los nombres correctos
+    posAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "POSITION", posKnob);
+    speedAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SCAN_SPEED", speedKnob);
+    dirAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SCAN_MODE", dirKnob);
 }
 
+// 2. DESTRUCTOR (Se queda como lo tenías)
 ScanModule::~ScanModule() {}
 
-// 2. DIBUJO DE FONDO: Le ponemos un borde sutil para ver dónde está nuestro módulo
+// 3. DIBUJO DE FONDO: Le ponemos un borde sutil para ver dónde está nuestro módulo
 void ScanModule::paint(juce::Graphics& g)
 {
     g.setColour(juce::Colours::white.withAlpha(0.1f));
     g.drawRect(getLocalBounds(), 1); // Dibuja un cuadrado alrededor del módulo
 }
 
-// 3. COLOCACIÓN: Ponemos el knob en el centro de este módulo
+// 4. POSICIONAMIENTO DE LOS BOTONES
 void ScanModule::resized()
 {
-    // 1. Tomamos el área total con un margen de 10 píxeles
+    // Margen global de 10 píxeles para que los knobs respiren
     auto area = getLocalBounds().reduced(10);
 
-    // 2. Calculamos cuánto mide exactamente un tercio del ancho total
-    auto widthUnit = area.getWidth() / 3;
+    // Dividimos el ancho total en 3 columnas iguales
+    int widthUnit = area.getWidth() / 3;
 
-    // 3. Cortamos el primer tercio desde la izquierda para POSITION
-    positionKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
-
-    // 4. Cortamos el segundo tercio (el central) para SCAN SPEED
-    scanSpeedKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
-
-    // 5. El área que queda en la variable 'area' es el tercio de la derecha.
-    // Como no llamamos a setBounds para ningún knob con lo que queda,
-    // ese espacio se queda vacío y reservado para el futuro knob de "Direction".
+    // Repartimos los 3 knobs de izquierda a derecha.
+    posKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));   // Columna 1: Position
+    speedKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5)); // Columna 2: Speed
+    dirKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));   // Columna 3: Direction (Modos)
 }

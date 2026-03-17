@@ -220,6 +220,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SPRAY_PITCH", "Pitch Spray", juce::NormalisableRange<float>(0.0f, 12.0f, 0.01f), 0.0f));
 
+    // SCAN MODE (Dir): 0 = Forward, 1 = Reverse, 2 = Ping-Pong
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "SCAN_MODE", "Scan Mode", juce::NormalisableRange<float>(0.0f, 2.0f, 1.0f), 0.0f));
+
     return { params.begin(), params.end() };
 }
 
