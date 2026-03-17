@@ -11,6 +11,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include <array>
+#include <atomic>
 
 // ==============================================================================
 // 1. LA CLASE SOUND
@@ -28,6 +29,9 @@ class GranularVoice : public juce::SynthesiserVoice
 public:
     // ¡NUEVO CONSTRUCTOR! Recibe el audio y los parámetros
     GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
+
+    std::atomic<float> visualGrainPos[128];
+    std::atomic<float> visualGrainEnv[128];
 
     bool canPlaySound(juce::SynthesiserSound* sound) override;
     void startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* sound, int currentPitchWheelPosition) override;

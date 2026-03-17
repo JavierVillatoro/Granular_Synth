@@ -20,7 +20,8 @@
 class Granular_SynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
                                             public juce::FileDragAndDropTarget,
                                             public juce::ChangeListener,
-                                            public juce::AudioProcessorValueTreeState::Listener
+                                            public juce::AudioProcessorValueTreeState::Listener,
+                                            public juce::Timer
 {
 public:
     Granular_SynthAudioProcessorEditor (Granular_SynthAudioProcessor&);
@@ -29,6 +30,8 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    void timerCallback() override;
 
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;

@@ -29,6 +29,11 @@ void GranularVoice::stopNote(float velocity, bool allowTailOff)
 {
     // Por ahora, el sonido se corta de golpe (más adelante le pondremos la 'R' de ADSR)
     isPlaying = false;
+
+    // Al soltar la tecla, limpiamos la pizarra visual inmediatamente
+    for (int i = 0; i < 128; ++i) {
+        visualGrainEnv[i].store(0.0f);
+    }
     clearCurrentNote();
 }
 
@@ -41,13 +46,13 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
     currentVelocity = velocity;
     pitchRatio = std::pow(2.0, (midiNoteNumber - 60) / 12.0);
 
-    // 1. Apagamos a todos los soldados para empezar en limpio
-    for (auto& grain : grains) {
-        grain.isActive = false;
+    // Reiniciamos a los soldados lógicos Y visuales para empezar en limpio
+    for (int i = 0; i < 128; ++i) {
+        grains[i].isActive = false;
+        visualGrainEnv[i].store(0.0f); // Apaga los fantasmas
     }
 
-    // 2. Reiniciamos temporizadores
-    samplesUntilNextGrain = 0.0; // Que dispare un grano inmediatamente
+    samplesUntilNextGrain = 0.0;
     autoScanOffset = 0.0;
 }
 
@@ -135,6 +140,8 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         float totalR = 0.0f;
         int activeCount = 0;
 
+        int grainIndex = 0; // Empezamos a contar los granos
+
         for (auto& grain : grains)
         {
             if (grain.isActive)
@@ -149,6 +156,16 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 // Posición de lectura con pitch global y pitch aleatorio
                 int readPos = grain.startSample + (int)(grain.currentPosition * pitchRatio * grain.pitchRandomRatio);
 
+                // Si readPos se pasa del límite, evitamos que pinte fuera de la pantalla
+                int safeReadPos = juce::jlimit(0, audioBuffer->getNumSamples() - 1, readPos);
+
+                // Calculamos su posición de 0.0 a 1.0 a lo largo del audio
+                float normalizedPos = (float)safeReadPos / (float)audioBuffer->getNumSamples();
+
+                // Guardamos en la pizarra atómica
+                visualGrainPos[grainIndex].store(normalizedPos);
+                visualGrainEnv[grainIndex].store(window); // Usamos la envolvente para la opacidad/altura
+
                 if (readPos >= 0 && readPos < audioBuffer->getNumSamples())
                 {
                     float sample = audioBuffer->getReadPointer(0)[readPos] * window;
@@ -159,6 +176,13 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 grain.currentPosition += 1.0;
                 if (grain.currentPosition >= grainLength) grain.isActive = false;
             }
+            else
+            {
+                // ¡VITAL! Si el grano está muerto, le decimos a la pantalla que lo apague
+                visualGrainEnv[grainIndex].store(0.0f);
+            }
+
+            grainIndex++; // ¡VITAL! Pasamos al siguiente soldado en la lista
         }
 
         // --- 4. SALIDA ---

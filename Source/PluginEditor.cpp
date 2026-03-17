@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "GranularVoice.h"
 
 //==============================================================================
 Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_SynthAudioProcessor& p)
@@ -30,6 +31,8 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("POSITION", this);
     audioProcessor.apvts.addParameterListener("GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("SHAPE", this);
+
+    startTimerHz(30);
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
@@ -127,6 +130,46 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.setColour(juce::Colours::white.withAlpha(0.9f));
             g.drawLine(cursorX, layer1Area.getY(), cursorX, layer1Area.getBottom(), 2.0f);
         }
+
+        // ==========================================================
+        // --- MAGIA VISUAL DE LOS GRANOS ANIMADOS ---
+        // ==========================================================
+        auto& synth = audioProcessor.getSynthesiser();
+
+        // Recorremos todas las voces (por si tocas acordes)
+        for (int i = 0; i < synth.getNumVoices(); ++i)
+        {
+            if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i)))
+            {
+                for (int g_idx = 0; g_idx < 128; ++g_idx)
+                {
+                    float env = voice->visualGrainEnv[g_idx].load();
+
+                    if (env > 0.001f)
+                    {
+                        float pos = voice->visualGrainPos[g_idx].load();
+
+                        // Calculamos el tiempo exacto del grano para aplicar el Zoom y Scroll actual
+                        double grainTimeSeconds = pos * totalAudioSeconds;
+                        float xPixel = layer1Area.getX() + ((grainTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
+
+                        // Solo lo dibujamos si cae dentro de la pantalla visible
+                        if (xPixel >= layer1Area.getX() && xPixel <= layer1Area.getRight())
+                        {
+                            float maxLineHeight = layer1Area.getHeight() * 0.8f;
+                            float currentHeight = maxLineHeight * env;
+
+                            float yCenter = layer1Area.getCentreY();
+                            float yStart = yCenter - (currentHeight / 2.0f);
+
+                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
+                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
+                        }
+                    }
+                }
+            }
+        }
+        // ==========================================================
     }
     else
     {
@@ -173,22 +216,17 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     {
         for (int col = 0; col < numColumns; ++col)
         {
-            // Creamos el rectángulo del módulo
             juce::Rectangle<int> moduleRect(bottomModulesArea.getX() + (col * moduleWidth),
                 bottomModulesArea.getY() + (row * moduleHeight),
                 moduleWidth, moduleHeight);
 
-            // Dibujamos el borde cyan sutil
             g.setColour(juce::Colours::cyan.withAlpha(0.2f));
             g.drawRect(moduleRect, 1);
 
-            // --- TÍTULO DEL MÓDULO (Arriba) ---
             g.setColour(juce::Colours::white.withAlpha(0.7f));
             g.setFont(juce::Font(16.0f, juce::Font::bold));
-            // removeFromTop nos devuelve el trozo de arriba y "encoge" el resto del rectángulo
             g.drawText(moduleNames[modIndex], moduleRect.removeFromTop(30), juce::Justification::centred);
 
-            // --- ETIQUETAS DE LOS KNOBS (Abajo) ---
             auto labelArea = moduleRect.removeFromBottom(25);
             int numKnobs = knobNames[modIndex].size();
             int labelWidth = labelArea.getWidth() / numKnobs;
@@ -351,5 +389,11 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
 {
     // Al arrastrar, llamamos exactamente a la misma lógica que al hacer clic
     mouseDown(event);
+}
+
+void Granular_SynthAudioProcessorEditor::timerCallback()
+{
+    // Esto le dice a JUCE: "Oye, borra la pantalla y vuelve a llamar a paint()"
+    repaint();
 }
 
