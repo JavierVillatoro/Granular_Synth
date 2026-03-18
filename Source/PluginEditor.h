@@ -14,6 +14,7 @@
 #include "EngineModule.h"
 #include "SprayModule.h"
 #include "PitchModule.h"
+#include "FilterModule.h"
 
 //==============================================================================
 /**
@@ -70,6 +71,7 @@ private:
     ScanModule scanModule{ audioProcessor.apvts };
     SprayModule sprayModule{ audioProcessor.apvts };
     PitchModule pitchModule{ audioProcessor.apvts };
+    FilterModule filterModule{ audioProcessor.apvts };
 
     // --- VARIABLES DE ZOOM Y NAVEGACIÓN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10

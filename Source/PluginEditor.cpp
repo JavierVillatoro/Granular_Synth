@@ -26,6 +26,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(engineModule);
     addAndMakeVisible(sprayModule);
     addAndMakeVisible(pitchModule);
+    addAndMakeVisible(filterModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -201,7 +202,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         juce::StringArray {"Trans", "Fine", "Scale"},      // Pitch
         juce::StringArray {"Rate", "Depth", "Wave"},       // LFO
         juce::StringArray {"A", "D", "S", "R"},            // Envelope
-        juce::StringArray {"Freq", "Res", "Type"},         // Filter
+        juce::StringArray {"LPF", "Res", "HPF"},           // Filter
         juce::StringArray {"Size", "Fback", "Mix"}         // Space
     };
 
@@ -254,11 +255,11 @@ void Granular_SynthAudioProcessorEditor::resized()
     int moduleWidth = bottomModulesArea.getWidth() / 4;
     int moduleHeight = bottomModulesArea.getHeight() / 2;
 
-    // Calculamos el rectángulo de la Casilla 1 (Fila 0, Columna 0)
+    // Casilla 1 (Fila 0, Columna 0)
     juce::Rectangle<int> module1Rect(bottomModulesArea.getX(), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     engineModule.setBounds(module1Rect);
 
-    // Calculamos el cuadrado exacto del Módulo 2 (Fila 0, Columna 1)
+    // Módulo 2 (Fila 0, Columna 1)
     juce::Rectangle<int> module2Rect(bottomModulesArea.getX() + moduleWidth,
         bottomModulesArea.getY(),
         moduleWidth,
@@ -268,13 +269,20 @@ void Granular_SynthAudioProcessorEditor::resized()
     juce::Rectangle<int> module3Rect(bottomModulesArea.getX() + (moduleWidth * 2), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     sprayModule.setBounds(module3Rect);
 
-    // Colocamos nuestra rueda de Posición en el centro de ese módulo, con un poco de margen (reduced)
+    
     //positionKnob.setBounds(module2Rect.reduced(20));
     scanModule.setBounds(module2Rect);
     
-    //PITCH (Fila 0, Columna 3) ---
+    // PITCH (Fila 0, Columna 3) ---
     juce::Rectangle<int> module4Rect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     pitchModule.setBounds(module4Rect);
+
+    // FILTER (Fila 1, Columna 2)
+    juce::Rectangle<int> filterRect(bottomModulesArea.getX() + (moduleWidth * 2),
+        bottomModulesArea.getY() + moduleHeight, // + moduleHeight nos baja a la segunda fila
+        moduleWidth,
+        moduleHeight);
+    filterModule.setBounds(filterRect);
 }
 
 // ==============================================================================

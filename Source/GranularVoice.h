@@ -71,4 +71,8 @@ private:
     // Aquí guardamos las llaves para usarlas luego en la cocina
     juce::AudioBuffer<float>* audioBuffer;
     juce::AudioProcessorValueTreeState* apvts;
+
+    // FILTROS ANALÓGICOS ESTÉREO
+    juce::dsp::StateVariableTPTFilter<float> lpf[2]; // 0 = L, 1 = R
+    juce::dsp::StateVariableTPTFilter<float> hpf[2]; // 0 = L, 1 = R
 };

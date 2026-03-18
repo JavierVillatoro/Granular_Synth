@@ -237,6 +237,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "PITCH_SCALE", "Scale Mode", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
 
+    // --- FILTER MODULE ---
+    // LPF Freq: Empieza abierto del todo (20000 Hz) para dejar pasar el sonido
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "FILTER_LPF", "LPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f));
+
+    // 
+   // params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        //"FILTER_RES", "Resonance", juce::NormalisableRange<float>(0.1f, 5.0f, 0.01f), 0.707f));
+
+    // Resonance: De 0.707 (Plano/Neutro) a 2.5 (Pico)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "FILTER_RES", "Resonance", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
+
+    // HPF Freq: Empieza cerrado abajo (20 Hz) para no cortar los graves al principio
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
+
     return { params.begin(), params.end() };
 }
 

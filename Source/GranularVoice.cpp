@@ -46,7 +46,7 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
     currentVelocity = velocity;
     pitchRatio = std::pow(2.0, (midiNoteNumber - 60) / 12.0);
 
-    // Reiniciamos a los soldados lógicos Y visuales para empezar en limpio
+    // Reset grains
     for (int i = 0; i < 128; ++i) {
         grains[i].isActive = false;
         visualGrainEnv[i].store(0.0f); // Apaga los fantasmas
@@ -54,6 +54,26 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
 
     samplesUntilNextGrain = 0.0;
     autoScanOffset = 0.0;
+
+
+    // Reset Filter
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = getSampleRate();
+    spec.maximumBlockSize = 1; // Procesamos muestra a muestra
+    spec.numChannels = 1;      // Un filtro por canal
+
+    for (int i = 0; i < 2; ++i)
+    {
+        // Low Pass
+        lpf[i].prepare(spec);
+        lpf[i].setType(juce::dsp::StateVariableTPTFilterType::lowpass);
+        lpf[i].reset();
+
+        // High Pass
+        hpf[i].prepare(spec);
+        hpf[i].setType(juce::dsp::StateVariableTPTFilterType::highpass);
+        hpf[i].reset();
+    }
 }
 
 // --------------------------------------------------------------------------
@@ -62,7 +82,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 {
     if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
 
-    // --- 1. LEER PARÁMETROS (¡Aquí arriba, una sola vez por bloque!) ---
+    //  LEER PARÁMETROS
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
@@ -72,13 +92,23 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float sprayPan = apvts->getRawParameterValue("SPRAY_PAN")->load();
     float sprayPitch = apvts->getRawParameterValue("SPRAY_PITCH")->load();
     float scanMode = apvts->getRawParameterValue("SCAN_MODE")->load();
+    float filterLpfFreq = apvts->getRawParameterValue("FILTER_LPF")->load();
+    float filterRes = apvts->getRawParameterValue("FILTER_RES")->load();
+    float filterHpfFreq = apvts->getRawParameterValue("FILTER_HPF")->load();
 
-    // LEEMOS LOS NUEVOS KNOBS DE PITCH
+    for (int i = 0; i < 2; ++i) {
+        lpf[i].setCutoffFrequency(filterLpfFreq);
+        lpf[i].setResonance(filterRes);
+        hpf[i].setCutoffFrequency(filterHpfFreq);
+        hpf[i].setResonance(filterRes);
+    }
+
+    // LEEr KNOBS DE PITCH
     float pitchTrans = apvts->getRawParameterValue("PITCH_TRANS")->load();
     float pitchFine = apvts->getRawParameterValue("PITCH_FINE")->load();
     float pitchScale = apvts->getRawParameterValue("PITCH_SCALE")->load();
 
-    // Calculamos el tono base general
+    // TONO BASE
     float currentTrans = pitchTrans + pitchFine;
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
@@ -215,13 +245,30 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             grainIndex++;
         }
 
-        // --- 4. SALIDA ---
+        // --- 4. FILTROS Y SALIDA ANALÓGICA ---
+
+        // 1º Ajustamos el volumen general según el número de granos vivos
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
-            totalL = std::tanh(totalL * gainScale);
-            totalR = std::tanh(totalR * gainScale);
+            totalL *= gainScale;
+            totalR *= gainScale;
         }
 
+        // 2º Pasamos el sonido por los FILTROS
+        // Al hacerlo aquí, el filtro actúa sobre el sonido dinámico puro
+        totalL = hpf[0].processSample(0, totalL);
+        totalR = hpf[1].processSample(0, totalR);
+
+        totalL = lpf[0].processSample(0, totalL);
+        totalR = lpf[1].processSample(0, totalR);
+
+        // 3º AHORA SÍ: Aplicamos la saturación/limitador analógico (std::tanh)
+        // Esto "abraza" cualquier pico de resonancia del filtro y lo convierte en 
+        // calidez de cinta, asegurando que el volumen nunca se descontrole.
+        totalL = std::tanh(totalL);
+        totalR = std::tanh(totalR);
+
+        // 4º Enviamos al altavoz multiplicando por la fuerza con la que pulsaste la tecla (Velocity)
         outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);
         outputBuffer.addSample(1, startSample + s, totalR * currentVelocity);
     }
