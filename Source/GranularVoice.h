@@ -52,6 +52,7 @@ private:
         float pitchRandomRatio = 1.0f;// SPRAY_PITCH
         float panL = 1.0f; 
         float panR = 1.0f;
+        float activePitchRatio = 1.0f;
     };
 
     // --- EL EJÉRCITO ---

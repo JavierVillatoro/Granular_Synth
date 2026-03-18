@@ -224,6 +224,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SCAN_MODE", "Scan Mode", juce::NormalisableRange<float>(0.0f, 2.0f, 1.0f), 0.0f));
 
+    // --- PITCH MODULE ---
+    // Transpose: de -24 a +24 semitonos (usamos pasos de 1 para que sean notas exactas)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "PITCH_TRANS", "Transpose", juce::NormalisableRange<float>(-24.0f, 24.0f, 1.0f), 0.0f));
+
+    // Fine: de -1.0 a +1.0 (representa -100 a +100 cents)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "PITCH_FINE", "Fine Tune", juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));
+
+    // Scale: Modos de cuantización (0 = Libre, 1 = Octavas, 2 = Quintas, 3 = Pentatónica)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "PITCH_SCALE", "Scale Mode", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
+
     return { params.begin(), params.end() };
 }
 

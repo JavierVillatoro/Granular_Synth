@@ -25,6 +25,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(scanModule);
     addAndMakeVisible(engineModule);
     addAndMakeVisible(sprayModule);
+    addAndMakeVisible(pitchModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -270,6 +271,10 @@ void Granular_SynthAudioProcessorEditor::resized()
     // Colocamos nuestra rueda de Posición en el centro de ese módulo, con un poco de margen (reduced)
     //positionKnob.setBounds(module2Rect.reduced(20));
     scanModule.setBounds(module2Rect);
+    
+    //PITCH (Fila 0, Columna 3) ---
+    juce::Rectangle<int> module4Rect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY(), moduleWidth, moduleHeight);
+    pitchModule.setBounds(module4Rect);
 }
 
 // ==============================================================================

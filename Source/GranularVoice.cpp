@@ -62,7 +62,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 {
     if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
 
-    // --- 1. LEER PARÁMETROS ---
+    // --- 1. LEER PARÁMETROS (¡Aquí arriba, una sola vez por bloque!) ---
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
@@ -71,7 +71,16 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float shapeParam = apvts->getRawParameterValue("SHAPE")->load();
     float sprayPan = apvts->getRawParameterValue("SPRAY_PAN")->load();
     float sprayPitch = apvts->getRawParameterValue("SPRAY_PITCH")->load();
-    float scanMode = apvts->getRawParameterValue("SCAN_MODE")->load(); // <--- NUEVO MODO DE ESCANEO
+    float scanMode = apvts->getRawParameterValue("SCAN_MODE")->load();
+
+    // LEEMOS LOS NUEVOS KNOBS DE PITCH
+    float pitchTrans = apvts->getRawParameterValue("PITCH_TRANS")->load();
+    float pitchFine = apvts->getRawParameterValue("PITCH_FINE")->load();
+    float pitchScale = apvts->getRawParameterValue("PITCH_SCALE")->load();
+
+    // Calculamos el tono base general
+    float currentTrans = pitchTrans + pitchFine;
+    float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
     float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
     float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * totalAudioSeconds);
@@ -80,26 +89,17 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     for (int s = 0; s < numSamples; ++s)
     {
-        // --- 1.5 CÁLCULO DE POSICIÓN CON MODOS (FORWARD, REVERSE, PING-PONG) ---
+        // --- 1.5 CÁLCULO DE POSICIÓN CON MODOS ---
         autoScanOffset += (double)scanSpeed / getSampleRate();
         float rawPos = positionKnob + (float)autoScanOffset;
 
-        // Arreglo rápido para que rawPos nunca sea negativo y el fmod funcione perfecto
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;
 
         float currentTargetPos = 0.0f;
 
-        if (scanMode < 0.5f) // MODO 0: FORWARD
-        {
-            currentTargetPos = std::fmod(rawPos, 1.0f);
-        }
-        else if (scanMode < 1.5f) // MODO 1: REVERSE
-        {
-            currentTargetPos = 1.0f - std::fmod(rawPos, 1.0f);
-        }
-        else // MODO 2: PING-PONG
-        {
-            // Usamos una función triángulo para el rebote
+        if (scanMode < 0.5f) currentTargetPos = std::fmod(rawPos, 1.0f);
+        else if (scanMode < 1.5f) currentTargetPos = 1.0f - std::fmod(rawPos, 1.0f);
+        else {
             float triangle = std::abs(std::fmod(rawPos * 2.0f, 2.0f) - 1.0f);
             currentTargetPos = juce::jlimit(0.0f, 1.0f, triangle);
         }
@@ -120,9 +120,44 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
                     grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
 
-                    // Lógica de Pitch Spray
-                    float pitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
-                    grain.pitchRandomRatio = std::pow(2.0f, pitchRand / 12.0f);
+                    // --- LÓGICA DE PITCH SPRAY CON ESCALAS  ---
+                    float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
+                    int scaleModeInt = (int)pitchScale;
+
+                    if (scaleModeInt == 1) // Octavas
+                    {
+                        rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
+                    }
+                    else if (scaleModeInt == 2) // Octavas y Quintas
+                    {
+                        int st = (int)std::round(rawPitchRand);
+                        int oct = (st / 12) * 12;
+                        int rem = std::abs(st % 12);
+
+                        if (rem < 4) rem = 0;
+                        else if (rem < 10) rem = 7;
+                        else { rem = 0; oct += (st < 0 ? -12 : 12); }
+
+                        rawPitchRand = oct + (st < 0 ? -rem : rem);
+                    }
+                    else if (scaleModeInt == 3) // Pentatónica Menor
+                    {
+                        int st = (int)std::round(rawPitchRand);
+                        int oct = (st / 12) * 12;
+                        int rem = std::abs(st % 12);
+                        int q = 0;
+
+                        if (rem <= 1) q = 0;
+                        else if (rem <= 4) q = 3;
+                        else if (rem <= 6) q = 5;
+                        else if (rem <= 8) q = 7;
+                        else q = 10;
+
+                        rawPitchRand = oct + (st < 0 ? -q : q);
+                    }
+
+                    grain.pitchRandomRatio = std::pow(2.0f, rawPitchRand / 12.0f);
+                    grain.activePitchRatio = finalBasePitchRatio * grain.pitchRandomRatio;
 
                     // Spray de Pan (Estéreo)
                     float randomPan = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPan;
@@ -139,8 +174,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         float totalL = 0.0f;
         float totalR = 0.0f;
         int activeCount = 0;
-
-        int grainIndex = 0; // Empezamos a contar los granos
+        int grainIndex = 0;
 
         for (auto& grain : grains)
         {
@@ -153,18 +187,15 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 float square = (progress < 0.02f) ? progress / 0.02f : (progress > 0.98f ? (1.0f - progress) / 0.02f : 1.0f);
                 float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
 
-                // Posición de lectura con pitch global y pitch aleatorio
-                int readPos = grain.startSample + (int)(grain.currentPosition * pitchRatio * grain.pitchRandomRatio);
+                // --- USAMOS EL NUEVO finalBasePitchRatio AQUÍ ---
+                //int readPos = grain.startSample + (int)(grain.currentPosition * finalBasePitchRatio * grain.pitchRandomRatio);
+                int readPos = grain.startSample + (int)(grain.currentPosition * grain.activePitchRatio);
 
-                // Si readPos se pasa del límite, evitamos que pinte fuera de la pantalla
                 int safeReadPos = juce::jlimit(0, audioBuffer->getNumSamples() - 1, readPos);
-
-                // Calculamos su posición de 0.0 a 1.0 a lo largo del audio
                 float normalizedPos = (float)safeReadPos / (float)audioBuffer->getNumSamples();
 
-                // Guardamos en la pizarra atómica
                 visualGrainPos[grainIndex].store(normalizedPos);
-                visualGrainEnv[grainIndex].store(window); // Usamos la envolvente para la opacidad/altura
+                visualGrainEnv[grainIndex].store(window);
 
                 if (readPos >= 0 && readPos < audioBuffer->getNumSamples())
                 {
@@ -178,11 +209,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             }
             else
             {
-                // ¡VITAL! Si el grano está muerto, le decimos a la pantalla que lo apague
                 visualGrainEnv[grainIndex].store(0.0f);
             }
 
-            grainIndex++; // ¡VITAL! Pasamos al siguiente soldado en la lista
+            grainIndex++;
         }
 
         // --- 4. SALIDA ---
