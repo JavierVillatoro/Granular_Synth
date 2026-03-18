@@ -254,6 +254,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
 
+    // --- AMP ENVELOPE (Tiempos en segundos, Sustain de 0 a 1) ---
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_A", "Amp Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_D", "Amp Decay", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_S", "Amp Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_R", "Amp Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
+
+    // --- ENVELOPE 2 (Para la futura Matriz de Modulación) ---
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_A", "Env2 Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_D", "Env2 Decay", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_S", "Env2 Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_R", "Env2 Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
+
     return { params.begin(), params.end() };
 }
 
