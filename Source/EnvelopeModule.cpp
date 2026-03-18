@@ -100,6 +100,7 @@ void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds
     g.fillEllipse(attackX - dotSize / 2, topY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(decayX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(sustainX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
+    g.fillEllipse(releaseX - dotSize / 2, bottomY - dotSize / 2, dotSize, dotSize);
 }
 
 void EnvelopeModule::resized()
