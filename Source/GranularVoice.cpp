@@ -27,14 +27,18 @@ bool GranularVoice::canPlaySound(juce::SynthesiserSound* sound)
 // 4. TECLA SOLTADA (Note Off)
 void GranularVoice::stopNote(float velocity, bool allowTailOff)
 {
-    // Por ahora, el sonido se corta de golpe (más adelante le pondremos la 'R' de ADSR)
-    isPlaying = false;
-
-    // Al soltar la tecla, limpiamos la pizarra visual inmediatamente
-    for (int i = 0; i < 128; ++i) {
-        visualGrainEnv[i].store(0.0f);
+    if (allowTailOff)
+    {
+        // NO cortamos el sonido. Le decimos al ADSR que inicie el Release.
+        ampAdsr.noteOff();
     }
-    clearCurrentNote();
+    else
+    {
+        // Solo cortamos de golpe si el programa anfitrión entra en pánico (Panic Stop)
+        clearCurrentNote();
+        ampAdsr.reset();
+        isPlaying = false;
+    }
 }
 
 void GranularVoice::pitchWheelMoved(int newPitchWheelValue) {}
@@ -74,6 +78,9 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
         hpf[i].setType(juce::dsp::StateVariableTPTFilterType::highpass);
         hpf[i].reset();
     }
+    
+    ampAdsr.setSampleRate(getSampleRate());
+    ampAdsr.noteOn();
 }
 
 // --------------------------------------------------------------------------
@@ -95,6 +102,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float filterLpfFreq = apvts->getRawParameterValue("FILTER_LPF")->load();
     float filterRes = apvts->getRawParameterValue("FILTER_RES")->load();
     float filterHpfFreq = apvts->getRawParameterValue("FILTER_HPF")->load();
+    ampAdsrParams.attack = apvts->getRawParameterValue("AMP_A")->load();
+    ampAdsrParams.decay = apvts->getRawParameterValue("AMP_D")->load();
+    ampAdsrParams.sustain = apvts->getRawParameterValue("AMP_S")->load();
+    ampAdsrParams.release = apvts->getRawParameterValue("AMP_R")->load();
+    ampAdsr.setParameters(ampAdsrParams);
 
     for (int i = 0; i < 2; ++i) {
         lpf[i].setCutoffFrequency(filterLpfFreq);
@@ -268,9 +280,23 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         totalL = std::tanh(totalL);
         totalR = std::tanh(totalR);
 
-        // 4º Enviamos al altavoz multiplicando por la fuerza con la que pulsaste la tecla (Velocity)
-        outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);
-        outputBuffer.addSample(1, startSample + s, totalR * currentVelocity);
+        // ENVOLVENTE ADSR AL VOLUMEN
+        float currentAdsrVolume = ampAdsr.getNextSample();
+        totalL *= currentAdsrVolume;
+        totalR *= currentAdsrVolume;
+
+        outputBuffer.addSample(0, startSample + s, totalL* currentVelocity);
+        outputBuffer.addSample(1, startSample + s, totalR* currentVelocity);
+
+        // Si el ADSR ha llegado a cero (el Release ha terminado), matamos la voz por fin
+        if (!ampAdsr.isActive())
+        {
+            for (int i = 0; i < 128; ++i) {
+                visualGrainEnv[i].store(0.0f);
+            }
+            clearCurrentNote();
+            isPlaying = false;
+        }
     }
 }
 
