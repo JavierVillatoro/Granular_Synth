@@ -30,6 +30,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(filterModule);
     addAndMakeVisible(envelopeModule);
     addAndMakeVisible(spaceModule);
+    addAndMakeVisible(lfoModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -282,6 +283,12 @@ void Granular_SynthAudioProcessorEditor::resized()
     // ==========================================
     // --- FILA 1 (LOS 4 MÓDULOS DE ABAJO) ---
     // ==========================================
+
+    // LFO (Fila 1, Columna 0)
+    juce::Rectangle<int> lfoRect(bottomModulesArea.getX(),
+        bottomModulesArea.getY() + moduleHeight,
+        moduleWidth, moduleHeight);
+    lfoModule.setBounds(lfoRect);
 
     // ENVELOPE (Fila 1, Columna 1)
     juce::Rectangle<int> envRect(bottomModulesArea.getX() + moduleWidth,

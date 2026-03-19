@@ -309,6 +309,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_S", "Env2 Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_R", "Env2 Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
+    // ==============================================================================
+    // --- LFO 1 (GLOBAL ---
+    // ==============================================================================
+
+    // Subdivisiones Musicales (El reloj principal por ahora)
+    juce::StringArray beatDivisions = { "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "LFO1_BEAT", "Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
+
+    // Forma de Onda
+    juce::StringArray waveShapes = { "Sine", "Triangle", "Saw", "Square", "S&H" };
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "LFO1_WAVE", "Waveform", waveShapes, 0)); // El 0 es Sine
+
+    // Amplitude (Depth) - Controla el tamaño de la onda
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "LFO1_DEPTH", "Amp", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+
+    // Jitter - Añade ruido orgánico a la señal
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "LFO1_JITTER", "Jitter", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
     return { params.begin(), params.end() };
 }
 
