@@ -108,6 +108,13 @@ void Granular_SynthAudioProcessor::prepareToPlay (double sampleRate, int samples
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    // Preparamos la Reverb
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
+    masterReverb.prepare(spec);
+
     synth.setCurrentPlaybackSampleRate(sampleRate);
 }
 
@@ -151,6 +158,32 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
     // Él leerá el MIDI, verá qué teclas has pulsado, y le dirá a las Voces que rellenen el buffer de audio.
     synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+
+    // ==========================================================
+    // 2. APLICAMOS LA REVERB GLOBAL (ESTILO IMMERSIVE/SHIMMER)
+    // ==========================================================
+    float size = apvts.getRawParameterValue("SPACE_SIZE")->load();
+    float fback = apvts.getRawParameterValue("SPACE_FBACK")->load();
+    float mix = apvts.getRawParameterValue("SPACE_MIX")->load();
+
+    // Configuramos los parámetros para un sonido "Lush" y abierto
+    reverbParams.roomSize = size;
+    // Invertimos fback: Si está a tope (1.0), el damping es 0 (brillante e infinito)
+    reverbParams.damping = 1.0f - fback;
+    reverbParams.width = 1.0f; // Estéreo abierto al máximo (inmersión total)
+    reverbParams.freezeMode = 0.0f;
+
+    // EL TRUCO DE POTENCIA CONSTANTE (Para evitar subidas de volumen extrañas)
+    // Usamos seno y coseno para cruzar el volumen seco y mojado de forma perfecta
+    reverbParams.dryLevel = std::cos(mix * juce::MathConstants<float>::halfPi);
+    reverbParams.wetLevel = std::sin(mix * juce::MathConstants<float>::halfPi);
+
+    masterReverb.setParameters(reverbParams);
+
+    // Pasamos el audio del buffer por el motor de Reverb
+    juce::dsp::AudioBlock<float> audioBlock(buffer);
+    juce::dsp::ProcessContextReplacing<float> context(audioBlock);
+    masterReverb.process(context);
 }
 
 //==============================================================================
@@ -253,6 +286,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // HPF Freq: Empieza cerrado abajo (20 Hz) para no cortar los graves al principio
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
+
+    // --- SPACE MODULE (REVERB) ---
+    // Size: Tamaño de la sala (0.0 = armario, 1.0 = catedral infinita)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+
+    // Fback (Damping/Absorción): Define si la cola es oscura y cálida (0.0) o brillante y metálica (1.0)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_FBACK", "Feedback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+
+    // Mix: 0.0 = 100% Seco, 1.0 = 100% Mojado
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_MIX", "Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
 
     // --- AMP ENVELOPE (Tiempos en segundos, Sustain de 0 a 1) ---
     params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_A", "Amp Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));

@@ -16,6 +16,7 @@
 #include "PitchModule.h"
 #include "FilterModule.h"
 #include "EnvelopeModule.h"
+#include "SpaceModule.h"
 
 //==============================================================================
 /**
@@ -74,6 +75,7 @@ private:
     PitchModule pitchModule{ audioProcessor.apvts };
     FilterModule filterModule{ audioProcessor.apvts };
     EnvelopeModule envelopeModule{ audioProcessor.apvts };
+    SpaceModule spaceModule{ audioProcessor.apvts };
 
     // --- VARIABLES DE ZOOM Y NAVEGACIÓN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10

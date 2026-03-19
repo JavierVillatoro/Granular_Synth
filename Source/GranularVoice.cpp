@@ -132,7 +132,8 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     for (int s = 0; s < numSamples; ++s)
     {
         // --- 1.5 CÁLCULO DE POSICIÓN CON MODOS ---
-        autoScanOffset += (double)scanSpeed / getSampleRate();
+        //autoScanOffset += (double)scanSpeed / getSampleRate();
+        autoScanOffset += (double)scanSpeed / (getSampleRate() * totalAudioSeconds);
         float rawPos = positionKnob + (float)autoScanOffset;
 
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;

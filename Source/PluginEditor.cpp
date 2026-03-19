@@ -29,6 +29,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(pitchModule);
     addAndMakeVisible(filterModule);
     addAndMakeVisible(envelopeModule);
+    addAndMakeVisible(spaceModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -189,10 +190,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     }
 
     // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES (Derecha)
-    g.setColour(juce::Colours::darkgrey);
+    //g.setColour(juce::Colours::darkgrey);
+    g.setColour(juce::Colour(0xff121212));
     g.fillRect(rightMixerArea);
     g.setColour(juce::Colours::white.withAlpha(0.8f));
-    g.drawText("ADSR & LAYER MIXER", rightMixerArea, juce::Justification::centred, false);
+    g.drawText("MATRIX MOD & LAYER MIXER", rightMixerArea, juce::Justification::centred, false);
 
     // ==============================================================================
     // 5. NUEVO: DIBUJAMOS LOS 8 MÓDULOS CON NOMBRES Y ETIQUETAS
@@ -292,6 +294,12 @@ void Granular_SynthAudioProcessorEditor::resized()
         bottomModulesArea.getY() + moduleHeight,
         moduleWidth, moduleHeight);
     filterModule.setBounds(filterRect);
+
+    // SPACE (Fila 1, Columna 3)  
+    juce::Rectangle<int> spaceRect(bottomModulesArea.getX() + (moduleWidth * 3),
+        bottomModulesArea.getY() + moduleHeight,
+        moduleWidth, moduleHeight);
+    spaceModule.setBounds(spaceRect);
 }
 
 // ==============================================================================
