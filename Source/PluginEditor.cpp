@@ -205,7 +205,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         juce::StringArray {"Pos", "Speed", "Dir"},         // Scan
         juce::StringArray {"Pos", "Pitch", "Pan"},         // Spray
         juce::StringArray {"Trans", "Fine", "Scale"},      // Pitch
-        juce::StringArray {"Rate", "Depth", "Wave"},       // LFO
+        juce::StringArray {"", "", ""},                    // LFO
         juce::StringArray {"", "", "", ""},                // Envelope
         juce::StringArray {"LPF", "Res", "HPF"},           // Filter
         juce::StringArray {"Size", "Fback", "Mix"}         // Space
