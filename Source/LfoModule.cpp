@@ -247,11 +247,38 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
         };
 
     // Trazamos las líneas
-    for (size_t i = 0; i < lfoNodes.size(); ++i)
+    //for (size_t i = 0; i < lfoNodes.size(); ++i)
+    //{
+        //auto pos = getPixelPos(lfoNodes[i]);
+        //if (i == 0) lfoPath.startNewSubPath(pos);
+        //else lfoPath.lineTo(pos); // (Más adelante cambiaremos esto por curvas Bézier)
+    //}
+
+    // Trazamos las líneas (¡AHORA CON CURVAS!)
+    for (size_t i = 0; i < lfoNodes.size() - 1; ++i)
     {
-        auto pos = getPixelPos(lfoNodes[i]);
-        if (i == 0) lfoPath.startNewSubPath(pos);
-        else lfoPath.lineTo(pos); // (Más adelante cambiaremos esto por curvas Bézier)
+        auto nodeA = lfoNodes[i];
+        auto nodeB = lfoNodes[i + 1];
+
+        if (i == 0) lfoPath.startNewSubPath(getPixelPos(nodeA));
+
+        // Si la curva está a 0, trazamos una línea recta directa
+        if (std::abs(nodeA.curve) < 0.01f) {
+            lfoPath.lineTo(getPixelPos(nodeB));
+        }
+        else {
+            // Magia: Dibujamos la curva dividiéndola en 20 micro-segmentos
+            int numSegments = 20;
+            float power = std::exp(nodeA.curve * 3.0f); // Tensión Exponencial
+
+            for (int s = 1; s <= numSegments; ++s) {
+                float t = (float)s / (float)numSegments;
+                float warpedT = std::pow(t, power);
+                float interpX = nodeA.x + (nodeB.x - nodeA.x) * t;
+                float interpY = nodeA.y + (nodeB.y - nodeA.y) * warpedT;
+                lfoPath.lineTo(getPixelPos({ interpX, interpY, 0.0f }));
+            }
+        }
     }
 
     // Relleno semitransparente (estilo Serum)
@@ -276,7 +303,109 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
     }
 }
 
-// Funciones vacías del ratón (Por ahora, para que el compilador no se queje)
-void LfoModule::mouseDown(const juce::MouseEvent& event) {}
-void LfoModule::mouseDrag(const juce::MouseEvent& event) {}
-void LfoModule::mouseDoubleClick(const juce::MouseEvent& event) {}
+// RATON
+void LfoModule::mouseDown(const juce::MouseEvent& event)
+{
+    // CÁLCULO EXACTO DEL LIENZO (Igual que en el Paint)
+    auto areaInt = lfo2Area;
+    areaInt.removeFromTop(20);
+    auto canvasArea = areaInt.reduced(10).toFloat();
+
+    draggedNode = -1;
+    draggedCurve = -1;
+
+    // 1. Comprobamos si hemos agarrado un NODO (Punto blanco)
+    for (int i = 0; i < lfoNodes.size(); ++i) {
+        juce::Point<float> nodePos(canvasArea.getX() + lfoNodes[i].x * canvasArea.getWidth(),
+            canvasArea.getBottom() - lfoNodes[i].y * canvasArea.getHeight());
+
+        if (event.position.getDistanceFrom(nodePos) < 15.0f) { // Imán de 15 píxeles
+            draggedNode = i;
+            return; // ¡Agarrado! Salimos de la función
+        }
+    }
+
+    // 2. Si no agarramos un nodo, comprobamos si estamos agarrando una CURVA (Línea)
+    if (canvasArea.contains(event.position) || lfo2Area.toFloat().contains(event.position)) {
+        float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
+
+        // Buscamos entre qué dos puntos ha caído el ratón
+        for (int i = 0; i < lfoNodes.size() - 1; ++i) {
+            if (normX >= lfoNodes[i].x && normX <= lfoNodes[i + 1].x) {
+                draggedCurve = i;
+                initialCurve = lfoNodes[i].curve; // Guardamos cómo estaba la curva
+                return;
+            }
+        }
+    }
+}
+
+void LfoModule::mouseDrag(const juce::MouseEvent& event)
+{
+    // CÁLCULO EXACTO DEL LIENZO
+    auto areaInt = lfo2Area;
+    areaInt.removeFromTop(20);
+    auto canvasArea = areaInt.reduced(10).toFloat();
+
+    // CASO A: Estamos moviendo un NODO
+    if (draggedNode != -1) {
+        float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
+        float normY = (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight();
+
+        normY = juce::jlimit(0.0f, 1.0f, normY); // Límite vertical perfecto
+
+        // Límite horizontal (No puede adelantar a sus vecinos)
+        if (draggedNode == 0) normX = 0.0f;
+        else if (draggedNode == lfoNodes.size() - 1) normX = 1.0f;
+        else {
+            normX = juce::jlimit(lfoNodes[draggedNode - 1].x + 0.02f, lfoNodes[draggedNode + 1].x - 0.02f, normX);
+        }
+
+        lfoNodes[draggedNode].x = normX;
+        lfoNodes[draggedNode].y = normY;
+        repaint();
+    }
+    // CASO B: Estamos doblando una CURVA
+    else if (draggedCurve != -1) {
+        float dy = (event.mouseDownPosition.y - event.y) / canvasArea.getHeight();
+        lfoNodes[draggedCurve].curve = juce::jlimit(-1.0f, 1.0f, initialCurve + (dy * 2.0f));
+        repaint();
+    }
+}
+
+void LfoModule::mouseDoubleClick(const juce::MouseEvent& event)
+{
+    // CÁLCULO EXACTO DEL LIENZO
+    auto areaInt = lfo2Area;
+    areaInt.removeFromTop(20);
+    auto canvasArea = areaInt.reduced(10).toFloat();
+
+    // 1. BORRAR: ¿Hemos hecho doble clic en un nodo?
+    for (int i = 1; i < lfoNodes.size() - 1; ++i) {
+        juce::Point<float> nodePos(canvasArea.getX() + lfoNodes[i].x * canvasArea.getWidth(),
+            canvasArea.getBottom() - lfoNodes[i].y * canvasArea.getHeight());
+
+        if (event.position.getDistanceFrom(nodePos) < 15.0f) {
+            lfoNodes.erase(lfoNodes.begin() + i);
+            repaint();
+            return;
+        }
+    }
+
+    // 2. AÑADIR: Si no hay nodo, creamos uno nuevo
+    float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
+    float normY = (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight();
+
+    normX = juce::jlimit(0.0f, 1.0f, normX);
+    normY = juce::jlimit(0.0f, 1.0f, normY);
+
+    LfoNode newNode{ normX, normY, 0.0f };
+
+    for (auto it = lfoNodes.begin(); it != lfoNodes.end(); ++it) {
+        if (it->x > newNode.x) {
+            lfoNodes.insert(it, newNode);
+            break;
+        }
+    }
+    repaint();
+}

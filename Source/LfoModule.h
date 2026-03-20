@@ -47,6 +47,8 @@ private:
     // --- NUEVO: Variables del LFO 2 Dibujable ---
     std::vector<LfoNode> lfoNodes; // Aquí guardamos tu dibujo
     int draggedNode = -1;          // Saber qué punto estás agarrando con el ratón
+    int draggedCurve = -1;
+    float initialCurve = 0.0f;
     juce::Rectangle<int> lfo2Area; // Guardamos las coordenadas del lienzo para saber si clicas dentro
 
     // Funciones de dibujo modulares
