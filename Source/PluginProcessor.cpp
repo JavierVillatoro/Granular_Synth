@@ -327,9 +327,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "LFO1_DEPTH", "Amp", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
 
-    // Jitter - Añade ruido orgánico a la señal
+    // Jitter 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "LFO1_JITTER", "Jitter", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
+    // --- LFO 2 (VECTOR) ---
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "LFO2_BEAT", "LFO 2 Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
 
     return { params.begin(), params.end() };
 }

@@ -19,6 +19,10 @@ LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
     waveSelector.addItemList({ "Sine", "Triangle", "Saw", "Square", "S&H" }, 1);
     beatSelector.addItemList({ "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" }, 1);
 
+    addAndMakeVisible(beatSelector2);
+    beatSelector2.addItemList({ "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" }, 1);
+    beatAttach2 = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, "LFO2_BEAT", beatSelector2);
+
     // --- Conexiones al APVTS ---
     depthAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, "LFO1_DEPTH", depthKnob);
     jitterAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, "LFO1_JITTER", jitterKnob);
@@ -56,6 +60,11 @@ void LfoModule::resized()
     auto lfo1Area = area.removeFromTop(area.getHeight() / 2);
 
     lfo2Area = area;
+
+    auto lfo2Header = lfo2Area; // Copiamos el área
+    lfo2Header.removeFromTop(2); // Un poco de margen superior
+    lfo2Header.removeFromLeft(100); // Dejamos 100 píxeles a la izquierda para el texto "LFO 2 (Vector)"
+    beatSelector2.setBounds(lfo2Header.removeFromLeft(70).removeFromTop(16)); // Lo hacemos pequeñito y elegante
 
     lfo1Area.removeFromTop(20);
     auto screenArea = lfo1Area.removeFromLeft(130).reduced(5);

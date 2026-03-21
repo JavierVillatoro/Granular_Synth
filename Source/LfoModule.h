@@ -35,6 +35,10 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> depthAttach, jitterAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveAttach, beatAttach;
 
+    // --- NUEVO: Componente visual del LFO 2 ---
+    juce::ComboBox beatSelector2;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> beatAttach2;
+
     // --- Variables del LFO 2 Dibujable (Bézier) ---
     std::vector<LfoNode> lfoNodes;
 
