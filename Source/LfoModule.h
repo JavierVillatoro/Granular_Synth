@@ -1,21 +1,12 @@
-/*
-  ==============================================================================
-
-    LfoModule.h
-    Created: 19 Mar 2026 8:45:08pm
-    Author:  franc
-
-  ==============================================================================
-*/
-
 #pragma once
 #include <JuceHeader.h>
 
-// NUEVO: La estructura de datos para cada punto de tu LFO dibujable
+// NUEVO PARADIGMA: Cada punto es un NODO VECTORIAL completo (Cubic Bézier)
 struct LfoNode {
-    float x;     // Posición horizontal (0.0 a 1.0)
-    float y;     // Posición vertical (0.0 a 1.0)
-    float curve; // Curva de tensión hacia el siguiente nodo (-1.0 a 1.0) -> ¡La usaremos pronto!
+    juce::Point<float> pos;       // Posición principal del punto blanco (0.0 a 1.0)
+    juce::Point<float> handleIn;  // Manecilla IZQUIERDA (Relativa a pos, ej. {-0.1, 0.0})
+    juce::Point<float> handleOut; // Manecilla DERECHA (Relativa a pos, ej. {0.1, 0.0})
+    bool isSmooth = true;         // ¿Las manecillas están alineadas o rotas?
 };
 
 class LfoModule : public juce::Component, public juce::Timer
@@ -28,7 +19,7 @@ public:
     void resized() override;
     void timerCallback() override;
 
-    // --- NUEVO: Escuchamos al ratón ---
+    // --- Escuchamos al ratón ---
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseDoubleClick(const juce::MouseEvent& event) override;
@@ -44,16 +35,24 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> depthAttach, jitterAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> waveAttach, beatAttach;
 
-    // --- NUEVO: Variables del LFO 2 Dibujable ---
-    std::vector<LfoNode> lfoNodes; // Aquí guardamos tu dibujo
-    int draggedNode = -1;          // Saber qué punto estás agarrando con el ratón
+    // --- Variables del LFO 2 Dibujable (Bézier) ---
+    std::vector<LfoNode> lfoNodes;
+
+    // Memoria del ratón
+    int draggedNode = -1;
+    bool draggingHandleIn = false; // ¿Estás tirando de la manecilla izquierda?
+    bool draggingHandleOut = false;// ¿Estás tirando de la manecilla derecha?
+
+    //CURVE
     int draggedCurve = -1;
-    float initialCurve = 0.0f;
-    juce::Rectangle<int> lfo2Area; // Guardamos las coordenadas del lienzo para saber si clicas dentro
+    float initialHandleOutY = 0.0f;
+    float initialHandleInY = 0.0f;
+
+    juce::Rectangle<int> lfo2Area;
 
     // Funciones de dibujo modulares
     void drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds);
-    void drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds); // NUEVO
+    void drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LfoModule)
 };

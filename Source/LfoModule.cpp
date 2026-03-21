@@ -1,13 +1,3 @@
-/*
-  ==============================================================================
-
-    LfoModule.cpp
-    Created: 19 Mar 2026 8:45:08pm
-    Author:  franc
-
-  ==============================================================================
-*/
-
 #include "LfoModule.h"
 
 LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts)
@@ -35,12 +25,25 @@ LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
     waveAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, "LFO1_WAVE", waveSelector);
     beatAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, "LFO1_BEAT", beatSelector);
 
-    startTimerHz(30); // Actualiza la pantalla a 30fps para ver el Jitter en vivo
+    startTimerHz(30);
 
-    // Inicializa LFO 2 con una forma de triángulo básica
-    lfoNodes.push_back({ 0.0f, 0.5f, 0.0f });  // Punto inicial (Izquierda, Centro)
-    lfoNodes.push_back({ 0.5f, 1.0f, 0.0f });  // Punto central (Medio, Arriba del todo)
-    lfoNodes.push_back({ 1.0f, 0.5f, 0.0f });  // Punto final (Derecha, Centro)
+    // ==============================================================================
+    // NUEVO: Inicializa LFO 2 Vectorial con un triángulo básico y manecillas planas
+    // ==============================================================================
+    LfoNode nodeStart, nodeMid, nodeEnd;
+
+    nodeStart.pos = { 0.0f, 0.5f };
+    nodeStart.handleOut = { 0.1f, 0.0f }; // Sale recta a la derecha
+    lfoNodes.push_back(nodeStart);
+
+    nodeMid.pos = { 0.5f, 1.0f };
+    nodeMid.handleIn = { -0.1f, 0.0f };  // Entra recta desde la izquierda
+    nodeMid.handleOut = { 0.1f, 0.0f };  // Sale recta a la derecha
+    lfoNodes.push_back(nodeMid);
+
+    nodeEnd.pos = { 1.0f, 0.5f };
+    nodeEnd.handleIn = { -0.1f, 0.0f }; // Entra recta desde la izquierda
+    lfoNodes.push_back(nodeEnd);
 }
 
 LfoModule::~LfoModule() {}
@@ -52,10 +55,8 @@ void LfoModule::resized()
     auto area = getLocalBounds();
     auto lfo1Area = area.removeFromTop(area.getHeight() / 2);
 
-    // Guardamos el área exacta del lienzo del LFO 2 para el ratón
     lfo2Area = area;
 
-    // --- Layout del LFO 1 ---
     lfo1Area.removeFromTop(20);
     auto screenArea = lfo1Area.removeFromLeft(130).reduced(5);
     auto menusArea = lfo1Area.removeFromLeft(70).reduced(2, 5);
@@ -75,17 +76,12 @@ void LfoModule::paint(juce::Graphics& g)
     g.drawLine(area.getX(), lfo1Area.getBottom(), area.getRight(), lfo1Area.getBottom(), 1.0f);
 
     drawLfo1(g, lfo1Area);
-
-    // Llamamos a la nueva super-función del LFO 2
     drawLfo2(g, lfo2Area);
 }
 
 void LfoModule::drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
-    // ========================================================
-    // --- 1. AJUSTES VISUALES: COLORES Y TEXTO ---
-    // ========================================================
-    juce::Colour titaniumColor = juce::Colour(0xffd0d0d0); // Gris platino brillante
+    juce::Colour titaniumColor = juce::Colour(0xffd0d0d0);
 
     g.setColour(titaniumColor.withAlpha(0.8f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
@@ -95,21 +91,15 @@ void LfoModule::drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds)
     g.drawText("Amp", depthKnob.getBounds().translated(0, 25), juce::Justification::centred, false);
     g.drawText("Jitter", jitterKnob.getBounds().translated(0, 25), juce::Justification::centred, false);
 
-    // ==============================================================================
-    // --- NUEVO 1.5: FORZAR KNOBS DE LFO A GRIS PLATINO ---
-    // ==============================================================================
     auto setKnobPlatino = [&](juce::Slider& k) {
         k.setColour(juce::Slider::rotarySliderOutlineColourId, titaniumColor.withAlpha(0.2f));
         k.setColour(juce::Slider::rotarySliderFillColourId, titaniumColor.withAlpha(0.8f));
-        k.setColour(juce::Slider::thumbColourId, titaniumColor); // El "punto" del knob
+        k.setColour(juce::Slider::thumbColourId, titaniumColor);
         };
 
     setKnobPlatino(depthKnob);
     setKnobPlatino(jitterKnob);
 
-    // ========================================================
-    // --- 2. CONFIGURACIÓN DE LA PANTALLA ---
-    // ========================================================
     auto screenRect = bounds;
     screenRect.removeFromTop(20);
     screenRect = screenRect.removeFromLeft(130).reduced(5);
@@ -119,36 +109,27 @@ void LfoModule::drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds)
     g.setColour(titaniumColor.withAlpha(0.3f));
     g.drawRect(screenRect, 1);
 
-    // ==============================================================================
-    // --- 2.5: MATEMÁTICAS DE LA ONDA (DINÁMICAS Y REALISTAS) ---
-    // ==============================================================================
-
-    // Leemos los parámetros en vivo del cerebro
     float amp = apvtsRef.getRawParameterValue("LFO1_DEPTH")->load();
     float jitter = apvtsRef.getRawParameterValue("LFO1_JITTER")->load();
     int waveType = (int)apvtsRef.getRawParameterValue("LFO1_WAVE")->load();
     int beatIndex = (int)apvtsRef.getRawParameterValue("LFO1_BEAT")->load();
 
-    // TABLA DE MAPEO CORREGIDA: La pantalla representa 1 Redonda (1/1 o un compás de 4/4)
     auto getNumCyclesForBeat = [](int beatIdx) -> float {
         switch (beatIdx) {
-        case 0: return 0.125f;// 8/1 - Muy lento
-        case 1: return 0.25f; // 4/1
-        case 2: return 0.5f;  // 2/1
-        case 3: return 1.0f;  // 1/1 (1 ciclo ocupa toda la pantalla)
-        case 4: return 2.0f;  // 1/2 (Blancas - 2 ciclos)
-        case 5: return 4.0f;  // 1/4 (Negras - 4 ciclos)
-        case 6: return 8.0f;  // 1/8 (Corcheas - 8 ciclos)
-        case 7: return 16.0f; // 1/16 (Semicorcheas - 16 ciclos)
-        case 8: return 32.0f; // 1/32 (Fusas - 32 ciclos, bastante apretado)
+        case 0: return 0.125f;
+        case 1: return 0.25f;
+        case 2: return 0.5f;
+        case 3: return 1.0f;
+        case 4: return 2.0f;
+        case 5: return 4.0f;
+        case 6: return 8.0f;
+        case 7: return 16.0f;
+        case 8: return 32.0f;
         default: return 4.0f;
         }
         };
 
-    // Obtenemos los ciclos exactos
     float numCycles = getNumCyclesForBeat(beatIndex);
-
-    // Altura máxima = 90% de la caja. Lo multiplicamos por el Amp.
     float actualAmplitude = (screenRect.getHeight() / 2.0f) * 0.9f * amp;
 
     float startX = screenRect.getX();
@@ -156,49 +137,34 @@ void LfoModule::drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds)
     float centerY = screenRect.getCentreY();
     juce::Path wavePath;
 
-    // ==============================================================================
-    // --- 3: EL MOTOR DE DIBUJO UNIFICADO ---
-    // ==============================================================================
-
     for (float x = 0; x <= width; x += 1.0f)
     {
-        // Calculamos la "fase global" (ej. de 0.0 a 4.0 si estamos en 1/4)
         float phase = (x / width) * numCycles;
-
-        // Fase dentro de un solo ciclo (siempre va de 0.0 a 1.0)
         float phaseInCycle = std::fmod(phase, 1.0f);
         float yVal = 0.0f;
 
-        // Fórmulas de las formas de onda
         if (waveType == 0)      yVal = std::sin(phaseInCycle * juce::MathConstants<float>::twoPi);
         else if (waveType == 1) yVal = 2.0f * std::abs(2.0f * phaseInCycle - 1.0f) - 1.0f;
         else if (waveType == 2) yVal = 1.0f - 2.0f * phaseInCycle;
         else if (waveType == 3) yVal = (phaseInCycle < 0.5f) ? 1.0f : -1.0f;
         else if (waveType == 4) {
-            // FIX S&H: Función Hash matemática (Caos puro)
             int currentStep = (int)std::floor(phase);
-            // Multiplicamos por un número gigante para que el Seno salte a lo loco entre -1 y 1
             yVal = std::sin((float)currentStep * 8373.123f);
         }
 
-        // --- APLICAMOS EL JITTER (RUIDO) ---
         if (jitter > 0.0f) {
             float noise = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f);
-            // El S&H admite más ruido visual que las ondas limpias
             float jitterStrength = (waveType == 4) ? 0.5f : 0.3f;
             yVal += noise * jitter * jitterStrength;
             yVal = juce::jlimit(-1.0f, 1.0f, yVal);
         }
 
-        // Convertimos el valor matemático (-1 a 1) en píxeles de pantalla
         float finalY = centerY - (yVal * actualAmplitude);
 
-        // Trazamos la línea
         if (x == 0) wavePath.startNewSubPath(startX, finalY);
         else wavePath.lineTo(startX + x, finalY);
     }
 
-    // Dibujamos el trazo final en Gris Platino
     g.setColour(titaniumColor.withAlpha(0.9f));
     g.strokePath(wavePath, juce::PathStrokeType(1.5f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 }
@@ -207,20 +173,17 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
 {
     juce::Colour titaniumColor = juce::Colour(0xffd0d0d0);
 
-    // 1. TEXTO Y FONDO
     g.setColour(titaniumColor.withAlpha(0.8f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("LFO 2", bounds.reduced(5).withHeight(15), juce::Justification::topLeft, false);
+    g.drawText("LFO 2 (Vector)", bounds.reduced(5).withHeight(15), juce::Justification::topLeft, false);
 
-    // Creamos la "Pantalla" interactiva (dejamos margen para los textos)
     auto canvasArea = bounds;
     canvasArea.removeFromTop(20);
-    canvasArea = canvasArea.reduced(10); // Margen para que los puntos no toquen el borde
+    canvasArea = canvasArea.reduced(10);
 
     g.setColour(juce::Colours::black.withAlpha(0.4f));
     g.fillRect(canvasArea);
 
-    // Dibujamos una cuadrícula sutil (Grid)
     g.setColour(juce::Colours::white.withAlpha(0.05f));
     float stepX = canvasArea.getWidth() / 4.0f;
     float stepY = canvasArea.getHeight() / 4.0f;
@@ -228,12 +191,10 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
         g.drawLine(canvasArea.getX() + (stepX * i), canvasArea.getY(), canvasArea.getX() + (stepX * i), canvasArea.getBottom());
         g.drawLine(canvasArea.getX(), canvasArea.getY() + (stepY * i), canvasArea.getRight(), canvasArea.getY() + (stepY * i));
     }
-
     g.setColour(titaniumColor.withAlpha(0.3f));
     g.drawRect(canvasArea, 1);
 
-    // 2. DIBUJAMOS LOS PUNTOS Y LÍNEAS DE NUESTRO VECTOR
-    if (lfoNodes.size() < 2) return; // Protección anti-crashes
+    if (lfoNodes.size() < 2) return;
 
     juce::Path lfoPath;
     float startX = canvasArea.getX();
@@ -241,99 +202,122 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
     float width = canvasArea.getWidth();
     float height = canvasArea.getHeight();
 
-    // Función rápida para convertir de coordenadas normalizadas (0.0-1.0) a píxeles de la pantalla
-    auto getPixelPos = [&](LfoNode node) -> juce::Point<float> {
-        return { startX + (node.x * width), bottomY - (node.y * height) }; // Y está invertida visualmente
+    auto getPixelPos = [&](juce::Point<float> normPos) -> juce::Point<float> {
+        return { startX + (normPos.x * width), bottomY - (normPos.y * height) };
         };
 
-    // Trazamos las líneas
-    //for (size_t i = 0; i < lfoNodes.size(); ++i)
-    //{
-        //auto pos = getPixelPos(lfoNodes[i]);
-        //if (i == 0) lfoPath.startNewSubPath(pos);
-        //else lfoPath.lineTo(pos); // (Más adelante cambiaremos esto por curvas Bézier)
-    //}
-
-    // Trazamos las líneas (¡AHORA CON CURVAS!)
-    for (size_t i = 0; i < lfoNodes.size() - 1; ++i)
+    for (size_t i = 0; i < lfoNodes.size(); ++i)
     {
-        auto nodeA = lfoNodes[i];
-        auto nodeB = lfoNodes[i + 1];
+        auto posA = getPixelPos(lfoNodes[i].pos);
 
-        if (i == 0) lfoPath.startNewSubPath(getPixelPos(nodeA));
-
-        // Si la curva está a 0, trazamos una línea recta directa
-        if (std::abs(nodeA.curve) < 0.01f) {
-            lfoPath.lineTo(getPixelPos(nodeB));
+        if (i == 0) {
+            lfoPath.startNewSubPath(posA);
         }
         else {
-            // Magia: Dibujamos la curva dividiéndola en 20 micro-segmentos
-            int numSegments = 20;
-            float power = std::exp(nodeA.curve * 3.0f); // Tensión Exponencial
+            auto posB = posA;
+            auto nodePrevious = lfoNodes[i - 1];
+            auto nodeCurrent = lfoNodes[i];
 
-            for (int s = 1; s <= numSegments; ++s) {
-                float t = (float)s / (float)numSegments;
-                float warpedT = std::pow(t, power);
-                float interpX = nodeA.x + (nodeB.x - nodeA.x) * t;
-                float interpY = nodeA.y + (nodeB.y - nodeA.y) * warpedT;
-                lfoPath.lineTo(getPixelPos({ interpX, interpY, 0.0f }));
-            }
+            auto handleOutA = getPixelPos(nodePrevious.pos + nodePrevious.handleOut);
+            auto handleInB = getPixelPos(nodeCurrent.pos + nodeCurrent.handleIn);
+
+            lfoPath.cubicTo(handleOutA, handleInB, posB);
         }
     }
 
-    // Relleno semitransparente (estilo Serum)
     juce::Path filledPath = lfoPath;
-    filledPath.lineTo(getPixelPos(lfoNodes.back()).x, bottomY);
-    filledPath.lineTo(getPixelPos(lfoNodes.front()).x, bottomY);
+    filledPath.lineTo(getPixelPos({ lfoNodes.back().pos.x, 0.0f }).x, bottomY);
+    filledPath.lineTo(getPixelPos({ lfoNodes.front().pos.x, 0.0f }).x, bottomY);
     filledPath.closeSubPath();
-
     g.setColour(titaniumColor.withAlpha(0.15f));
     g.fillPath(filledPath);
-
-    // Borde de la línea
     g.setColour(titaniumColor.withAlpha(0.9f));
     g.strokePath(lfoPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 
-    // Dibujamos los "Nodos" (Circulitos) para que el usuario sepa de dónde agarrar
     float dotSize = 8.0f;
+    float handleSize = 6.0f;
+
     g.setColour(juce::Colours::white);
-    for (const auto& node : lfoNodes) {
-        auto pos = getPixelPos(node);
-        g.fillEllipse(pos.x - dotSize / 2, pos.y - dotSize / 2, dotSize, dotSize);
+    for (int i = 0; i < lfoNodes.size(); ++i) {
+        auto node = lfoNodes[i];
+        auto pPos = getPixelPos(node.pos);
+
+        g.setColour(juce::Colours::grey);
+
+        if (i > 0) {
+            auto hIn = getPixelPos(node.pos + node.handleIn);
+            g.drawLine(pPos.x, pPos.y, hIn.x, hIn.y, 1.0f); // CORREGIDO
+            g.fillEllipse(hIn.x - handleSize / 2, hIn.y - handleSize / 2, handleSize, handleSize);
+        }
+
+        if (i < lfoNodes.size() - 1) {
+            auto hOut = getPixelPos(node.pos + node.handleOut);
+            g.drawLine(pPos.x, pPos.y, hOut.x, hOut.y, 1.0f); // CORREGIDO
+            g.fillEllipse(hOut.x - handleSize / 2, hOut.y - handleSize / 2, handleSize, handleSize);
+        }
+
+        g.setColour(juce::Colours::white);
+        g.fillEllipse(pPos.x - dotSize / 2, pPos.y - dotSize / 2, dotSize, dotSize);
     }
 }
 
-// RATON
+// ==============================================================================
+// --- CONTROL VECTORIAL (RATÓN) ---
+// ==============================================================================
 void LfoModule::mouseDown(const juce::MouseEvent& event)
 {
-    // CÁLCULO EXACTO DEL LIENZO (Igual que en el Paint)
     auto areaInt = lfo2Area;
     areaInt.removeFromTop(20);
     auto canvasArea = areaInt.reduced(10).toFloat();
 
     draggedNode = -1;
-    draggedCurve = -1;
+    draggedCurve = -1; // <-- Reseteamos
+    draggingHandleIn = false;
+    draggingHandleOut = false;
 
-    // 1. Comprobamos si hemos agarrado un NODO (Punto blanco)
+    auto getPixelPos = [&](juce::Point<float> normPos) -> juce::Point<float> {
+        return { canvasArea.getX() + (normPos.x * canvasArea.getWidth()),
+                 canvasArea.getBottom() - (normPos.y * canvasArea.getHeight()) };
+        };
+
+    // 1. ¿Hemos clicado en una manecilla?
     for (int i = 0; i < lfoNodes.size(); ++i) {
-        juce::Point<float> nodePos(canvasArea.getX() + lfoNodes[i].x * canvasArea.getWidth(),
-            canvasArea.getBottom() - lfoNodes[i].y * canvasArea.getHeight());
-
-        if (event.position.getDistanceFrom(nodePos) < 15.0f) { // Imán de 15 píxeles
-            draggedNode = i;
-            return; // ¡Agarrado! Salimos de la función
+        if (i > 0) {
+            auto hInPix = getPixelPos(lfoNodes[i].pos + lfoNodes[i].handleIn);
+            if (event.position.getDistanceFrom(hInPix) < 10.0f) {
+                draggedNode = i;
+                draggingHandleIn = true;
+                return;
+            }
+        }
+        if (i < lfoNodes.size() - 1) {
+            auto hOutPix = getPixelPos(lfoNodes[i].pos + lfoNodes[i].handleOut);
+            if (event.position.getDistanceFrom(hOutPix) < 10.0f) {
+                draggedNode = i;
+                draggingHandleOut = true;
+                return;
+            }
         }
     }
 
-    // 2. Si no agarramos un nodo, comprobamos si estamos agarrando una CURVA (Línea)
-    if (canvasArea.contains(event.position) || lfo2Area.toFloat().contains(event.position)) {
-        float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
+    // 2. ¿Hemos clicado en un nodo principal?
+    for (int i = 0; i < lfoNodes.size(); ++i) {
+        auto nodePix = getPixelPos(lfoNodes[i].pos);
+        if (event.position.getDistanceFrom(nodePix) < 15.0f) {
+            draggedNode = i;
+            return;
+        }
+    }
 
-        // Buscamos entre qué dos puntos ha caído el ratón
+    // 3. NUEVO: ¿Hemos clicado en medio de la curva para doblarla?
+    if (canvasArea.contains(event.position)) {
+        float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
         for (int i = 0; i < lfoNodes.size() - 1; ++i) {
-            if (normX >= lfoNodes[i].x && normX <= lfoNodes[i + 1].x) {
+            if (normX >= lfoNodes[i].pos.x && normX <= lfoNodes[i + 1].pos.x) {
                 draggedCurve = i;
-                initialCurve = lfoNodes[i].curve; // Guardamos cómo estaba la curva
+                // Guardamos la posición inicial de las manecillas antes de empezar a tirar
+                initialHandleOutY = lfoNodes[i].handleOut.y;
+                initialHandleInY = lfoNodes[i + 1].handleIn.y;
                 return;
             }
         }
@@ -342,67 +326,179 @@ void LfoModule::mouseDown(const juce::MouseEvent& event)
 
 void LfoModule::mouseDrag(const juce::MouseEvent& event)
 {
-    // CÁLCULO EXACTO DEL LIENZO
+    // Protección anti-crashes
+    if (draggedNode == -1 && draggedCurve == -1) return;
+
+    // 1. OBTENEMOS EL ÁREA EXACTA DEL LIENZO
     auto areaInt = lfo2Area;
     areaInt.removeFromTop(20);
     auto canvasArea = areaInt.reduced(10).toFloat();
 
-    // CASO A: Estamos moviendo un NODO
-    if (draggedNode != -1) {
-        float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
-        float normY = (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight();
+    // 2. CALCULAMOS LA POSICIÓN NORMALIZADA DEL RATÓN
+    juce::Point<float> mouseNorm = {
+        (event.position.x - canvasArea.getX()) / canvasArea.getWidth(),
+        (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight()
+    };
 
-        normY = juce::jlimit(0.0f, 1.0f, normY); // Límite vertical perfecto
+    // Blindamos el ratón para que no se salga nunca de los bordes matemáticos
+    mouseNorm.x = juce::jlimit(0.0f, 1.0f, mouseNorm.x);
+    mouseNorm.y = juce::jlimit(0.0f, 1.0f, mouseNorm.y);
 
-        // Límite horizontal (No puede adelantar a sus vecinos)
-        if (draggedNode == 0) normX = 0.0f;
-        else if (draggedNode == lfoNodes.size() - 1) normX = 1.0f;
+    // ==============================================================================
+    // --- 3. LOGICA DE ARRASTRE SEGURO Y LOCAL ---
+    // ==============================================================================
+
+    // CASO A: Estamos moviendo un Nodo Principal (Punto Blanco)
+    if (draggedNode != -1 && !draggingHandleIn && !draggingHandleOut)
+    {
+        auto& node = lfoNodes[draggedNode];
+        float normX = mouseNorm.x;
+        float normY = mouseNorm.y;
+
+        // Límite horizontal estricto para que los nodos no se crucen
+        if (draggedNode == 0) normX = 0.0f; // El primero está clavado a la izquierda
+        else if (draggedNode == lfoNodes.size() - 1) normX = 1.0f; // El último clavado a la derecha
         else {
-            normX = juce::jlimit(lfoNodes[draggedNode - 1].x + 0.02f, lfoNodes[draggedNode + 1].x - 0.02f, normX);
+            normX = juce::jlimit(lfoNodes[draggedNode - 1].pos.x + 0.02f, lfoNodes[draggedNode + 1].pos.x - 0.02f, normX);
         }
 
-        lfoNodes[draggedNode].x = normX;
-        lfoNodes[draggedNode].y = normY;
-        repaint();
+        // Movemos el nodo y sus manecillas se mueven con él
+        node.pos = { normX, normY };
     }
-    // CASO B: Estamos doblando una CURVA
-    else if (draggedCurve != -1) {
+
+    // CASO B: Estamos moviendo una Manecilla Gris (Izquierda o Derecha)
+    else if (draggedNode != -1 && (draggingHandleIn || draggingHandleOut))
+    {
+        auto& node = lfoNodes[draggedNode];
+
+        if (draggingHandleIn) {
+            node.handleIn = mouseNorm - node.pos;
+            if (node.isSmooth && draggedNode < lfoNodes.size() - 1) node.handleOut = -node.handleIn;
+        }
+        else if (draggingHandleOut) {
+            node.handleOut = mouseNorm - node.pos;
+            if (node.isSmooth && draggedNode > 0) node.handleIn = -node.handleOut;
+        }
+    }
+
+    // CASO C: Estamos "doblando" la línea desde el centro (MÁGICO Y LOCAL)
+    else if (draggedCurve != -1)
+    {
+        // Calculamos el desplazamiento vertical desde que hicimos clic
         float dy = (event.mouseDownPosition.y - event.y) / canvasArea.getHeight();
-        lfoNodes[draggedCurve].curve = juce::jlimit(-1.0f, 1.0f, initialCurve + (dy * 2.0f));
-        repaint();
+
+        // Sensibilidad ajustada para un control suave
+        float sensitivity = 1.3f;
+
+        auto& nodeA = lfoNodes[draggedCurve];
+        auto& nodeB = lfoNodes[draggedCurve + 1];
+
+        // EL TRUCO MÁGICO: Cuando manipulas el segmento central, forzamos que 
+        // los nodos NO sean "smooth" (simétricos) para que el movimiento sea local.
+        nodeA.isSmooth = false;
+        nodeB.isSmooth = false;
+
+        // Doblamos las manecillas hacia arriba/abajo (Eje Y)
+        // Usamos initialHandle...Y para que el movimiento sea acumulativo y suave
+        nodeA.handleOut.y = initialHandleOutY + (dy * sensitivity);
+        nodeB.handleIn.y = initialHandleInY + (dy * sensitivity);
+
+        // Ajustamos automáticamente el ancho de la curva (Eje X) para que quede bonita
+        float distNodesX = nodeB.pos.x - nodeA.pos.x;
+        nodeA.handleOut.x = distNodesX * 0.45f;
+        nodeB.handleIn.x = -(distNodesX * 0.45f);
     }
+
+    // ==============================================================================
+    // --- 4. ESCUDO DE SEGURIDAD ABSOLUTO (POST-PROCESADO) ---
+    // ==============================================================================
+    // Este bloque de seguridad se ejecuta SIEMPRE para blindar la interfaz y el audio.
+
+    for (int i = 0; i < lfoNodes.size(); ++i) {
+        auto& n = lfoNodes[i];
+
+        // Filtro A: Blindaje del Techo y Suelo (Eje Y)
+        // Por mucho que estiremos, las manecillas nunca saldrán de 0.0 - 1.0
+        float handleInY = n.pos.y + n.handleIn.y;
+        if (handleInY > 1.0f || handleInY < 0.0f) {
+            float targetY = juce::jlimit(0.0f, 1.0f, handleInY) - n.pos.y;
+            n.handleIn.y = targetY;
+            // Si es smooth, su espejo también se ajusta en Y
+            if (n.isSmooth) n.handleOut.y = -n.handleIn.y;
+        }
+
+        float handleOutY = n.pos.y + n.handleOut.y;
+        if (handleOutY > 1.0f || handleOutY < 0.0f) {
+            float targetY = juce::jlimit(0.0f, 1.0f, handleOutY) - n.pos.y;
+            n.handleOut.y = targetY;
+            if (n.isSmooth) n.handleIn.y = -n.handleOut.y;
+        }
+
+        // Filtro B: Blindaje Anti-Viajes-en-el-Tiempo (Eje X)
+        // Las manecillas no pueden cruzar la mitad de la distancia hacia el nodo vecino.
+
+        // Para el nodo actual, manecilla Out vs nodo siguiente
+        if (i < lfoNodes.size() - 1) {
+            float limitX = (lfoNodes[i + 1].pos.x - n.pos.x) * 0.5f;
+            if (n.handleOut.x > limitX) n.handleOut.x = limitX;
+            if (n.handleOut.x < 0.0f) n.handleOut.x = 0.0f; // Nunca hacia atrás
+            // Si es smooth, su espejo se ajusta en X
+            if (n.isSmooth) n.handleIn.x = -n.handleOut.x;
+        }
+
+        // Para el nodo actual, manecilla In vs nodo anterior
+        if (i > 0) {
+            float limitX = (n.pos.x - lfoNodes[i - 1].pos.x) * 0.5f;
+            if (n.handleIn.x < -limitX) n.handleIn.x = -limitX;
+            if (n.handleIn.x > 0.0f) n.handleIn.x = 0.0f; // Nunca hacia adelante
+            if (n.isSmooth) n.handleOut.x = -n.handleIn.x;
+        }
+    }
+
+    repaint();
 }
 
 void LfoModule::mouseDoubleClick(const juce::MouseEvent& event)
 {
-    // CÁLCULO EXACTO DEL LIENZO
     auto areaInt = lfo2Area;
     areaInt.removeFromTop(20);
     auto canvasArea = areaInt.reduced(10).toFloat();
 
-    // 1. BORRAR: ¿Hemos hecho doble clic en un nodo?
-    for (int i = 1; i < lfoNodes.size() - 1; ++i) {
-        juce::Point<float> nodePos(canvasArea.getX() + lfoNodes[i].x * canvasArea.getWidth(),
-            canvasArea.getBottom() - lfoNodes[i].y * canvasArea.getHeight());
+    auto getPixelPos = [&](juce::Point<float> normPos) -> juce::Point<float> {
+        return { canvasArea.getX() + (normPos.x * canvasArea.getWidth()),
+                 canvasArea.getBottom() - (normPos.y * canvasArea.getHeight()) };
+        };
 
-        if (event.position.getDistanceFrom(nodePos) < 15.0f) {
-            lfoNodes.erase(lfoNodes.begin() + i);
+    // 1. Borrar nodo central si hacemos doble clic en él
+    if (draggedNode != -1 && draggedNode != 0 && draggedNode != lfoNodes.size() - 1) {
+        auto nodePix = getPixelPos(lfoNodes[draggedNode].pos);
+        if (event.position.getDistanceFrom(nodePix) < 15.0f) {
+            lfoNodes.erase(lfoNodes.begin() + draggedNode);
+            draggedNode = -1;
             repaint();
             return;
         }
     }
 
-    // 2. AÑADIR: Si no hay nodo, creamos uno nuevo
-    float normX = (event.position.x - canvasArea.getX()) / canvasArea.getWidth();
-    float normY = (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight();
+    // 2. Si hacemos doble clic en el nodo (no manecilla), alternamos "Smooth" vs "Roto"
+    if (draggedNode != -1 && !draggingHandleIn && !draggingHandleOut) {
+        lfoNodes[draggedNode].isSmooth = !lfoNodes[draggedNode].isSmooth;
+        return;
+    }
 
-    normX = juce::jlimit(0.0f, 1.0f, normX);
-    normY = juce::jlimit(0.0f, 1.0f, normY);
+    // 3. Crear nuevo nodo
+    juce::Point<float> newPos = {
+        juce::jlimit(0.0f, 1.0f, (event.position.x - canvasArea.getX()) / canvasArea.getWidth()),
+        juce::jlimit(0.0f, 1.0f, (canvasArea.getBottom() - event.position.y) / canvasArea.getHeight())
+    };
 
-    LfoNode newNode{ normX, normY, 0.0f };
+    LfoNode newNode;
+    newNode.pos = newPos;
+    newNode.handleIn = { -0.05f, 0.0f }; // Manecillas pequeñas por defecto
+    newNode.handleOut = { 0.05f, 0.0f };
 
     for (auto it = lfoNodes.begin(); it != lfoNodes.end(); ++it) {
-        if (it->x > newNode.x) {
+        if (it->pos.x > newNode.pos.x) {
             lfoNodes.insert(it, newNode);
             break;
         }
