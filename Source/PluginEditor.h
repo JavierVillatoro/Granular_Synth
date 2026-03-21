@@ -48,7 +48,7 @@ public:
 
     void parameterChanged(const juce::String& parameterID, float newValue) override
     {
-        // Añadimos "SHAPE" a la condición
+        // Aadimos "SHAPE" a la condicin
         if (parameterID == "POSITION" || parameterID == "GRAIN_SIZE" || parameterID == "SHAPE")
         {
             juce::MessageManager::callAsync([this] { repaint(); });
@@ -79,9 +79,9 @@ private:
     SpaceModule spaceModule{ audioProcessor.apvts };
     LfoModule lfoModule{ audioProcessor.apvts };
 
-    // --- VARIABLES DE ZOOM Y NAVEGACIÓN ---
+    // --- VARIABLES DE ZOOM Y NAVEGACIN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10
-    double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qué parte del audio está a la izquierda de la pantalla
+    double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qu	 parte del audio est a la izquierda de la pantalla
     int lastDragX = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessorEditor)

@@ -13,7 +13,7 @@
 EnvelopeModule::EnvelopeModule(juce::AudioProcessorValueTreeState& apvts)
     : apvtsRef(apvts)
 {
-    // Hacemos que la pantalla se actualice a 30fps para que los gr·ficos sean fluidos
+    // Hacemos que la pantalla se actualice a 30fps para que los gr√°ficos sean fluidos
     startTimerHz(30);
 }
 
@@ -21,7 +21,7 @@ EnvelopeModule::~EnvelopeModule() {}
 
 void EnvelopeModule::timerCallback()
 {
-    repaint(); // Redibuja los gr·ficos si movemos algo
+    repaint(); // Redibuja los gr√°ficos si movemos algo
 }
 
 void EnvelopeModule::paint(juce::Graphics& g)
@@ -43,66 +43,67 @@ void EnvelopeModule::paint(juce::Graphics& g)
     float e2S = apvtsRef.getRawParameterValue("ENV2_S")->load();
     float e2R = apvtsRef.getRawParameterValue("ENV2_R")->load();
 
-    // Dibujamos las dos envolventes separadas visualmente por una lÌnea sutil
+    // Dibujamos la l√≠nea separadora
     g.setColour(juce::Colours::white.withAlpha(0.1f));
     g.drawLine(area.getX(), ampArea.getBottom(), area.getRight(), ampArea.getBottom(), 1.0f);
 
-    // Pintamos los gr·ficos
-    drawEnvelope(g, ampArea.reduced(5), "AMP", aA, aD, aS, aR);
-    drawEnvelope(g, env2Area.reduced(5), "ENV 2", e2A, e2D, e2S, e2R);
+    // ====================================================================
+    // --- COLORES: Local (Cyan) vs Global (Gris Titanio) ---
+    // ====================================================================
+    juce::Colour layerColor = juce::Colours::cyan;
+    juce::Colour globalColor = juce::Colour(0xffd0d0d0);
+
+    // Pintamos los gr√°ficos pas√°ndoles el color como variable final
+    drawEnvelope(g, ampArea.reduced(5), "AMP", aA, aD, aS, aR, layerColor);
+    drawEnvelope(g, env2Area.reduced(5), "ENV 2", e2A, e2D, e2S, e2R, globalColor);
 }
 
-void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name, float a, float d, float s, float r)
+void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name,
+    float a, float d, float s, float r, juce::Colour envColor) // <-- A√ëADIDO envColor
 {
-    // 1. Textos Minimalistas (Arriba a la izquierda)
+    // 1. Textos Minimalistas
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
     g.drawText(name, bounds.withHeight(15), juce::Justification::topLeft, false);
 
-    // 2. MATEM¡TICAS DEL DIBUJO (ESCALA FIJA PARA EL RAT”N)
+    // 2. MATEM√ÅTICAS DEL DIBUJO
     float totalVisualTime = 15.0f;
 
     float startX = bounds.getX();
     float bottomY = bounds.getBottom();
     float width = bounds.getWidth();
-    float height = bounds.getHeight() - 15; // Dejamos hueco para el texto
+    float height = bounds.getHeight() - 15;
     float topY = bottomY - height;
 
-    // Calculamos X moviÈndose proporcionalmente a los 15 segundos reales
     float attackX = startX + (width * (a / totalVisualTime));
     float decayX = attackX + (width * (d / totalVisualTime));
-    float sustainX = decayX + (width * (2.0f / totalVisualTime)); // El Sustain visual ocupa 2 segundos
-    float releaseX = sustainX + (width * (r / totalVisualTime));  // °El release ahora es din·mico y se mueve!
+    float sustainX = decayX + (width * (2.0f / totalVisualTime));
+    float releaseX = sustainX + (width * (r / totalVisualTime));
 
-    // Evitamos que si ponemos todos los par·metros al m·ximo (5+5+2+5=17s) se salga de la caja
     releaseX = juce::jlimit(startX, (float)bounds.getRight(), releaseX);
-
-    // Calculamos la posiciÛn Y del Sustain (invertido porque Y=0 est· arriba)
     float sustainY = bottomY - (height * s);
 
-    // 3. CREAMOS LA FORMA VECTORIAL (PATH)
+    // 3. CREAMOS LA FORMA VECTORIAL
     juce::Path envPath;
-    envPath.startNewSubPath(startX, bottomY);          // Punto 0: Inicio
-    envPath.lineTo(attackX, topY);                     // Punto 1: Pico del Attack
-    envPath.lineTo(decayX, sustainY);                  // Punto 2: CaÌda al Sustain
-    envPath.lineTo(sustainX, sustainY);                // Punto 3: Mantiene el Sustain
-    envPath.lineTo(releaseX, bottomY);                 // Punto 4: Final del Release
+    envPath.startNewSubPath(startX, bottomY);          // Inicio
+    envPath.lineTo(attackX, topY);                     // Pico
+    envPath.lineTo(decayX, sustainY);                  // Ca√≠da
+    envPath.lineTo(sustainX, sustainY);                // Sustain
+    envPath.lineTo(releaseX, bottomY);                 // Final
 
-    // 4. EL TOQUE SERUM (Relleno Cyan semitransparente y Borde Brillante)
-    g.setColour(juce::Colours::cyan.withAlpha(0.2f)); // Relleno suave
+    // 4. EL TOQUE SERUM (Usamos la variable envColor)
+    g.setColour(envColor.withAlpha(0.2f)); // Relleno suave
     g.fillPath(envPath);
 
-    g.setColour(juce::Colours::cyan.withAlpha(0.9f)); // Borde NeÛn
+    g.setColour(envColor.withAlpha(0.9f)); // Borde Brillante
     g.strokePath(envPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 
-    // Dibujamos los circulitos en los nodos clave (M·s grandes para agarrarlos con el ratÛn)
-    float dotSize = 8.0f; // Los subo a 8.0f para que el "hitbox" sea f·cil de tocar
+    // Dibujamos los circulitos blancos
+    float dotSize = 8.0f;
     g.setColour(juce::Colours::white);
 
-    // Solo dibujamos los 3 nodos interactivos (Attack, Decay, Release)
     g.fillEllipse(attackX - dotSize / 2, topY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(decayX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
-    //g.fillEllipse(sustainX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(releaseX - dotSize / 2, bottomY - dotSize / 2, dotSize, dotSize);
 }
 
@@ -112,7 +113,7 @@ void EnvelopeModule::resized()
 }
 
 // =================================================================================
-// --- EVENTOS DE RAT”N (ESTILO SERUM) ---
+// --- EVENTOS DE RAT√ìN (ESTILO SERUM) ---
 // =================================================================================
 
 void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
@@ -122,7 +123,7 @@ void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
     auto ampArea = area.removeFromTop(area.getHeight() / 2);
     auto env2Area = area;
 
-    // FunciÛn lambda para comprobar si hemos cazado alg˙n punto blanco
+    // Funci√≥n lambda para comprobar si hemos cazado alg√∫n punto blanco
     auto checkHits = [&](juce::Rectangle<int> bounds, juce::String prefix, int baseIndex)
         {
             float a = apvtsRef.getRawParameterValue(prefix + "_A")->load();
@@ -145,7 +146,7 @@ void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
 
             juce::Point<float> mousePos = event.position;
 
-            // Si hacemos clic a menos de 15 pÌxeles del punto, lo cazamos
+            // Si hacemos clic a menos de 15 p√≠xeles del punto, lo cazamos
             if (mousePos.getDistanceFrom({ attackX, topY }) < 15.0f) { activeNode = baseIndex; startParamX = a; }
             else if (mousePos.getDistanceFrom({ decayX, sustainY }) < 15.0f) { activeNode = baseIndex + 1; startParamX = d; startParamY = s; }
             else if (mousePos.getDistanceFrom({ releaseX, bottomY }) < 15.0f) { activeNode = baseIndex + 2; startParamX = r; }
@@ -159,22 +160,22 @@ void EnvelopeModule::mouseDrag(const juce::MouseEvent& event)
 {
     if (activeNode == -1) return; // Si no cazamos nada, salimos
 
-    // Calculamos cu·nto se ha movido el ratÛn desde el clic inicial
+    // Calculamos cu√°nto se ha movido el rat√≥n desde el clic inicial
     float deltaX = event.getDistanceFromDragStartX();
     float deltaY = event.getDistanceFromDragStartY();
 
-    // Sensibilidad del ratÛn: 50 pÌxeles movidos = 1 segundo de tiempo
+    // Sensibilidad del rat√≥n: 50 p√≠xeles movidos = 1 segundo de tiempo
     float timeChange = deltaX * 0.02f;
-    // Sensibilidad Y: 100 pÌxeles = Todo el rango de Sustain (0 a 1)
+    // Sensibilidad Y: 100 p√≠xeles = Todo el rango de Sustain (0 a 1)
     float sustainChange = -deltaY * 0.01f;
 
-    // FunciÛn r·pida para enviar el valor actualizado al motor de audio
+    // Funci√≥n r√°pida para enviar el valor actualizado al motor de audio
     auto updateParam = [&](juce::String id, float startVal, float change, float min, float max) {
         if (auto* p = apvtsRef.getParameter(id))
             p->setValueNotifyingHost(p->convertTo0to1(juce::jlimit(min, max, startVal + change)));
         };
 
-    // Aplicamos los cambios dependiendo de quÈ punto agarramos
+    // Aplicamos los cambios dependiendo de qu√© punto agarramos
     if (activeNode == 0)      updateParam("AMP_A", startParamX, timeChange, 0.01f, 5.0f);
     else if (activeNode == 1) {
         updateParam("AMP_D", startParamX, timeChange, 0.01f, 5.0f); // Mover X cambia Decay

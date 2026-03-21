@@ -27,7 +27,7 @@ public:
 class GranularVoice : public juce::SynthesiserVoice
 {
 public:
-    // ¡NUEVO CONSTRUCTOR! Recibe el audio y los parámetros
+    // Â¡NUEVO CONSTRUCTOR! Recibe el audio y los parÃ¡metros
     GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
 
     std::atomic<float> visualGrainPos[128];
@@ -44,9 +44,9 @@ private:
     
     struct Grain
     {
-        bool isActive = false;      // ¿Está sonando o está en la reserva?
-        double currentPosition = 0; // Por dónde va leyendo el audio (de 0 a grainLength)
-        int startSample = 0;        // La "foto" de dónde empezó a leer en el archivo
+        bool isActive = false;      // Â¿EstÃ¡ sonando o estÃ¡ en la reserva?
+        double currentPosition = 0; // Por dÃ³nde va leyendo el audio (de 0 a grainLength)
+        int startSample = 0;        // La "foto" de dÃ³nde empezÃ³ a leer en el archivo
         //float randomPan = 0.5f;     // SPRAY de paneo
         float randomPitch = 1.0f;
         float pitchRandomRatio = 1.0f;// SPRAY_PITCH
@@ -55,7 +55,7 @@ private:
         float activePitchRatio = 1.0f;
     };
 
-    // --- EL EJÉRCITO ---
+    // --- EL EJÃ‰RCITO ---
     static constexpr int maxGrains = 128;
     std::array<Grain, maxGrains> grains;
 
@@ -68,11 +68,11 @@ private:
     float currentVelocity = 0.0f;
     float pitchRatio = 1.0f;
 
-    // Aquí guardamos las llaves para usarlas luego en la cocina
+    // AquÃ­ guardamos las llaves para usarlas luego en la cocina
     juce::AudioBuffer<float>* audioBuffer;
     juce::AudioProcessorValueTreeState* apvts;
 
-    // FILTROS ANALÓGICOS ESTÉREO
+    // FILTROS ANALÃ“GICOS ESTÃ‰REO
     juce::dsp::StateVariableTPTFilter<float> lpf[2]; // 0 = L, 1 = R
     juce::dsp::StateVariableTPTFilter<float> hpf[2]; // 0 = L, 1 = R
 

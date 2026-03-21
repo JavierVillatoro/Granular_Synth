@@ -152,11 +152,11 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    // 1. Limpiamos los altavoces por si habÌa ruido viejo
+    // 1. Limpiamos los altavoces por si hab√≠a ruido viejo
     buffer.clear();
 
-    // 2. °Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
-    // …l leer· el MIDI, ver· quÈ teclas has pulsado, y le dir· a las Voces que rellenen el buffer de audio.
+    // 2. ¬°Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
+    // √âl leer√° el MIDI, ver√° qu√© teclas has pulsado, y le dir√° a las Voces que rellenen el buffer de audio.
     synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 
     // ==========================================================
@@ -166,14 +166,14 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     float fback = apvts.getRawParameterValue("SPACE_FBACK")->load();
     float mix = apvts.getRawParameterValue("SPACE_MIX")->load();
 
-    // Configuramos los par·metros para un sonido "Lush" y abierto
+    // Configuramos los par√°metros para un sonido "Lush" y abierto
     reverbParams.roomSize = size;
-    // Invertimos fback: Si est· a tope (1.0), el damping es 0 (brillante e infinito)
+    // Invertimos fback: Si est√° a tope (1.0), el damping es 0 (brillante e infinito)
     reverbParams.damping = 1.0f - fback;
-    reverbParams.width = 1.0f; // EstÈreo abierto al m·ximo (inmersiÛn total)
+    reverbParams.width = 1.0f; // Est√©reo abierto al m√°ximo (inmersi√≥n total)
     reverbParams.freezeMode = 0.0f;
 
-    // EL TRUCO DE POTENCIA CONSTANTE (Para evitar subidas de volumen extraÒas)
+    // EL TRUCO DE POTENCIA CONSTANTE (Para evitar subidas de volumen extra√±as)
     // Usamos seno y coseno para cruzar el volumen seco y mojado de forma perfecta
     reverbParams.dryLevel = std::cos(mix * juce::MathConstants<float>::halfPi);
     reverbParams.wetLevel = std::sin(mix * juce::MathConstants<float>::halfPi);
@@ -242,11 +242,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "DENSITY", "Density", juce::NormalisableRange<float>(1.0f, 120.0f, 0.1f, 0.5f), 20.0f));
 
-    // 6. SHAPE (°ESTE ES EL QUE FALTABA!)
+    // 6. SHAPE (¬°ESTE ES EL QUE FALTABA!)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SHAPE", "Shape", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
-    // SPRAY PAN: 0.0 (Todo al centro) a 1.0 (Repartido por todo el estÈreo)
+    // SPRAY PAN: 0.0 (Todo al centro) a 1.0 (Repartido por todo el est√©reo)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "SPRAY_PAN", "Pan Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
@@ -266,7 +266,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "PITCH_FINE", "Fine Tune", juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));
 
-    // Scale: Modos de cuantizaciÛn (0 = Libre, 1 = Octavas, 2 = Quintas, 3 = PentatÛnica)
+    // Scale: Modos de cuantizaci√≥n (0 = Libre, 1 = Octavas, 2 = Quintas, 3 = Pentat√≥nica)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "PITCH_SCALE", "Scale Mode", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
 
@@ -288,10 +288,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
         "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
 
     // --- SPACE MODULE (REVERB) ---
-    // Size: TamaÒo de la sala (0.0 = armario, 1.0 = catedral infinita)
+    // Size: Tama√±o de la sala (0.0 = armario, 1.0 = catedral infinita)
     params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
 
-    // Fback (Damping/AbsorciÛn): Define si la cola es oscura y c·lida (0.0) o brillante y met·lica (1.0)
+    // Fback (Damping/Absorci√≥n): Define si la cola es oscura y c√°lida (0.0) o brillante y met√°lica (1.0)
     params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_FBACK", "Feedback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
 
     // Mix: 0.0 = 100% Seco, 1.0 = 100% Mojado
@@ -303,7 +303,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_S", "Amp Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_R", "Amp Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
-    // --- ENVELOPE 2 (Para la futura Matriz de ModulaciÛn) ---
+    // --- ENVELOPE 2 (Para la futura Matriz de Modulaci√≥n) ---
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_A", "Env2 Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_D", "Env2 Decay", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_S", "Env2 Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
@@ -323,11 +323,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         "LFO1_WAVE", "Waveform", waveShapes, 0)); // El 0 es Sine
 
-    // Amplitude (Depth) - Controla el tamaÒo de la onda
+    // Amplitude (Depth) - Controla el tama√±o de la onda
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "LFO1_DEPTH", "Amp", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
 
-    // Jitter - AÒade ruido org·nico a la seÒal
+    // Jitter - A√±ade ruido org√°nico a la se√±al
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "LFO1_JITTER", "Jitter", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
@@ -342,13 +342,13 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path)
     // 2. Le pedimos a nuestro manager que intente crear un "lector" para este archivo
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
 
-    // 3. Si el lector se ha creado con Èxito (es decir, si el archivo era un wav, mp3, flac v·lido)
+    // 3. Si el lector se ha creado con √©xito (es decir, si el archivo era un wav, mp3, flac v√°lido)
     if (reader != nullptr)
     {
-        // Preparamos nuestro "disco duro" (audioBuffer) con el n˙mero de canales y la longitud del audio
+        // Preparamos nuestro "disco duro" (audioBuffer) con el n√∫mero de canales y la longitud del audio
         audioBuffer.setSize((int)reader->numChannels, (int)reader->lengthInSamples);
 
-        // Volcamos toda la informaciÛn del lector dentro de nuestro audioBuffer
+        // Volcamos toda la informaci√≥n del lector dentro de nuestro audioBuffer
         reader->read(&audioBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
 
         // Mensaje interno para que sepamos que todo ha ido bien (esto no lo ve el usuario)

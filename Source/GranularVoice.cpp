@@ -17,7 +17,7 @@ GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProces
     apvts = apvtsToUse;
 }
 
-// 2. øPODEMOS TOCAR ESTO? SÌ, aceptamos todo.
+// 2. ¬øPODEMOS TOCAR ESTO? S√≠, aceptamos todo.
 bool GranularVoice::canPlaySound(juce::SynthesiserSound* sound)
 {
     return dynamic_cast<GranularSound*>(sound) != nullptr;
@@ -34,7 +34,7 @@ void GranularVoice::stopNote(float velocity, bool allowTailOff)
     }
     else
     {
-        // Solo cortamos de golpe si el programa anfitriÛn entra en p·nico (Panic Stop)
+        // Solo cortamos de golpe si el programa anfitri√≥n entra en p√°nico (Panic Stop)
         clearCurrentNote();
         ampAdsr.reset();
         isPlaying = false;
@@ -89,7 +89,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 {
     if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
 
-    //  LEER PAR¡METROS
+    //  LEER PAR√ÅMETROS
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
@@ -131,7 +131,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     for (int s = 0; s < numSamples; ++s)
     {
-        // --- 1.5 C¡LCULO DE POSICI”N CON MODOS ---
+        // --- 1.5 C√ÅLCULO DE POSICI√ìN CON MODOS ---
         //autoScanOffset += (double)scanSpeed / getSampleRate();
         autoScanOffset += (double)scanSpeed / (getSampleRate() * totalAudioSeconds);
         float rawPos = positionKnob + (float)autoScanOffset;
@@ -158,12 +158,12 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     grain.isActive = true;
                     grain.currentPosition = 0.0;
 
-                    // Spray de PosiciÛn
+                    // Spray de Posici√≥n
                     float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
                     float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
                     grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
 
-                    // --- L”GICA DE PITCH SPRAY CON ESCALAS  ---
+                    // --- L√ìGICA DE PITCH SPRAY CON ESCALAS  ---
                     float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
                     int scaleModeInt = (int)pitchScale;
 
@@ -183,7 +183,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
                         rawPitchRand = oct + (st < 0 ? -rem : rem);
                     }
-                    else if (scaleModeInt == 3) // PentatÛnica Menor
+                    else if (scaleModeInt == 3) // Pentat√≥nica Menor
                     {
                         int st = (int)std::round(rawPitchRand);
                         int oct = (st / 12) * 12;
@@ -202,7 +202,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     grain.pitchRandomRatio = std::pow(2.0f, rawPitchRand / 12.0f);
                     grain.activePitchRatio = finalBasePitchRatio * grain.pitchRandomRatio;
 
-                    // Spray de Pan (EstÈreo)
+                    // Spray de Pan (Est√©reo)
                     float randomPan = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPan;
                     grain.panL = std::cos(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
                     grain.panR = std::sin(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
@@ -230,7 +230,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 float square = (progress < 0.02f) ? progress / 0.02f : (progress > 0.98f ? (1.0f - progress) / 0.02f : 1.0f);
                 float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
 
-                // --- USAMOS EL NUEVO finalBasePitchRatio AQUÕ ---
+                // --- USAMOS EL NUEVO finalBasePitchRatio AQU√ç ---
                 //int readPos = grain.startSample + (int)(grain.currentPosition * finalBasePitchRatio * grain.pitchRandomRatio);
                 int readPos = grain.startSample + (int)(grain.currentPosition * grain.activePitchRatio);
 
@@ -258,24 +258,24 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             grainIndex++;
         }
 
-        // --- 4. FILTROS Y SALIDA ANAL”GICA ---
+        // --- 4. FILTROS Y SALIDA ANAL√ìGICA ---
 
-        // 1∫ Ajustamos el volumen general seg˙n el n˙mero de granos vivos
+        // 1¬∫ Ajustamos el volumen general seg√∫n el n√∫mero de granos vivos
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
             totalL *= gainScale;
             totalR *= gainScale;
         }
 
-        // 2∫ Pasamos el sonido por los FILTROS
-        // Al hacerlo aquÌ, el filtro act˙a sobre el sonido din·mico puro
+        // 2¬∫ Pasamos el sonido por los FILTROS
+        // Al hacerlo aqu√≠, el filtro act√∫a sobre el sonido din√°mico puro
         totalL = hpf[0].processSample(0, totalL);
         totalR = hpf[1].processSample(0, totalR);
 
         totalL = lpf[0].processSample(0, totalL);
         totalR = lpf[1].processSample(0, totalR);
 
-        // 3∫ AHORA SÕ: Aplicamos la saturaciÛn/limitador analÛgico (std::tanh)
+        // 3¬∫ AHORA S√ç: Aplicamos la saturaci√≥n/limitador anal√≥gico (std::tanh)
         // Esto "abraza" cualquier pico de resonancia del filtro y lo convierte en 
         // calidez de cinta, asegurando que el volumen nunca se descontrole.
         totalL = std::tanh(totalL);

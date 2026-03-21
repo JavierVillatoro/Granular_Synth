@@ -35,7 +35,7 @@ private:
 
     // Funcin interna para dibujar cada envolvente de forma elegante
     void drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name,
-        float a, float d, float s, float r);
+        float a, float d, float s, float r, juce::Colour envColor);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(EnvelopeModule)
 };
