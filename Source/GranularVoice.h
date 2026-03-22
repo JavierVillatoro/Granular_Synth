@@ -13,6 +13,8 @@
 #include <array>
 #include <atomic>
 
+class Granular_SynthAudioProcessor;
+
 // ==============================================================================
 // 1. LA CLASE SOUND
 class GranularSound : public juce::SynthesiserSound
@@ -20,6 +22,7 @@ class GranularSound : public juce::SynthesiserSound
 public:
     bool appliesToNote(int midiNoteNumber) override { return true; }
     bool appliesToChannel(int midiChannel) override { return true; }
+
 };
 
 // ==============================================================================
@@ -29,6 +32,9 @@ class GranularVoice : public juce::SynthesiserVoice
 public:
     // ¡NUEVO CONSTRUCTOR! Recibe el audio y los parámetros
     GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
+
+    float currentLfo1Value = 0.0f;
+    float currentLfo2Value = 0.0f;
 
     std::atomic<float> visualGrainPos[128];
     std::atomic<float> visualGrainEnv[128];

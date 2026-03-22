@@ -108,8 +108,29 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     ampAdsrParams.release = apvts->getRawParameterValue("AMP_R")->load();
     ampAdsr.setParameters(ampAdsrParams);
 
+    //for (int i = 0; i < 2; ++i) {
+        //lpf[i].setCutoffFrequency(filterLpfFreq);
+        //lpf[i].setResonance(filterRes);
+        //hpf[i].setCutoffFrequency(filterHpfFreq);
+        //hpf[i].setResonance(filterRes);
+    //}
+
+    // ==========================================================
+// --- INYECCIÓN TEMPORAL: LFO 1 + LFO 2 AL FILTRO LPF ---
+// ==========================================================
+// Calculamos cuántos Hz mueve cada LFO por separado
+    float modFromLfo1 = currentLfo1Value * 2000.0f;
+    float modFromLfo2 = (currentLfo2Value - 0.5f) * 4000.0f; // LFO2 es vectorial (0 a 1), lo centramos con -0.5
+
+    // LA MAGIA DE LA MATRIZ: Sumamos el valor base del knob + LFO 1 + LFO 2
+    float modulatedLpfFreq = filterLpfFreq + modFromLfo1 + modFromLfo2;
+
+    // Evitamos que el filtro explote bajando de 20Hz o subiendo de 20kHz
+    modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, modulatedLpfFreq);
+
+    // Aplicamos el resultado final a los filtros estéreo
     for (int i = 0; i < 2; ++i) {
-        lpf[i].setCutoffFrequency(filterLpfFreq);
+        lpf[i].setCutoffFrequency(modulatedLpfFreq); // <-- USAMOS LA FRECUENCIA MODULADA SUMADA
         lpf[i].setResonance(filterRes);
         hpf[i].setCutoffFrequency(filterHpfFreq);
         hpf[i].setResonance(filterRes);

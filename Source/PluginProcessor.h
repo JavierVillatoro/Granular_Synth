@@ -61,6 +61,17 @@ public:
 
     juce::Synthesiser& getSynthesiser() { return synth; }
 
+    // Estas variables guardan el valor exacto del LFO en este preciso instante.
+    // Las Voces Granulares las leerán para saber cómo tienen que moverse.
+    float globalLfo1Value = 0.0f; // Oscilará entre -1.0 y 1.0
+    float globalLfo2Value = 0.0f; // Oscilará entre 0.0 y 1.0 (Vectorial)
+
+    // ==========================================================
+    // --- MEMORIA WAVETABLE PARA EL LFO 2 
+    // ==========================================================
+    static constexpr int LFO_TABLE_SIZE = 2048; // High resolution 
+    std::array<float, LFO_TABLE_SIZE> lfo2Table = { 0.0f }; // Zeros table
+
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
@@ -75,6 +86,19 @@ private:
 
     juce::dsp::Reverb masterReverb;
     juce::Reverb::Parameters reverbParams;
+
+    // ==========================================================
+    // --- RELOJES DSP INTERNOS (PHASE ACCUMULATORS) ---
+    // ==========================================================
+    float lfo1Phase = 0.0f; // El contador de tiempo del LFO 1 (va de 0.0 a 1.0)
+    float lfo2Phase = 0.0f; // El contador de tiempo del LFO 2 (va de 0.0 a 1.0)
+
+    // ==========================================================
+    // --- DATOS DEL ENTORNO (DAW / STANDALONE) ---
+    // ==========================================================
+    double currentSampleRate = 44100.0; // Cuántas "fotos" de audio hacemos por segundo
+    double currentBPM = 120.0;          // El tempo actual (por defecto 120)
+    bool isPlaying = false;             // ¿El DAW está dándole al Play?
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
 };

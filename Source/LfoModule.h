@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 
+class Granular_SynthAudioProcessor;
+
 // NUEVO PARADIGMA: Cada punto es un NODO VECTORIAL completo (Cubic Bézier)
 struct LfoNode {
     juce::Point<float> pos;       // Posición principal del punto blanco (0.0 a 1.0)
@@ -57,6 +59,8 @@ private:
     // Funciones de dibujo modulares
     void drawLfo1(juce::Graphics& g, juce::Rectangle<int> bounds);
     void drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds);
+
+    void bakeWavetable();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LfoModule)
 };

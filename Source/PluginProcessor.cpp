@@ -151,7 +151,141 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 #endif
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
-{
+{   // ==========================================================
+    // --- 1. LEER EL RELOJ DEL DAW (SYNC) ---
+    // ==========================================================
+    // Invocamos a la antena de JUCE
+    if (auto* playHead = getPlayHead())
+    {
+        // Le pedimos al DAW la información de posición actual
+        if (auto positionInfo = playHead->getPosition())
+        {
+            // Extraemos los BPM
+            if (positionInfo->getBpm().hasValue()) {
+                currentBPM = *positionInfo->getBpm();
+            }
+
+            // Comprobamos si el DAW está reproduciendo (Play)
+            isPlaying = positionInfo->getIsPlaying();
+
+            // (En el futuro aquí extraeremos el ppqPosition para sincronizar la fase al milímetro)
+        }
+    }
+    else
+    {
+        // Si no hay DAW (modo Standalone), volveremos a un reloj interno.
+        // De momento lo dejamos a 120 fijo y siempre reproduciendo.
+        currentBPM = 120.0;
+        isPlaying = true;
+    }
+
+    // ==========================================================
+    // --- 1.5 CÁLCULO DE LOS LFOs (CONTROL RATE) ---
+    // ==========================================================
+
+    // 1. Calculamos cuánto tiempo "dura" este bloque de audio en segundos
+    float blockDuration = buffer.getNumSamples() / (float)currentSampleRate;
+    float beatsPerSecond = currentBPM / 60.0f; // Ej: 120 BPM = 2 beats por segundo
+
+    // Tabla de conversión (El índice del ComboBox a multiplicador de tempo)
+    // 1/4 (índice 5) significa 1 ciclo por cada beat (negra).
+    auto getBpsMultiplier = [](int idx) -> float {
+        switch (idx) {
+        case 0: return 0.03125f; // 8/1
+        case 1: return 0.0625f;  // 4/1
+        case 2: return 0.125f;   // 2/1
+        case 3: return 0.25f;    // 1/1 (Redonda)
+        case 4: return 0.5f;     // 1/2 (Blanca)
+        case 5: return 1.0f;     // 1/4 (Negra - Valor estándar)
+        case 6: return 2.0f;     // 1/8 (Corchea)
+        case 7: return 4.0f;     // 1/16 (Semicorchea)
+        case 8: return 8.0f;     // 1/32 (Fusa)
+        default: return 1.0f;
+        }
+        };
+
+    // --- AVANZAMOS EL RELOJ DEL LFO 1 ---
+    int beatIdx1 = (int)apvts.getRawParameterValue("LFO1_BEAT")->load();
+    float freq1 = beatsPerSecond * getBpsMultiplier(beatIdx1);
+
+    lfo1Phase += freq1 * blockDuration;
+    if (lfo1Phase >= 1.0f) lfo1Phase -= 1.0f; // Bucle infinito de 0.0 a 1.0
+
+    // --- AVANZAMOS EL RELOJ DEL LFO 2 ---
+    //int beatIdx2 = (int)apvts.getRawParameterValue("LFO2_BEAT")->load();
+    //float freq2 = beatsPerSecond * getBpsMultiplier(beatIdx2);
+
+    //lfo2Phase += freq2 * blockDuration;
+    //if (lfo2Phase >= 1.0f) lfo2Phase -= 1.0f;
+
+    // --- AVANZAMOS EL RELOJ DEL LFO 2 ---
+    int beatIdx2 = (int)apvts.getRawParameterValue("LFO2_BEAT")->load();
+    float freq2 = beatsPerSecond * getBpsMultiplier(beatIdx2);
+
+    lfo2Phase += freq2 * blockDuration;
+    if (lfo2Phase >= 1.0f) lfo2Phase -= 1.0f;
+
+    // --- MAGIA: WAVETABLE LOOKUP PARA EL LFO 2 ---
+    // 1. Convertimos la fase (0.0 a 1.0) en un índice de la tabla (0 a 2047)
+    float tableIndex = lfo2Phase * (LFO_TABLE_SIZE - 1);
+
+    // 2. Buscamos entre qué dos números exactos hemos caído
+    int indexA = (int)tableIndex;
+    int indexB = indexA + 1;
+    if (indexB >= LFO_TABLE_SIZE) indexB = 0; // Por seguridad
+
+    float frac = tableIndex - (float)indexA; // El decimal (ej: si es 500.2, frac es 0.2)
+
+    // 3. Interpolación Lineal (Mezclamos los dos números para una calidad de audio de estudio)
+    float lfo2Output = lfo2Table[indexA] + frac * (lfo2Table[indexB] - lfo2Table[indexA]);
+
+    // Lo mandamos al escaparate público
+    globalLfo2Value = lfo2Output;
+
+    // --- GENERAMOS LA FORMA DE ONDA DEL LFO 1 ---
+    int waveType = (int)apvts.getRawParameterValue("LFO1_WAVE")->load();
+    float lfo1Output = 0.0f;
+
+    if (waveType == 0)      lfo1Output = std::sin(lfo1Phase * juce::MathConstants<float>::twoPi);
+    else if (waveType == 1) lfo1Output = 2.0f * std::abs(2.0f * lfo1Phase - 1.0f) - 1.0f; // Triángulo
+    else if (waveType == 2) lfo1Output = 1.0f - 2.0f * lfo1Phase; // Sierra invertida
+    else if (waveType == 3) lfo1Output = (lfo1Phase < 0.5f) ? 1.0f : -1.0f; // Cuadrada
+    else if (waveType == 4) { // Sample & Hold (Ruido escalonado)
+        // Solo cambia de valor cuando la fase se reinicia
+        static float lastRand = 0.0f;
+        static float lastPhase = 0.0f;
+        if (lfo1Phase < lastPhase) {
+            lastRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
+        }
+        lastPhase = lfo1Phase;
+        lfo1Output = lastRand;
+    }
+
+    // Aplicamos el Jitter (Ruido orgánico) al LFO 1
+    float jitter1 = apvts.getRawParameterValue("LFO1_JITTER")->load();
+    if (jitter1 > 0.0f) {
+        float noise = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
+        lfo1Output += noise * jitter1 * 0.3f; // 0.3f para que el ruido no sea ensordecedor
+        lfo1Output = juce::jlimit(-1.0f, 1.0f, lfo1Output);
+    }
+
+    // Aplicamos la amplitud y lo mandamos al escaparate público
+    float amp1 = apvts.getRawParameterValue("LFO1_DEPTH")->load();
+    globalLfo1Value = lfo1Output * amp1;
+
+    // --- NUEVO: Enviamos el LFO 1 y LFO 2 a las Voces ---
+    for (int i = 0; i < synth.getNumVoices(); ++i) {
+        if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
+            voice->currentLfo1Value = globalLfo1Value; 
+            voice->currentLfo2Value = globalLfo2Value;
+        }
+    }
+
+    // (El cálculo del LFO 2 lo haremos en el siguiente paso, requiere leer los vectores Bézier)
+
+    // ==========================================================
+    // --- 2. PROCESAMIENTO DE AUDIO NORMAL ---
+    // ==========================================================
     // 1. Limpiamos los altavoces por si había ruido viejo
     buffer.clear();
 

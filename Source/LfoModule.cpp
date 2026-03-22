@@ -1,4 +1,5 @@
 #include "LfoModule.h"
+#include "PluginProcessor.h"
 
 LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts)
 {
@@ -48,6 +49,8 @@ LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
     nodeEnd.pos = { 1.0f, 0.5f };
     nodeEnd.handleIn = { -0.1f, 0.0f }; // Entra recta desde la izquierda
     lfoNodes.push_back(nodeEnd);
+
+    bakeWavetable();
 }
 
 LfoModule::~LfoModule() {}
@@ -465,6 +468,7 @@ void LfoModule::mouseDrag(const juce::MouseEvent& event)
     }
 
     repaint();
+    bakeWavetable();
 }
 
 void LfoModule::mouseDoubleClick(const juce::MouseEvent& event)
@@ -513,4 +517,62 @@ void LfoModule::mouseDoubleClick(const juce::MouseEvent& event)
         }
     }
     repaint();
+    bakeWavetable();
+}
+
+void LfoModule::bakeWavetable()
+{
+    // 1. Accedemos al Cerebro (El Procesador de Audio)
+    auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvtsRef.processor);
+    if (processor == nullptr) return; // Por si acaso
+
+    // 2. Creamos un array temporal para no molestar al audio mientras cocinamos
+    std::array<float, 2048> tempTable;
+    tempTable.fill(0.0f);
+
+    int lastFilledIndex = 0;
+    float lastY = lfoNodes.front().pos.y;
+
+    // 3. Escaneamos cada segmento de la curva
+    for (size_t i = 0; i < lfoNodes.size() - 1; ++i)
+    {
+        auto pA = lfoNodes[i];
+        auto pB = lfoNodes[i + 1];
+
+        // Los 4 puntos de control de la curva Bézier
+        juce::Point<float> p0 = pA.pos;
+        juce::Point<float> p1 = pA.pos + pA.handleOut;
+        juce::Point<float> p2 = pB.pos + pB.handleIn;
+        juce::Point<float> p3 = pB.pos;
+
+        // Damos 500 "pasos" por segmento para tener una resolución impecable
+        int steps = 500;
+        for (int s = 0; s <= steps; ++s) {
+            float t = (float)s / (float)steps;
+            float invT = 1.0f - t;
+
+            // FÓRMULA MÁGICA: Bézier Cúbica Paramétrica
+            float x = invT * invT * invT * p0.x + 3.0f * invT * invT * t * p1.x + 3.0f * invT * t * t * p2.x + t * t * t * p3.x;
+            float y = invT * invT * invT * p0.y + 3.0f * invT * invT * t * p1.y + 3.0f * invT * t * t * p2.y + t * t * t * p3.y;
+
+            // Convertimos la posición X (0.0 - 1.0) en un índice de la tabla (0 - 2047)
+            int currentIdx = juce::jlimit(0, 2047, (int)std::round(x * 2047.0f));
+
+            // Rellenamos la tabla (cubrimos pequeños huecos entre pasos por seguridad)
+            for (int fill = lastFilledIndex; fill <= currentIdx; ++fill) {
+                tempTable[fill] = y;
+            }
+
+            lastFilledIndex = currentIdx + 1;
+            lastY = y;
+        }
+    }
+
+    // Rellenamos el final por si acaso hubo algún redondeo raro
+    for (int fill = lastFilledIndex; fill < 2048; ++fill) {
+        tempTable[fill] = lastY;
+    }
+
+    // 4. ¡Damos el cambiazo! Volcamos la tabla al procesador en 1 microsegundo
+    processor->lfo2Table = tempTable;
 }
