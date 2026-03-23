@@ -73,8 +73,80 @@ void FilterModule::resized()
 
 // ... (deja tu función paint tal y como la tengas por ahora, la cambiaremos en el próximo paso)
 // ... (añade las funciones mouseDown y mouseDrag vacías al final si no las tenías)
-void FilterModule::mouseDown(const juce::MouseEvent& event) {}
-void FilterModule::mouseDrag(const juce::MouseEvent& event) {}
+void FilterModule::mouseDown(const juce::MouseEvent& event)
+{
+    // Solo actuamos si el clic está dentro del rectángulo de la gráfica
+    if (!graphArea.contains(event.x, event.y)) return;
+
+    // Obtenemos las posiciones actuales de los puntos para calcular la distancia
+    auto getDotX = [&](float freq) {
+        float minF = 20.0f, maxF = 20000.0f;
+        float proportion = std::log10(freq / minF) / std::log10(maxF / minF);
+        return graphArea.getX() + proportion * graphArea.getWidth();
+        };
+
+    auto getDotY = [&](float qVal) {
+        float qDb = 20.0f * std::log10(juce::jmax(qVal, 0.707f));
+        float yNorm = juce::jmap(qDb, -2.0f, 15.0f, 0.8f, 0.0f);
+        return graphArea.getY() + (yNorm * graphArea.getHeight());
+        };
+
+    float baseHpf = apvtsRef.getRawParameterValue("FILTER_HPF")->load();
+    float baseHRes = apvtsRef.getRawParameterValue("FILTER_RES_HPF")->load();
+    float baseLpf = apvtsRef.getRawParameterValue("FILTER_LPF")->load();
+    float baseLRes = apvtsRef.getRawParameterValue("FILTER_RES_LPF")->load();
+
+    juce::Point<float> hpfDot(getDotX(baseHpf), getDotY(baseHRes));
+    juce::Point<float> lpfDot(getDotX(baseLpf), getDotY(baseLRes));
+
+    juce::Point<float> mousePos((float)event.x, (float)event.y); 
+
+    // Si pulsamos cerca (radio de 20px para que sea fácil acertar) de un punto
+    float hitRadius = 20.0f;
+
+    if (mousePos.getDistanceFrom(hpfDot) < hitRadius) {
+        draggedDot = 0; // Enganchamos HPF
+    }
+    else if (mousePos.getDistanceFrom(lpfDot) < hitRadius) {
+        draggedDot = 1; // Enganchamos LPF
+    }
+    else {
+        draggedDot = -1; // Clic en el aire
+    }
+}
+void FilterModule::mouseDrag(const juce::MouseEvent& event)
+{
+    // Si no tenemos ningún punto enganchado, salimos
+    if (draggedDot == -1) return;
+
+    // Convertimos la posición X e Y del ratón en proporciones de 0.0 a 1.0 dentro de la gráfica
+    float proportionX = (float)(event.x - graphArea.getX()) / (float)graphArea.getWidth();
+    float proportionY = (float)(event.y - graphArea.getY()) / (float)graphArea.getHeight();
+
+    // Limitamos para no salirnos de la caja
+    proportionX = juce::jlimit(0.0f, 1.0f, proportionX);
+    proportionY = juce::jlimit(0.0f, 1.0f, proportionY);
+
+    // Convertimos proporción X a Hercios (Logarítmico)
+    // freq = min * (max/min)^proportion
+    float newFreq = 20.0f * std::pow(1000.0f, proportionX);
+    newFreq = juce::jlimit(20.0f, 20000.0f, newFreq);
+
+    // Convertimos proporción Y a Resonancia (Y arriba es 0, así que invertimos con 1.0-)
+    // Mapeamos el 0-1 a nuestro rango del knob (0.707 a 2.5)
+    float newRes = juce::jmap(1.0f - proportionY, 0.0f, 1.0f, 0.707f, 2.5f);
+    newRes = juce::jlimit(0.707f, 2.5f, newRes);
+
+    // Actualizamos los Knobs (y los Attachments harán la magia de actualizar el Procesador)
+    if (draggedDot == 0) { // HPF
+        hpfKnob.setValue(newFreq);
+        resHpfKnob.setValue(newRes);
+    }
+    else if (draggedDot == 1) { // LPF
+        lpfKnob.setValue(newFreq);
+        resLpfKnob.setValue(newRes);
+    }
+}
 
 // Pégalo al final de FilterModule.cpp
 
@@ -163,4 +235,35 @@ void FilterModule::paint(juce::Graphics& g)
 
     g.setColour(juce::Colours::cyan.brighter());
     g.strokePath(filterCurve, juce::PathStrokeType(2.0f));
+
+    //White points
+    auto getDotX = [&](float freq) {
+        float minF = 20.0f, maxF = 20000.0f;
+        float proportion = std::log10(freq / minF) / std::log10(maxF / minF);
+        return graphArea.getX() + proportion * graphArea.getWidth();
+        };
+
+    auto getDotY = [&](float qVal) {
+        // Mapeamos Q (0.7-2.5) a una altura visual. Usamos una aproximación para
+        // que el punto se sitúe visualmente sobre el pico de la montaña cyan.
+        // dB pico aprox = 20 * log10(Q)
+        float qDb = 20.0f * std::log10(juce::jmax(qVal, 0.707f));
+        // Mapeamos esos dBs (aprox 0dB a 8dB) a píxeles en el tercio superior
+        float yNorm = juce::jmap(qDb, -2.0f, 15.0f, 0.8f, 0.0f); // 0dB está al 80% de altura de la caja
+        return graphArea.getY() + (yNorm * graphArea.getHeight());
+        };
+
+    // Obtenemos valores base reales (del knob, sin modulación)
+    float baseHpf = apvtsRef.getRawParameterValue("FILTER_HPF")->load();
+    float baseHRes = apvtsRef.getRawParameterValue("FILTER_RES_HPF")->load();
+    float baseLpf = apvtsRef.getRawParameterValue("FILTER_LPF")->load();
+    float baseLRes = apvtsRef.getRawParameterValue("FILTER_RES_LPF")->load();
+
+    juce::Point<float> hpfDot(getDotX(baseHpf), getDotY(baseHRes));
+    juce::Point<float> lpfDot(getDotX(baseLpf), getDotY(baseLRes));
+
+    float dotRadius = 5.0f;
+    g.setColour(juce::Colours::white);
+    g.fillEllipse(hpfDot.getX() - dotRadius, hpfDot.getY() - dotRadius, dotRadius * 2, dotRadius * 2);
+    g.fillEllipse(lpfDot.getX() - dotRadius, lpfDot.getY() - dotRadius, dotRadius * 2, dotRadius * 2);
 }
