@@ -11,7 +11,7 @@
 #pragma once
 #include <JuceHeader.h>
 
-class FilterModule : public juce::Component
+class FilterModule : public juce::Component, public juce::Timer
 {
 public:
     FilterModule(juce::AudioProcessorValueTreeState& apvts);
@@ -19,8 +19,8 @@ public:
 
     void paint(juce::Graphics&) override;
     void resized() override;
+    void timerCallback() override;
 
-    // --- MAGIA INTERACTIVA (Ratón) ---
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
 
