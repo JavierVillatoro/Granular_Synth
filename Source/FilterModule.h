@@ -17,18 +17,26 @@ public:
     FilterModule(juce::AudioProcessorValueTreeState& apvts);
     ~FilterModule() override;
 
+    void paint(juce::Graphics&) override;
     void resized() override;
 
-private:
-    // Los 3 knobs del filtro analógico
-    juce::Slider lpfKnob;
-    juce::Slider resKnob;
-    juce::Slider hpfKnob;
+    // --- MAGIA INTERACTIVA (Ratón) ---
+    void mouseDown(const juce::MouseEvent& event) override;
+    void mouseDrag(const juce::MouseEvent& event) override;
 
-    // Los cables para conectarlos al cerebro
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lpfAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hpfAttach;
+private:
+    juce::AudioProcessorValueTreeState& apvtsRef;
+
+    // --- LOS 4 KNOBS ---
+    juce::Slider lpfKnob, resLpfKnob;
+    juce::Slider hpfKnob, resHpfKnob;
+
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lpfAttach, resLpfAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> hpfAttach, resHpfAttach;
+
+    // --- ZONAS VISUALES ---
+    juce::Rectangle<int> graphArea;
+    int draggedDot = -1; // -1 = Nada, 0 = Punto HPF, 1 = Punto LPF
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FilterModule)
 };

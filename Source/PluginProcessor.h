@@ -62,9 +62,9 @@ public:
     juce::Synthesiser& getSynthesiser() { return synth; }
 
     // Estas variables guardan el valor exacto del LFO en este preciso instante.
-    // Las Voces Granulares las leer·n para saber cÛmo tienen que moverse.
-    float globalLfo1Value = 0.0f; // Oscilar· entre -1.0 y 1.0
-    float globalLfo2Value = 0.0f; // Oscilar· entre 0.0 y 1.0 (Vectorial)
+    // Las Voces Granulares las leer√°n para saber c√≥mo tienen que moverse.
+    float globalLfo1Value = 0.0f; // Oscilar√° entre -1.0 y 1.0
+    float globalLfo2Value = 0.0f; // Oscilar√° entre 0.0 y 1.0 (Vectorial)
 
     // ==========================================================
     // --- MEMORIA WAVETABLE PARA EL LFO 2 
@@ -96,9 +96,9 @@ private:
     // ==========================================================
     // --- DATOS DEL ENTORNO (DAW / STANDALONE) ---
     // ==========================================================
-    double currentSampleRate = 44100.0; // Cu·ntas "fotos" de audio hacemos por segundo
+    double currentSampleRate = 44100.0; // Cu√°ntas "fotos" de audio hacemos por segundo
     double currentBPM = 120.0;          // El tempo actual (por defecto 120)
-    bool isPlaying = false;             // øEl DAW est· d·ndole al Play?
+    bool isPlaying = false;             // ¬øEl DAW est√° d√°ndole al Play?
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
 };

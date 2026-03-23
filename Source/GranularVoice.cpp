@@ -100,8 +100,9 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float sprayPitch = apvts->getRawParameterValue("SPRAY_PITCH")->load();
     float scanMode = apvts->getRawParameterValue("SCAN_MODE")->load();
     float filterLpfFreq = apvts->getRawParameterValue("FILTER_LPF")->load();
-    float filterRes = apvts->getRawParameterValue("FILTER_RES")->load();
+    float filterResLpf = apvts->getRawParameterValue("FILTER_RES_LPF")->load();
     float filterHpfFreq = apvts->getRawParameterValue("FILTER_HPF")->load();
+    float filterResHpf = apvts->getRawParameterValue("FILTER_RES_HPF")->load();
     ampAdsrParams.attack = apvts->getRawParameterValue("AMP_A")->load();
     ampAdsrParams.decay = apvts->getRawParameterValue("AMP_D")->load();
     ampAdsrParams.sustain = apvts->getRawParameterValue("AMP_S")->load();
@@ -129,11 +130,12 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, modulatedLpfFreq);
 
     // Aplicamos el resultado final a los filtros estéreo
+    // Aplicamos el resultado final a los filtros estéreo
     for (int i = 0; i < 2; ++i) {
-        lpf[i].setCutoffFrequency(modulatedLpfFreq); // <-- USAMOS LA FRECUENCIA MODULADA SUMADA
-        lpf[i].setResonance(filterRes);
+        lpf[i].setCutoffFrequency(modulatedLpfFreq);
+        lpf[i].setResonance(filterResLpf); // Resonancia individual LPF
         hpf[i].setCutoffFrequency(filterHpfFreq);
-        hpf[i].setResonance(filterRes);
+        hpf[i].setResonance(filterResHpf); // Resonancia individual HPF
     }
 
     // LEEr KNOBS DE PITCH

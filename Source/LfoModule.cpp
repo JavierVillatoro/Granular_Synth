@@ -187,7 +187,7 @@ void LfoModule::drawLfo2(juce::Graphics& g, juce::Rectangle<int> bounds)
 
     g.setColour(titaniumColor.withAlpha(0.8f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
-    g.drawText("LFO 2 (Vector)", bounds.reduced(5).withHeight(15), juce::Justification::topLeft, false);
+    g.drawText("LFO 2", bounds.reduced(5).withHeight(15), juce::Justification::topLeft, false);
 
     auto canvasArea = bounds;
     canvasArea.removeFromTop(20);

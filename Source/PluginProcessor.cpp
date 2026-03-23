@@ -273,10 +273,10 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     float amp1 = apvts.getRawParameterValue("LFO1_DEPTH")->load();
     globalLfo1Value = lfo1Output * amp1;
 
-    // --- NUEVO: Enviamos el LFO 1 y LFO 2 a las Voces ---
+    // --- NUEVO: Enviamos el LFO 1 a las Voces ---
     for (int i = 0; i < synth.getNumVoices(); ++i) {
         if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
-            voice->currentLfo1Value = globalLfo1Value; 
+            voice->currentLfo1Value = globalLfo1Value; // 
             voice->currentLfo2Value = globalLfo2Value;
         }
     }
@@ -409,18 +409,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "FILTER_LPF", "LPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f));
 
-    // 
-   // params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        //"FILTER_RES", "Resonance", juce::NormalisableRange<float>(0.1f, 5.0f, 0.01f), 0.707f));
-
-    // Resonance: De 0.707 (Plano/Neutro) a 2.5 (Pico)
+    // Resonancia LPF: De 0.707 (Plano/Neutro) a 2.5 (Pico)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "FILTER_RES", "Resonance", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
+        "FILTER_RES_LPF", "LPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
 
     // HPF Freq: Empieza cerrado abajo (20 Hz) para no cortar los graves al principio
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
 
+    // Resonancia HPF: De 0.707 (Plano/Neutro) a 2.5 (Pico)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "FILTER_RES_HPF", "HPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
     // --- SPACE MODULE (REVERB) ---
     // Size: Tamaño de la sala (0.0 = armario, 1.0 = catedral infinita)
     params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));

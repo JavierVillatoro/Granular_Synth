@@ -191,11 +191,29 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     }
 
     // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES (Derecha)
-    //g.setColour(juce::Colours::darkgrey);
     g.setColour(juce::Colour(0xff121212));
-    g.fillRect(rightMixerArea);
-    g.setColour(juce::Colours::white.withAlpha(0.8f));
-    g.drawText("MATRIX MOD & LAYER MIXER", rightMixerArea, juce::Justification::centred, false);
+    g.fillRect(rightMixerArea); // Mantenemos el fondo oscuro
+
+    // ==========================================================
+    // --- DIBUJAMOS EL ESQUELETO FASE 3 Y 4 ---
+    // ==========================================================
+    // Dibujamos los bordes en color Cyan con un poco de transparencia
+    g.setColour(juce::Colours::cyan.withAlpha(0.3f));
+    g.drawRect(matrixArea, 1);
+    g.drawRect(mixerArea, 1);
+    g.drawRect(masterArea, 1);
+    g.drawRect(distArea, 1);
+    g.drawRect(bpmArea, 1);
+
+    // Escribimos los títulos de cada sección para orientarnos
+    g.setColour(juce::Colours::white.withAlpha(0.7f));
+    g.setFont(14.0f);
+
+    g.drawText("MATRIX", matrixArea, juce::Justification::centred);
+    g.drawText("MIXER", mixerArea, juce::Justification::centred);
+    g.drawText("MASTER / LIMIT", masterArea, juce::Justification::centred);
+    g.drawText("DIST", distArea, juce::Justification::centred);
+    g.drawText("BPM", bpmArea, juce::Justification::centred);
 
     // ==============================================================================
     // 5. NUEVO: DIBUJAMOS LOS 8 MÓDULOS CON NOMBRES Y ETIQUETAS
@@ -207,11 +225,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         juce::StringArray {"Trans", "Fine", "Scale"},      // Pitch
         juce::StringArray {"", "", ""},                    // LFO
         juce::StringArray {"", "", "", ""},                // Envelope
-        juce::StringArray {"LPF", "Res", "HPF"},           // Filter
+        juce::StringArray {"", "", ""},           // Filter
         juce::StringArray {"Size", "Fback", "Mix"}         // Space
     };
 
-    juce::StringArray moduleNames = { "ENGINE", "SCAN", "SPRAY", "PITCH", "LFO", "", "FILTER", "SPACE" };
+    juce::StringArray moduleNames = { "ENGINE", "SCAN", "SPRAY", "PITCH", "", "", "", "SPACE" };
 
     int numColumns = 4;
     int numRows = 2;
@@ -257,17 +275,36 @@ void Granular_SynthAudioProcessorEditor::resized()
     // 1. PRIMERO quitamos la zona de abajo (así pilla los 1200px de ancho total)
     auto bottomModulesArea = bounds.removeFromBottom(300);
 
-    // 2. DESPUÉS quitamos el mixer del hueco que ha quedado arriba
+    // 2. DESPUÉS quitamos el bloque de la derecha del hueco que ha quedado arriba
     auto rightMixerArea = bounds.removeFromRight(350);
 
-    // Ahora las matemáticas volverán a ser perfectas
+    // ==========================================================
+    // --- FASE 3: ESQUELETO MATRIX / MIXER / MASTER ---
+    // ==========================================================
+    auto area = rightMixerArea; // Usamos el bloque de 350px que acabas de separar
+
+    // 1. CORTE VERTICAL: Columna Derecha delgada (35% del ancho total de este bloque)
+    auto rightColumn = area.removeFromRight(area.getWidth() * 0.35f);
+
+    // Lo que sobra en 'area' es la Columna Izquierda (65% del ancho)
+    auto leftColumn = area;
+
+    // 2. CORTES IZQUIERDOS (Grandes)
+    matrixArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f); // Mitad arriba
+    mixerArea = leftColumn; // El resto (mitad abajo)
+
+    // 3. CORTES DERECHOS (Delgados)
+    masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f); // Mitad arriba
+    distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);   // 50% de lo que queda
+    bpmArea = rightColumn; // El resto final (abajo del todo)
+
+    // ==========================================
+    // --- CÁLCULOS DE LA ZONA INFERIOR (TU CÓDIGO INTACTO) ---
+    // ==========================================
     int moduleWidth = bottomModulesArea.getWidth() / 4;
     int moduleHeight = bottomModulesArea.getHeight() / 2;
 
-    // ==========================================
-    // --- FILA 0 (LOS 4 MÓDULOS DE ARRIBA) ---
-    // ==========================================
-
+    // --- FILA 0 ---
     juce::Rectangle<int> module1Rect(bottomModulesArea.getX(), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     engineModule.setBounds(module1Rect);
 
@@ -280,32 +317,17 @@ void Granular_SynthAudioProcessorEditor::resized()
     juce::Rectangle<int> module4Rect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     pitchModule.setBounds(module4Rect);
 
-    // ==========================================
-    // --- FILA 1 (LOS 4 MÓDULOS DE ABAJO) ---
-    // ==========================================
-
-    // LFO (Fila 1, Columna 0)
-    juce::Rectangle<int> lfoRect(bottomModulesArea.getX(),
-        bottomModulesArea.getY() + moduleHeight,
-        moduleWidth, moduleHeight);
+    // --- FILA 1 ---
+    juce::Rectangle<int> lfoRect(bottomModulesArea.getX(), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     lfoModule.setBounds(lfoRect);
 
-    // ENVELOPE (Fila 1, Columna 1)
-    juce::Rectangle<int> envRect(bottomModulesArea.getX() + moduleWidth,
-        bottomModulesArea.getY() + moduleHeight, // Bajamos una fila
-        moduleWidth, moduleHeight);
+    juce::Rectangle<int> envRect(bottomModulesArea.getX() + moduleWidth, bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     envelopeModule.setBounds(envRect);
 
-    // FILTER (Fila 1, Columna 2)
-    juce::Rectangle<int> filterRect(bottomModulesArea.getX() + (moduleWidth * 2),
-        bottomModulesArea.getY() + moduleHeight,
-        moduleWidth, moduleHeight);
+    juce::Rectangle<int> filterRect(bottomModulesArea.getX() + (moduleWidth * 2), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     filterModule.setBounds(filterRect);
 
-    // SPACE (Fila 1, Columna 3)  
-    juce::Rectangle<int> spaceRect(bottomModulesArea.getX() + (moduleWidth * 3),
-        bottomModulesArea.getY() + moduleHeight,
-        moduleWidth, moduleHeight);
+    juce::Rectangle<int> spaceRect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     spaceModule.setBounds(spaceRect);
 }
 

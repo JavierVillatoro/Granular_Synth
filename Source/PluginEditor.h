@@ -84,5 +84,11 @@ private:
     double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qu	 parte del audio est a la izquierda de la pantalla
     int lastDragX = 0;
 
+    juce::Rectangle<int> matrixArea;
+    juce::Rectangle<int> mixerArea;
+    juce::Rectangle<int> masterArea;
+    juce::Rectangle<int> distArea;
+    juce::Rectangle<int> bpmArea;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessorEditor)
 };
