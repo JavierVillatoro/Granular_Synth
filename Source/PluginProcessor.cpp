@@ -299,7 +299,67 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 
     // ==========================================================
-    // 2. APLICAMOS LA REVERB GLOBAL (ESTILO IMMERSIVE/SHIMMER)
+    // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---
+    // ==========================================================
+    float driveParam = apvts.getRawParameterValue("DIST_DRIVE")->load(); // 0.0 a 100.0
+    float mixParam = apvts.getRawParameterValue("DIST_MIX")->load() / 100.0f; // Lo pasamos a 0.0 - 1.0
+    int typeParam = (int)apvts.getRawParameterValue("DIST_TYPE")->load(); // 0, 1, 2, 3
+
+    // Solo procesamos si el Mix es mayor que 0 (ahorramos CPU si está apagado)
+    if (mixParam > 0.001f)
+    {
+        // Mapeamos el Drive (0-100) a un multiplicador de ganancia real (1x a 15x de ganancia)
+        float driveMultiplier = juce::jmap(driveParam, 0.0f, 100.0f, 1.0f, 15.0f);
+
+        // AUTO-GAIN: Si multiplicamos por 15, el volumen explota. 
+        // Usamos la raíz cuadrada inversa para bajar el volumen matemáticamente y mantenerlo estable.
+        float autoGain = 1.0f / std::sqrt(driveMultiplier);
+
+        // Variables previas para el Bitcrush (Reducimos de 16 bits a 2 bits según el Drive)
+        float bitCrushDepth = juce::jmap(driveParam, 0.0f, 100.0f, 16.0f, 2.0f);
+        float bitStep = std::pow(2.0f, bitCrushDepth - 1.0f);
+
+        // Recorremos el audio muestra a muestra
+        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+        {
+            auto* channelData = buffer.getWritePointer(channel);
+            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            {
+                float cleanSignal = channelData[sample];
+                float distortedSignal = cleanSignal;
+
+                // 1. Apretamos la señal con el Drive
+                float input = cleanSignal * driveMultiplier;
+
+                // 2. Aplicamos el algoritmo destructivo elegido
+                switch (typeParam)
+                {
+                case 0: // Soft Clip (Saturación analógica, cálida y redonda)
+                    distortedSignal = std::tanh(input);
+                    break;
+                case 1: // Hard Clip (Corte digital puro, muy agresivo)
+                    distortedSignal = juce::jlimit(-1.0f, 1.0f, input);
+                    break;
+                case 2: // Foldback (En vez de cortar, la onda rebota hacia dentro. Sonido metálico/alienígena)
+                    distortedSignal = std::sin(input * juce::MathConstants<float>::halfPi);
+                    break;
+                case 3: // Bitcrush (Estilo Gameboy / Lo-Fi)
+                    distortedSignal = std::round(input * bitStep) / bitStep;
+                    distortedSignal = juce::jlimit(-1.0f, 1.0f, distortedSignal); // Seguridad extra
+                    break;
+                }
+
+                // 3. Compensamos el volumen (Auto-Gain)
+                distortedSignal *= autoGain;
+
+                // 4. MIX (Compresión Paralela): Mezclamos la señal limpia con la distorsionada
+                channelData[sample] = (cleanSignal * (1.0f - mixParam)) + (distortedSignal * mixParam);
+            }
+        }
+    }
+
+    // ==========================================================
+    // 2.5 APLICAMOS LA REVERB GLOBAL (ESTILO IMMERSIVE/SHIMMER)
     // ==========================================================
     float size = apvts.getRawParameterValue("SPACE_SIZE")->load();
     float fback = apvts.getRawParameterValue("SPACE_FBACK")->load();
@@ -516,6 +576,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // Por defecto en -0.3dB para dejar un pequeño margen de seguridad antes del 0 digital absoluto.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "LIMITER_THRESH", "Limit Ceiling", juce::NormalisableRange<float>(-6.0f, 0.0f, 0.1f), -0.3f));//antes -20
+
+    // ==============================================================================
+    // --- DISTORTION (CAPA 1) ---
+    // ==============================================================================
+    // DRIVE: De 0 a 100%. Cuanto más alto, más destrozamos la señal.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DIST_DRIVE", "Drive", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+
+    // MIX: De 0 a 100%. 0 = Señal limpia, 100 = Solo distorsión.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "DIST_MIX", "Mix", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+
+    // TYPE: Un menú con nuestras 4 opciones destructivas.
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        "DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
 
     return { params.begin(), params.end() };
 }

@@ -19,6 +19,7 @@
 #include "SpaceModule.h"
 #include "LfoModule.h"
 #include "MasterModule.h"
+#include "DistModule.h"
 
 //==============================================================================
 /**
@@ -64,6 +65,7 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     MasterModule masterModule;
+    DistModule distModule;
 
     Granular_SynthAudioProcessor& audioProcessor;
 
