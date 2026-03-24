@@ -72,6 +72,14 @@ public:
     static constexpr int LFO_TABLE_SIZE = 2048; // High resolution 
     std::array<float, LFO_TABLE_SIZE> lfo2Table = { 0.0f }; // Zeros table
 
+    // --- VARIABLES VISUALES (Los espías para la Interfaz) ---
+    std::atomic<float> visualLpfCutoff{ 20000.0f };
+    std::atomic<float> visualHpfCutoff{ 20.0f };
+
+    // Mueve estas dos líneas AQUÍ a la zona pública:
+    std::atomic<float> visualMeterL{ -60.0f };
+    std::atomic<float> visualMeterR{ -60.0f };
+
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
@@ -86,6 +94,13 @@ private:
 
     juce::dsp::Reverb masterReverb;
     juce::Reverb::Parameters reverbParams;
+
+    // LIMITER ---
+    juce::dsp::Limiter<float> masterLimiter;
+
+    // max_vol channel
+    //std::atomic<float> visualMeterL{ -60.0f };
+    //std::atomic<float> visualMeterR{ -60.0f };
 
     // ==========================================================
     // --- RELOJES DSP INTERNOS (PHASE ACCUMULATORS) ---

@@ -14,6 +14,7 @@
 //==============================================================================
 Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_SynthAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
+    masterModule(p.apvts, p),
     thumbnailCache(5),
     thumbnail(512, p.getFormatManager(), thumbnailCache)
 {
@@ -31,6 +32,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(envelopeModule);
     addAndMakeVisible(spaceModule);
     addAndMakeVisible(lfoModule);
+    addAndMakeVisible(masterModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -211,7 +213,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.drawText("MIXER", mixerArea, juce::Justification::centred);
-    g.drawText("MASTER / LIMIT", masterArea, juce::Justification::centred);
+    //g.drawText("MASTER / LIMIT", masterArea, juce::Justification::centred);
     g.drawText("DIST", distArea, juce::Justification::centred);
     g.drawText("BPM", bpmArea, juce::Justification::centred);
 
@@ -296,6 +298,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     // 3. CORTES DERECHOS (Delgados)
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f); // Mitad arriba
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);   // 50% de lo que queda
+    masterModule.setBounds(masterArea);
     bpmArea = rightColumn; // El resto final (abajo del todo)
 
     // ==========================================

@@ -18,6 +18,7 @@
 #include "EnvelopeModule.h"
 #include "SpaceModule.h"
 #include "LfoModule.h"
+#include "MasterModule.h"
 
 //==============================================================================
 /**
@@ -62,6 +63,8 @@ public:
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
+    MasterModule masterModule;
+
     Granular_SynthAudioProcessor& audioProcessor;
 
     juce::AudioThumbnailCache thumbnailCache; 

@@ -104,17 +104,22 @@ void Granular_SynthAudioProcessor::changeProgramName (int index, const juce::Str
 }
 
 //==============================================================================
-void Granular_SynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
-    // Preparamos la Reverb
+    // 1. Configuramos el "molde" de memoria (ProcessSpec)
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels = getTotalNumOutputChannels();
+
+    // 2. Le damos el molde a la Reverb
     masterReverb.prepare(spec);
 
+    // 3. ¡LA CURA AL ERROR! Le damos el molde al Limitador para que reserve su memoria
+    masterLimiter.prepare(spec);
+    masterLimiter.setRelease(10.0f); // 10ms para que sea rápido protegiendo picos
+
+    // 4. Preparamos el sintetizador
     synth.setCurrentPlaybackSampleRate(sampleRate);
 }
 
@@ -318,6 +323,38 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     juce::dsp::AudioBlock<float> audioBlock(buffer);
     juce::dsp::ProcessContextReplacing<float> context(audioBlock);
     masterReverb.process(context);
+
+    // ==========================================================
+    // --- 3. MASTER VOLUME & BRICKWALL LIMITER ---
+    // ==========================================================
+    float masterVolDb = apvts.getRawParameterValue("MASTER_VOL")->load();
+    float limiterThresh = apvts.getRawParameterValue("LIMITER_THRESH")->load();
+
+    // 1. Aplicamos el volumen general (convertimos de decibelios a un multiplicador lineal)
+    float volumeMultiplier = juce::Decibels::decibelsToGain(masterVolDb);
+    buffer.applyGain(volumeMultiplier);
+
+    // 2. Aplicamos el Limitador de JUCE
+    masterLimiter.setThreshold(limiterThresh);
+    juce::dsp::AudioBlock<float> limiterBlock(buffer);
+    juce::dsp::ProcessContextReplacing<float> limiterContext(limiterBlock);
+    masterLimiter.process(limiterContext);
+
+    // ==========================================================
+    // --- 4. ACTUALIZAR LOS ESPÍAS VISUALES (VÚMETRO ESTÉREO) ---
+    // ==========================================================
+    // Leemos el pico máximo del canal Izquierdo (0) y Derecho (1) de este bloque
+    float peakL = buffer.getMagnitude(0, 0, buffer.getNumSamples());
+    float peakR = buffer.getMagnitude(1, 0, buffer.getNumSamples());
+
+    // Convertimos los picos a Decibelios (para que la barra baje suavemente en la UI)
+    // Usamos -60dB como piso de ruido absoluto
+    float dbL = juce::Decibels::gainToDecibels(peakL, -60.0f);
+    float dbR = juce::Decibels::gainToDecibels(peakR, -60.0f);
+
+    // Guardamos los valores para que el MasterModule.cpp los lea a 30 FPS
+    visualMeterL.store(dbL);
+    visualMeterR.store(dbR);
 }
 
 //==============================================================================
@@ -467,6 +504,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // --- LFO 2 (VECTOR) ---
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         "LFO2_BEAT", "LFO 2 Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
+
+    // ==============================================================================
+    // --- MASTER & LIMITER GLOBALES ---
+    // ==============================================================================
+    // Master Volume: de -60dB (silencio casi total) a +12dB (por si el sonido original es muy bajo)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "MASTER_VOL", "Master Vol (dB)", juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f, 2.0f), 0.0f));
+
+    // Limiter Threshold (Ceiling)
+    // Por defecto en -0.3dB para dejar un pequeño margen de seguridad antes del 0 digital absoluto.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "LIMITER_THRESH", "Limit Ceiling", juce::NormalisableRange<float>(-6.0f, 0.0f, 0.1f), -0.3f));//antes -20
 
     return { params.begin(), params.end() };
 }
