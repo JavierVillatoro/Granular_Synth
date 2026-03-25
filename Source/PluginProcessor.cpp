@@ -592,6 +592,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         "DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
 
+    // ==============================================================================
+    // --- GLOBAL BPM & SYNC ---
+    // ==============================================================================
+    // Manual BPM: Rango estándar de 20 a 300 BPM. Por defecto 120.
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "MANUAL_BPM", "Manual BPM", juce::NormalisableRange<float>(20.0f, 300.0f, 0.1f), 120.0f));
+
+    // Botón de DAW Sync (True = Lee el DAW, False = Lee el Knob manual)
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "SYNC_TO_DAW", "DAW Sync", true));
+
     return { params.begin(), params.end() };
 }
 

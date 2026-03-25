@@ -20,6 +20,7 @@
 #include "LfoModule.h"
 #include "MasterModule.h"
 #include "DistModule.h"
+#include "BpmModule.h"
 
 //==============================================================================
 /**
@@ -66,6 +67,7 @@ private:
     // access the processor object that created it.
     MasterModule masterModule;
     DistModule distModule;
+    BpmModule bpmModule;
 
     Granular_SynthAudioProcessor& audioProcessor;
 

@@ -16,6 +16,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     : AudioProcessorEditor(&p), audioProcessor(p),
     masterModule(p.apvts, p),
     distModule(p.apvts),
+    bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
     thumbnailCache(5),
     thumbnail(512, p.getFormatManager(), thumbnailCache)
 {
@@ -35,6 +36,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(lfoModule);
     addAndMakeVisible(masterModule);
     addAndMakeVisible(distModule);
+    addAndMakeVisible(bpmModule);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -217,7 +219,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("MIXER", mixerArea, juce::Justification::centred);
     //g.drawText("MASTER / LIMIT", masterArea, juce::Justification::centred);
     //g.drawText("DIST", distArea, juce::Justification::centred);
-    g.drawText("BPM", bpmArea, juce::Justification::centred);
+    //g.drawText("BPM", bpmArea, juce::Justification::centred);
 
     // ==============================================================================
     // 5. NUEVO: DIBUJAMOS LOS 8 MÓDULOS CON NOMBRES Y ETIQUETAS
@@ -303,6 +305,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     distModule.setBounds(distArea);
     masterModule.setBounds(masterArea);
     bpmArea = rightColumn; // El resto final (abajo del todo)
+    bpmModule.setBounds(bpmArea);
 
     // ==========================================
     // --- CÁLCULOS DE LA ZONA INFERIOR (TU CÓDIGO INTACTO) ---
