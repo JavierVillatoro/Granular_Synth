@@ -106,6 +106,7 @@ void Granular_SynthAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    currentSampleRate = sampleRate;
     // 1. Configuramos el "molde" de memoria (ProcessSpec)
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;

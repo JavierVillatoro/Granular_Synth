@@ -121,8 +121,8 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 // Hann (Campana)
                 float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
                 // Square (Trapecio con mini-fade de 5% para que no sea un bloque puro)
-                float square = (progress < 0.05f) ? progress / 0.05f : (progress > 0.95f ? (1.0f - progress) / 0.05f : 1.0f);
-
+                //float square = (progress < 0.05f) ? progress / 0.05f : (progress > 0.95f ? (1.0f - progress) / 0.05f : 1.0f);
+                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
                 float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
                 float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
 
