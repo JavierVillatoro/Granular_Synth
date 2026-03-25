@@ -157,32 +157,41 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {   // ==========================================================
-    // --- 1. LEER EL RELOJ DEL DAW (SYNC) ---
+    // --- 1. LEER EL RELOJ MAESTRO (DAW o MANUAL) ---
     // ==========================================================
-    // Invocamos a la antena de JUCE
-    if (auto* playHead = getPlayHead())
+    // Leemos qué nos dice la interfaz
+    bool syncToDaw = apvts.getRawParameterValue("SYNC_TO_DAW")->load() > 0.5f;
+    float manualBpm = apvts.getRawParameterValue("MANUAL_BPM")->load();
+
+    // Por defecto, asumimos que el usuario manda con el Knob
+    currentBPM = manualBpm;
+    isPlaying = true; // Asumimos que suena para poder diseñar sonidos tranquilamente
+
+    if (syncToDaw)
     {
-        // Le pedimos al DAW la información de posición actual
-        if (auto positionInfo = playHead->getPosition())
+        // Si el botón SYNC está encendido, invocamos a la antena de JUCE
+        if (auto* playHead = getPlayHead())
         {
-            // Extraemos los BPM
-            if (positionInfo->getBpm().hasValue()) {
-                currentBPM = *positionInfo->getBpm();
+            if (auto positionInfo = playHead->getPosition())
+            {
+                // Extraemos los BPM del DAW y sobrescribimos el valor del Knob
+                if (positionInfo->getBpm().hasValue()) {
+                    currentBPM = *positionInfo->getBpm();
+                }
+
+                // Comprobamos si el DAW está reproduciendo
+                isPlaying = positionInfo->getIsPlaying();
             }
-
-            // Comprobamos si el DAW está reproduciendo (Play)
-            isPlaying = positionInfo->getIsPlaying();
-
-            // (En el futuro aquí extraeremos el ppqPosition para sincronizar la fase al milímetro)
         }
     }
-    else
-    {
+    // ==========================================================
+    //else
+    //{
         // Si no hay DAW (modo Standalone), volveremos a un reloj interno.
         // De momento lo dejamos a 120 fijo y siempre reproduciendo.
-        currentBPM = 120.0;
-        isPlaying = true;
-    }
+        //currentBPM = 120.0;
+        //isPlaying = true;
+    //}
 
     // ==========================================================
     // --- 1.5 CÁLCULO DE LOS LFOs (CONTROL RATE) ---

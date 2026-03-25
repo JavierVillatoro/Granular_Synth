@@ -14,7 +14,11 @@ BpmModule::BpmModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
 {
     // 1. CONFIGURAMOS EL KNOB MANUAL (Estética Global Gris/Blanco)
     bpmKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    bpmKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    //bpmKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    // Mostramos la caja de texto debajo del knob (60px de ancho, 20px de alto)
+    bpmKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 15);
+    
+    bpmKnob.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
     bpmKnob.setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::lightgrey);
     bpmKnob.setColour(juce::Slider::thumbColourId, juce::Colours::white.withAlpha(0.9f));
     addAndMakeVisible(bpmKnob);
@@ -58,11 +62,13 @@ void BpmModule::resized()
 {
     auto area = getLocalBounds().reduced(2);
 
-    // El botón de Sync va abajo
-    auto bottomArea = area.removeFromBottom(25);
-    syncButton.setBounds(bottomArea.reduced(5, 2));
+    // Hacemos el hueco del botón inferior un poco más pequeño (20 en vez de 25)
+    auto bottomArea = area.removeFromBottom(20);
+    syncButton.setBounds(bottomArea.reduced(2, 0));
 
-    // Dejamos hueco arriba para el título y el resto es para el Knob
-    area.removeFromTop(15);
-    bpmKnob.setBounds(area.reduced(5));
+    // Reducimos el hueco de arriba del título (12 en vez de 15)
+    area.removeFromTop(12);
+
+    // ¡La clave! Le damos todo el área restante al knob SIN reducir los bordes
+    bpmKnob.setBounds(area);
 }
