@@ -157,53 +157,85 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 #endif
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
-{   // ==========================================================
+{
+    // ==========================================================
     // --- 1. LEER EL RELOJ MAESTRO (DAW o MANUAL) ---
     // ==========================================================
-    // Leemos qué nos dice la interfaz
     bool syncToDaw = apvts.getRawParameterValue("SYNC_TO_DAW")->load() > 0.5f;
     float manualBpm = apvts.getRawParameterValue("MANUAL_BPM")->load();
 
-    // Por defecto, asumimos que el usuario manda con el Knob
     currentBPM = manualBpm;
-    isPlaying = true; // Asumimos que suena para poder diseñar sonidos tranquilamente
+    isPlaying = true;
 
     if (syncToDaw)
     {
-        // Si el botón SYNC está encendido, invocamos a la antena de JUCE
         if (auto* playHead = getPlayHead())
         {
             if (auto positionInfo = playHead->getPosition())
             {
-                // Extraemos los BPM del DAW y sobrescribimos el valor del Knob
                 if (positionInfo->getBpm().hasValue()) {
                     currentBPM = *positionInfo->getBpm();
                 }
-
-                // Comprobamos si el DAW está reproduciendo
                 isPlaying = positionInfo->getIsPlaying();
             }
         }
     }
-    // ==========================================================
-    //else
-    //{
-        // Si no hay DAW (modo Standalone), volveremos a un reloj interno.
-        // De momento lo dejamos a 120 fijo y siempre reproduciendo.
-        //currentBPM = 120.0;
-        //isPlaying = true;
-    //}
 
     // ==========================================================
-    // --- LÓGICA DE RETRIGGER DEL LFO ---
+    // --- LÓGICA DE CAPA 1: PLAY / MIDI / HOLD ---
     // ==========================================================
-    bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
+    bool isPlayOn = apvts.getRawParameterValue("L1_PLAY")->load() > 0.5f;
+    bool isMidiOn = apvts.getRawParameterValue("L1_MIDI")->load() > 0.5f;
+    bool isHoldOn = apvts.getRawParameterValue("L1_HOLD")->load() > 0.5f;
 
+    // 1. Creamos un buffer MIDI limpio (nuestro "portero")
+    juce::MidiBuffer processedMidi;
+
+    // 2. Filtramos lo que viene del DAW / Teclado
     for (const auto metadata : midiMessages)
     {
         auto message = metadata.getMessage();
+        int samplePos = metadata.samplePosition;
 
-        // Solo reiniciamos si has pulsado una tecla Y el botón Retrig está activado
+        if (isMidiOn)
+        {
+            // Si HOLD está encendido, tiramos a la basura las órdenes de "Soltar Tecla"
+            if (isHoldOn && message.isNoteOff()) {
+                continue;
+            }
+
+            // Si pasa el filtro, lo metemos en nuestro buffer limpio
+            processedMidi.addEvent(message, samplePos);
+        }
+    }
+
+    // 3. Lógica del botón PLAY (Inyectar el Drone C3)
+    if (isPlayOn && !lastPlayState)
+    {
+        processedMidi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    }
+    else if (!isPlayOn && lastPlayState)
+    {
+        processedMidi.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+    }
+    lastPlayState = isPlayOn;
+
+    // 4. Limpieza del HOLD
+    if (!isHoldOn && lastHoldState)
+    {
+        synth.allNotesOff(0, true);
+    }
+    lastHoldState = isHoldOn;
+
+    // ==========================================================
+    // --- LÓGICA DE RETRIGGER DEL LFO (Actualizada) ---
+    // ==========================================================
+    bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
+
+    // ¡OJO! Ahora leemos de 'processedMidi', no de 'midiMessages'
+    for (const auto metadata : processedMidi)
+    {
+        auto message = metadata.getMessage();
         if (message.isNoteOn() && retrigLfo)
         {
             lfo1Phase = 0.0f;
@@ -323,7 +355,9 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
 
     // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
     // Él leerá el MIDI, verá qué teclas has pulsado, y le dirá a las Voces que rellenen el buffer de audio.
-    synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    //synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+    // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
+    synth.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
 
     // ==========================================================
     // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---

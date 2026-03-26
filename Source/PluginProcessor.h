@@ -115,5 +115,8 @@ private:
     double currentBPM = 120.0;          // El tempo actual (por defecto 120)
     bool isPlaying = false;             // ¿El DAW está dándole al Play?
 
+    bool lastPlayState = false;
+    bool lastHoldState = false;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
 };
