@@ -195,6 +195,23 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     //}
 
     // ==========================================================
+    // --- LÓGICA DE RETRIGGER DEL LFO ---
+    // ==========================================================
+    bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
+
+    for (const auto metadata : midiMessages)
+    {
+        auto message = metadata.getMessage();
+
+        // Solo reiniciamos si has pulsado una tecla Y el botón Retrig está activado
+        if (message.isNoteOn() && retrigLfo)
+        {
+            lfo1Phase = 0.0f;
+            lfo2Phase = 0.0f;
+        }
+    }
+
+    // ==========================================================
     // --- 1.5 CÁLCULO DE LOS LFOs (CONTROL RATE) ---
     // ==========================================================
 
@@ -574,6 +591,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // --- LFO 2 (VECTOR) ---
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
         "LFO2_BEAT", "LFO 2 Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
+
+    // RETRIG
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "LFO_RETRIG", "LFO Retrigger", false));
 
     // ==============================================================================
     // --- MASTER & LIMITER GLOBALES ---

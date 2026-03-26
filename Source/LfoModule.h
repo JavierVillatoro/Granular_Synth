@@ -43,6 +43,10 @@ private:
 
     // --- Variables del LFO 2 Dibujable (Bézier) ---
     std::vector<LfoNode> lfoNodes;
+    
+    // Retrigger
+    juce::TextButton retrigButton;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> retrigAttach;
 
     // Memoria del ratón
     int draggedNode = -1;

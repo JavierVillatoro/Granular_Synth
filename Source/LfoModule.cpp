@@ -30,10 +30,28 @@ LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
     waveAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, "LFO1_WAVE", waveSelector);
     beatAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, "LFO1_BEAT", beatSelector);
 
+    // ==========================================================
+    // --- RETRIG (Global) ---
+    // ==========================================================
+    retrigButton.setButtonText("RETRIG");
+    retrigButton.setClickingTogglesState(true);
+
+    // Apagado: Texto gris oscuro, sin fondo
+    retrigButton.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    retrigButton.setColour(juce::TextButton::textColourOffId, juce::Colours::grey);
+
+    // Encendido: Fondo gris sutil, texto blanco brillante
+    retrigButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::white.withAlpha(0.2f));
+    retrigButton.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
+
+    addAndMakeVisible(retrigButton);
+    retrigAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvtsRef, "LFO_RETRIG", retrigButton);
+    // ==========================================================
+
     startTimerHz(30);
 
     // ==============================================================================
-    // NUEVO: Inicializa LFO 2 Vectorial con un triángulo básico y manecillas planas
+    // Inicializa LFO 2 
     // ==============================================================================
     LfoNode nodeStart, nodeMid, nodeEnd;
 
@@ -71,10 +89,23 @@ void LfoModule::resized()
 
     lfo1Area.removeFromTop(20);
     auto screenArea = lfo1Area.removeFromLeft(130).reduced(5);
+
+    // ==========================================================
+    // 1. LOS MENÚS RESCATADOS
+    // ==========================================================
     auto menusArea = lfo1Area.removeFromLeft(70).reduced(2, 5);
     waveSelector.setBounds(menusArea.removeFromTop(menusArea.getHeight() / 2).reduced(0, 2));
     beatSelector.setBounds(menusArea.reduced(0, 2));
+
+    // ==========================================================
+    // 2. LOS KNOBS GIGANTES Y EL BOTÓN LEVITANDO
+    // ==========================================================
     auto knobsArea = lfo1Area.reduced(5);
+
+    // Colocamos el botón RETRIG en el hueco negro de arriba (levitando)
+    retrigButton.setBounds(knobsArea.getX() + 2, knobsArea.getY() - 18, knobsArea.getWidth() - 4, 14);
+
+    // Los knobs se reparten su espacio al 100% como al principio
     depthKnob.setBounds(knobsArea.removeFromLeft(knobsArea.getWidth() / 2));
     jitterKnob.setBounds(knobsArea);
 }
