@@ -17,6 +17,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     masterModule(p.apvts, p),
     distModule(p.apvts),
     bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
+    layer1Controls(p.apvts, "L1_"),
     thumbnailCache(5),
     thumbnail(512, p.getFormatManager(), thumbnailCache)
 {
@@ -37,6 +38,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(masterModule);
     addAndMakeVisible(distModule);
     addAndMakeVisible(bpmModule);
+    addAndMakeVisible(layer1Controls);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -187,7 +189,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     {
         g.setColour(juce::Colours::white.withAlpha(0.5f));
         g.setFont(20.0f);
-        g.drawText("Capa 1: Arrastra Audio", layer1Area, juce::Justification::centred, false);
+        //g.drawText("Capa 1: Arrastra Audio", layer1Area, juce::Justification::centred, false);
     }
 
     g.setColour(juce::Colours::white.withAlpha(0.1f));
@@ -283,6 +285,17 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // 2. DESPUÉS quitamos el bloque de la derecha del hueco que ha quedado arriba
     auto rightMixerArea = bounds.removeFromRight(350);
+
+    // ==========================================================
+    // Lo que sobra en 'bounds' es el rectángulo gigante de las ondas.
+    auto wavesArea = bounds;
+
+    // Calculamos el trozo exacto de la primera capa (1/4 del alto total)
+    auto layer1Area = wavesArea.removeFromTop(wavesArea.getHeight() / 4);
+
+    // Ponemos nuestro módulo flotando a 10px del borde, con 150px de ancho y 20px de alto
+    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 150, 20);
+    // ==========================================================
 
     // ==========================================================
     // --- FASE 3: ESQUELETO MATRIX / MIXER / MASTER ---

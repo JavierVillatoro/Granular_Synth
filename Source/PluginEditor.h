@@ -21,6 +21,7 @@
 #include "MasterModule.h"
 #include "DistModule.h"
 #include "BpmModule.h"
+#include "LayerControlsModule.h"
 
 //==============================================================================
 /**
@@ -68,6 +69,7 @@ private:
     MasterModule masterModule;
     DistModule distModule;
     BpmModule bpmModule;
+    LayerControlsModule layer1Controls;
 
     Granular_SynthAudioProcessor& audioProcessor;
 

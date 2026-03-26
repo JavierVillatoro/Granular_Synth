@@ -634,6 +634,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "SYNC_TO_DAW", "DAW Sync", true));
 
+    // ==============================================================================
+    // --- CONTROLES DE CAPA 1 (Play, MIDI, Hold) ---
+    // ==============================================================================
+    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_PLAY", "L1 Play", false));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_MIDI", "L1 MIDI", true)); // MIDI encendido por defecto
+    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_HOLD", "L1 Hold", false));
+
     return { params.begin(), params.end() };
 }
 
