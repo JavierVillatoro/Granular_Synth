@@ -337,7 +337,7 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     float amp1 = apvts.getRawParameterValue("LFO1_DEPTH")->load();
     globalLfo1Value = lfo1Output * amp1;
 
-    // --- NUEVO: Enviamos el LFO 1 a las Voces ---
+    // LFO1 to voices 
     for (int i = 0; i < synth.getNumVoices(); ++i) {
         if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
             voice->currentLfo1Value = globalLfo1Value; // 
