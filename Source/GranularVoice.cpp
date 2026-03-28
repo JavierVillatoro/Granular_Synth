@@ -9,6 +9,7 @@
 */
 
 #include "GranularVoice.h"
+#include "PluginProcessor.h"
 
 // 1. EL CONSTRUCTOR: Guardamos las llaves
 GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse)
@@ -148,7 +149,16 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
     float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
-    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * totalAudioSeconds);
+    // LEER LA VENTANA DE ZOOM Y AJUSTAR EL TAMAÑO ---
+    float winStart = 0.0f;
+    float winLen = 1.0f;
+    if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor)) {
+        winStart = processor->windowStartRatio.load();
+        winLen = processor->windowLengthRatio.load();
+    }
+    float activeAudioSeconds = totalAudioSeconds * winLen;
+    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds); // El Size se adapta a la pantalla!
+
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
     double samplesBetweenGrains = getSampleRate() / juce::jmax(0.1f, density);
 
@@ -182,8 +192,18 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     grain.currentPosition = 0.0;
 
                     // Spray de Posición
+                    //float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
+                    //float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+                    //grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
+
+                    // Spray de Posición (actúa sobre el porcentaje local)
                     float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
-                    float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+                    float localPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
+
+                    // --- NUEVO: MAGIA CROP (De pantalla al archivo real) ---
+                    float finalPos = winStart + (localPos * winLen);
+                    finalPos = juce::jlimit(0.0f, 1.0f, finalPos); // Seguridad absoluta antimadreos
+
                     grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
 
                     // --- LÓGICA DE PITCH SPRAY CON ESCALAS  ---

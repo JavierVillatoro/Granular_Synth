@@ -109,8 +109,17 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float sizeRatio = grainSizeParam->load();
             float shapeValue = shapeParamVal->load(); // Leemos el Shape actual
 
-            double cursorTimeSeconds = currentPosition * totalAudioSeconds;
-            float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * (float)totalAudioSeconds);
+            float winStart = audioProcessor.windowStartRatio.load();
+            float winLen = audioProcessor.windowLengthRatio.load();
+
+            // 1. Posición real de la línea en el archivo entero
+            float absolutePos = winStart + (currentPosition * winLen);
+            double cursorTimeSeconds = absolutePos * totalAudioSeconds;
+
+            // 2. El tamaño ahora es un % del trozo visible, no del archivo entero
+            float activeAudioSeconds = (float)totalAudioSeconds * winLen;
+            float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
+            // ==========================================================
             float cursorX = layer1Area.getX() + ((cursorTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
 
             float grainWidthPixels = (grainSizeSeconds / visibleSeconds) * layer1Area.getWidth();
@@ -438,9 +447,10 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
 
             // 6. Limitamos para no salirnos por los bordes izquierdo (0.0) o derecho
             viewStartRatio = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactor), viewStartRatio);
-
-            // Aplicamos el zoom definitivo y redibujamos
             zoomFactor = newZoomFactor;
+
+            audioProcessor.windowStartRatio.store((float)viewStartRatio);
+            audioProcessor.windowLengthRatio.store(1.0f / (float)zoomFactor);
             repaint();
         }
     }
@@ -463,8 +473,11 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
 
         // 3. MAGIA: Convertimos ese clic en pantalla a la posición real del audio,
         // teniendo en cuenta el nivel de Zoom y el desplazamiento actual.
-        float visibleRatio = 1.0f / zoomFactor;
-        float normalizedPos = viewStartRatio + (ratioInView * visibleRatio);
+        //float visibleRatio = 1.0f / zoomFactor;
+        //float normalizedPos = viewStartRatio + (ratioInView * visibleRatio);
+
+        // 3. MAGIA CROP: Convertimos el clic directo al valor del knob (0.0 a 1.0 de la pantalla visible)
+        float normalizedPos = juce::jlimit(0.0f, 1.0f, ratioInView);
 
         normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
 

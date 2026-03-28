@@ -65,6 +65,10 @@ public:
     juce::AudioBuffer<float>& getAudioBuffer() { return audioBuffer; }
     bool isAudioLoaded = false;
 
+    // Memoria ventana de zoom
+    std::atomic<float> windowStartRatio{ 0.0f };
+    std::atomic<float> windowLengthRatio{ 1.0f };
+
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;
 
