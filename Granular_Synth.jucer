@@ -4,6 +4,10 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="rIKO8T" name="Granular_Synth">
     <GROUP id="{849B0228-6809-FA67-5837-53AAF84891E6}" name="Source">
+      <FILE id="WJM7Fx" name="LayerMixerModule.cpp" compile="1" resource="0"
+            file="Source/LayerMixerModule.cpp"/>
+      <FILE id="VfgBZk" name="LayerMixerModule.h" compile="0" resource="0"
+            file="Source/LayerMixerModule.h"/>
       <FILE id="xSg6CS" name="LayerControlsModule.cpp" compile="1" resource="0"
             file="Source/LayerControlsModule.cpp"/>
       <FILE id="pGZr02" name="LayerControlsModule.h" compile="0" resource="0"

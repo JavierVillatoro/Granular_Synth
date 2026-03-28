@@ -304,36 +304,73 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
         // --- 4. FILTROS Y SALIDA ANALÓGICA ---
 
-        // 1º Ajustamos el volumen general según el número de granos vivos
+         // 1º Ajustamos el volumen general según el número de granos vivos
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
             totalL *= gainScale;
             totalR *= gainScale;
         }
 
-        // 2º Pasamos el sonido por los FILTROS
-        // Al hacerlo aquí, el filtro actúa sobre el sonido dinámico puro
+        // 2º Pasamos el sonido por los FILTROS globales (LPF y HPF)
         totalL = hpf[0].processSample(0, totalL);
         totalR = hpf[1].processSample(0, totalR);
 
         totalL = lpf[0].processSample(0, totalL);
         totalR = lpf[1].processSample(0, totalR);
 
-        // 3º AHORA SÍ: Aplicamos la saturación/limitador analógico (std::tanh)
-        // Esto "abraza" cualquier pico de resonancia del filtro y lo convierte en 
-        // calidez de cinta, asegurando que el volumen nunca se descontrole.
+        // 3º Saturación analógica suave para controlar picos ANTES de la EQ
         totalL = std::tanh(totalL);
         totalR = std::tanh(totalR);
 
-        // ENVOLVENTE ADSR AL VOLUMEN
+        // ==========================================================
+        // --- MIXER Y EQ DE 4 BANDAS ---
+        // ==========================================================
+        // Leemos los valores de los knobs de la UI
+        float eqLowGain = apvts->getRawParameterValue("L1_EQ_LOW")->load();
+        float eqMidLowGain = apvts->getRawParameterValue("L1_EQ_MID_LOW")->load();
+        float eqMidHighGain = apvts->getRawParameterValue("L1_EQ_MID_HIGH")->load();
+        float eqHighGain = apvts->getRawParameterValue("L1_EQ_HIGH")->load();
+        float mixerVolDb = apvts->getRawParameterValue("L1_MIX_VOL")->load();
+
+        auto sr = getSampleRate();
+
+        // Calculamos la curva de la EQ (Frecuencias fijas)
+        for (int i = 0; i < 2; ++i) {
+            // Fíjate que ahora usamos ".coefficients =" en lugar de ".setCoefficients(...)"
+            eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(eqLowGain));
+            eqMidLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidLowGain));
+            eqMidHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 2500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidHighGain));
+            eqHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr, 10000.0f, 0.7f, juce::Decibels::decibelsToGain(eqHighGain));
+        }
+
+        // Pasamos el audio estéreo por las 4 bandas de la EQ
+        totalL = eqLowFilter[0].processSample(totalL);
+        totalR = eqLowFilter[1].processSample(totalR);
+
+        totalL = eqMidLowFilter[0].processSample(totalL);
+        totalR = eqMidLowFilter[1].processSample(totalR);
+
+        totalL = eqMidHighFilter[0].processSample(totalL);
+        totalR = eqMidHighFilter[1].processSample(totalR);
+
+        totalL = eqHighFilter[0].processSample(totalL);
+        totalR = eqHighFilter[1].processSample(totalR);
+
+        // APLICAMOS EL FADER DE VOLUMEN (Convertimos de dB a Ganancia lineal)
+        float mixerVolGain = juce::Decibels::decibelsToGain(mixerVolDb);
+        totalL *= mixerVolGain;
+        totalR *= mixerVolGain;
+
+        // --- ENVOLVENTE ADSR GENERAL (Último paso antes de salir) ---
         float currentAdsrVolume = ampAdsr.getNextSample();
         totalL *= currentAdsrVolume;
         totalR *= currentAdsrVolume;
 
-        outputBuffer.addSample(0, startSample + s, totalL* currentVelocity);
-        outputBuffer.addSample(1, startSample + s, totalR* currentVelocity);
+        // Salida al buffer de Ableton
+        outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);
+        outputBuffer.addSample(1, startSample + s, totalR * currentVelocity);
 
-        // Si el ADSR ha llegado a cero (el Release ha terminado), matamos la voz por fin
+        // Si el ADSR ha llegado a cero, matamos la voz
         if (!ampAdsr.isActive())
         {
             for (int i = 0; i < 128; ++i) {
@@ -342,6 +379,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             clearCurrentNote();
             isPlaying = false;
         }
-    }
+    } // <-- Fin del bucle for (int s = 0; s < numSamples; ++s)
 }
 

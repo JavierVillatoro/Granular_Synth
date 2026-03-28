@@ -85,4 +85,10 @@ private:
     // ENV_AMP
     juce::ADSR ampAdsr;
     juce::ADSR::Parameters ampAdsrParams;
+
+    // --- FILTROS EQ 4 BANDAS (Estéreo) ---
+    juce::dsp::IIR::Filter<float> eqLowFilter[2];
+    juce::dsp::IIR::Filter<float> eqMidLowFilter[2];
+    juce::dsp::IIR::Filter<float> eqMidHighFilter[2];
+    juce::dsp::IIR::Filter<float> eqHighFilter[2];
 };

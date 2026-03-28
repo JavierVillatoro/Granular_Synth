@@ -22,6 +22,7 @@
 #include "DistModule.h"
 #include "BpmModule.h"
 #include "LayerControlsModule.h"
+#include "LayerMixerModule.h"
 
 //==============================================================================
 /**
@@ -87,6 +88,7 @@ private:
     EnvelopeModule envelopeModule{ audioProcessor.apvts };
     SpaceModule spaceModule{ audioProcessor.apvts };
     LfoModule lfoModule{ audioProcessor.apvts };
+    LayerMixerModule mixerModule1;
 
     // --- VARIABLES DE ZOOM Y NAVEGACIN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10

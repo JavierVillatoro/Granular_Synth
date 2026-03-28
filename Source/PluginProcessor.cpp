@@ -675,6 +675,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterBool>("L1_MIDI", "L1 MIDI", true)); // MIDI encendido por defecto
     params.push_back(std::make_unique<juce::AudioParameterBool>("L1_HOLD", "L1 Hold", false));
 
+    // ==========================================================
+    // --- MIXER & EQ (Capa 1) ---
+    // ==========================================================
+    // Volumen Fader (+6dB) con Skew para tacto natural (curva dB)
+    // -inf dB es 0.0, 0dB es aprox 0.75, +6dB es 1.0. 
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_MIX_VOL", "L1 Vol", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.1f, 2.0f), 0.0f));
+
+    // 4 Knobs de Ganancia EQ (-15dB a +15dB)
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_LOW", "L1 EQ Low", -15.0f, 15.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_LOW", "L1 EQ Mid-Low", -15.0f, 15.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_HIGH", "L1 EQ Mid-High", -15.0f, 15.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_HIGH", "L1 EQ High", -15.0f, 15.0f, 0.0f));
+
     return { params.begin(), params.end() };
 }
 

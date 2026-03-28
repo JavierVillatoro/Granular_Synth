@@ -17,6 +17,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     masterModule(p.apvts, p),
     distModule(p.apvts),
     bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
+    mixerModule1(p.apvts, "L1_"),
     layer1Controls(p.apvts, "L1_"),
     thumbnailCache(5),
     thumbnail(512, p.getFormatManager(), thumbnailCache)
@@ -39,6 +40,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(distModule);
     addAndMakeVisible(bpmModule);
     addAndMakeVisible(layer1Controls);
+    addAndMakeVisible(mixerModule1);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
@@ -331,6 +333,8 @@ void Granular_SynthAudioProcessorEditor::resized()
     matrixArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f); // Mitad arriba
     mixerArea = leftColumn; // El resto (mitad abajo)
 
+    mixerModule1.setBounds(mixerArea);
+
     // 3. CORTES DERECHOS (Delgados)
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f); // Mitad arriba
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);   // 50% de lo que queda
@@ -479,7 +483,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         // 3. MAGIA CROP: Convertimos el clic directo al valor del knob (0.0 a 1.0 de la pantalla visible)
         float normalizedPos = juce::jlimit(0.0f, 1.0f, ratioInView);
 
-        normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
+        //normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
 
         // 4. Actualizamos el knob y el motor de audio
         if (auto* posParam = audioProcessor.apvts.getParameter("POSITION"))
