@@ -1,7 +1,7 @@
 #include "LfoModule.h"
 #include "PluginProcessor.h"
 
-LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts)
+    LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts)
 {
     // --- Configuración de los Knobs ---
     auto setupKnob = [this](juce::Slider& k) {
@@ -51,22 +51,34 @@ LfoModule::LfoModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
     startTimerHz(30);
 
     // ==============================================================================
-    // Inicializa LFO 2 
+    // --- RECUPERAR LA MEMORIA DEL LFO 2 O CREAR EL TRIÁNGULO POR DEFECTO ---
     // ==============================================================================
-    LfoNode nodeStart, nodeMid, nodeEnd;
+    if (auto* p = dynamic_cast<Granular_SynthAudioProcessor*>(&apvtsRef.processor))
+    {
+        if (p->isLfoSaved)
+        {
+            // Copiamos los puntos guardados
+            lfoNodes = p->savedLfoNodes;
+        }
+        else
+        {
+            // Solo creamos el triángulo la primera vez que arrastramos el plugin a la pista
+            LfoNode nodeStart, nodeMid, nodeEnd;
 
-    nodeStart.pos = { 0.0f, 0.5f };
-    nodeStart.handleOut = { 0.1f, 0.0f }; // Sale recta a la derecha
-    lfoNodes.push_back(nodeStart);
+            nodeStart.pos = { 0.0f, 0.5f };
+            nodeStart.handleOut = { 0.1f, 0.0f };
+            lfoNodes.push_back(nodeStart);
 
-    nodeMid.pos = { 0.5f, 1.0f };
-    nodeMid.handleIn = { -0.1f, 0.0f };  // Entra recta desde la izquierda
-    nodeMid.handleOut = { 0.1f, 0.0f };  // Sale recta a la derecha
-    lfoNodes.push_back(nodeMid);
+            nodeMid.pos = { 0.5f, 1.0f };
+            nodeMid.handleIn = { -0.1f, 0.0f };
+            nodeMid.handleOut = { 0.1f, 0.0f };
+            lfoNodes.push_back(nodeMid);
 
-    nodeEnd.pos = { 1.0f, 0.5f };
-    nodeEnd.handleIn = { -0.1f, 0.0f }; // Entra recta desde la izquierda
-    lfoNodes.push_back(nodeEnd);
+            nodeEnd.pos = { 1.0f, 0.5f };
+            nodeEnd.handleIn = { -0.1f, 0.0f };
+            lfoNodes.push_back(nodeEnd);
+        }
+    }
 
     bakeWavetable();
 }
@@ -582,7 +594,7 @@ void LfoModule::bakeWavetable()
             float t = (float)s / (float)steps;
             float invT = 1.0f - t;
 
-            // FÓRMULA MÁGICA: Bézier Cúbica Paramétrica
+            // Bézier Cúbica Paramétrica
             float x = invT * invT * invT * p0.x + 3.0f * invT * invT * t * p1.x + 3.0f * invT * t * t * p2.x + t * t * t * p3.x;
             float y = invT * invT * invT * p0.y + 3.0f * invT * invT * t * p1.y + 3.0f * invT * t * t * p2.y + t * t * t * p3.y;
 
@@ -606,4 +618,10 @@ void LfoModule::bakeWavetable()
 
     // 4. ¡Damos el cambiazo! Volcamos la tabla al procesador en 1 microsegundo
     processor->lfo2Table = tempTable;
+
+    if (auto* p = dynamic_cast<Granular_SynthAudioProcessor*>(&apvtsRef.processor))
+    {
+        p->savedLfoNodes = lfoNodes; // Guardamos la nueva posición de los puntos
+        p->isLfoSaved = true;        // Avisamos de que hay datos guardados
+    }
 }

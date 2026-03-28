@@ -47,6 +47,16 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("SHAPE", this);
 
     startTimerHz(30);
+
+    // ==========================================================
+    // --- CURA PARA LA AMNESIA DE LA ONDA DE AUDIO ---
+    // ==========================================================
+    // Le preguntamos al Motor si ya tenía un audio cargado de antes
+    if (audioProcessor.isAudioLoaded && audioProcessor.lastLoadedFilePath.isNotEmpty())
+    {
+        // Si es así, le decimos a nuestro dibujante (thumbnail) que vuelva a cargar ese archivo visualmente
+        thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePath)));
+    }
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()

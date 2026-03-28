@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "GranularVoice.h"
+#include "LfoModule.h"
 
 //==============================================================================
 /**
@@ -60,6 +61,14 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     juce::Synthesiser& getSynthesiser() { return synth; }
+
+    juce::AudioBuffer<float>& getAudioBuffer() { return audioBuffer; }
+    bool isAudioLoaded = false;
+
+    std::vector<LfoNode> savedLfoNodes;
+    bool isLfoSaved = false;
+
+    juce::String lastLoadedFilePath = "";
 
     // Estas variables guardan el valor exacto del LFO en este preciso instante.
     // Las Voces Granulares las leerán para saber cómo tienen que moverse.

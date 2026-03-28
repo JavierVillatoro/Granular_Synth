@@ -698,4 +698,7 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path)
         // Mensaje interno para que sepamos que todo ha ido bien (esto no lo ve el usuario)
         DBG("Archivo cargado en la memoria: " + file.getFileName());
     }
+
+    isAudioLoaded = true;
+    lastLoadedFilePath = path;
 }
