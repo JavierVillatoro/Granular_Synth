@@ -90,7 +90,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 {
     if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
 
-    //  LEER PARÁMETROS
+    //  LEER PARÁMETROS GLOBALES
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue("GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue("SCAN_SPEED")->load();
@@ -110,45 +110,31 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     ampAdsrParams.release = apvts->getRawParameterValue("AMP_R")->load();
     ampAdsr.setParameters(ampAdsrParams);
 
-    //for (int i = 0; i < 2; ++i) {
-        //lpf[i].setCutoffFrequency(filterLpfFreq);
-        //lpf[i].setResonance(filterRes);
-        //hpf[i].setCutoffFrequency(filterHpfFreq);
-        //hpf[i].setResonance(filterRes);
-    //}
-
     // ==========================================================
-// --- INYECCIÓN TEMPORAL: LFO 1 + LFO 2 AL FILTRO LPF ---
-// ==========================================================
-// Calculamos cuántos Hz mueve cada LFO por separado
+    // --- INYECCIÓN TEMPORAL: LFO 1 + LFO 2 AL FILTRO LPF ---
+    // ==========================================================
     float modFromLfo1 = currentLfo1Value * 2000.0f;
-    float modFromLfo2 = (currentLfo2Value - 0.5f) * 4000.0f; // LFO2 es vectorial (0 a 1), lo centramos con -0.5
-
-    // LA MAGIA DE LA MATRIZ: Sumamos el valor base del knob + LFO 1 + LFO 2
+    float modFromLfo2 = (currentLfo2Value - 0.5f) * 4000.0f;
     float modulatedLpfFreq = filterLpfFreq + modFromLfo1 + modFromLfo2;
-
-    // Evitamos que el filtro explote bajando de 20Hz o subiendo de 20kHz
     modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, modulatedLpfFreq);
 
-    // Aplicamos el resultado final a los filtros estéreo
-    // Aplicamos el resultado final a los filtros estéreo
     for (int i = 0; i < 2; ++i) {
         lpf[i].setCutoffFrequency(modulatedLpfFreq);
-        lpf[i].setResonance(filterResLpf); // Resonancia individual LPF
+        lpf[i].setResonance(filterResLpf);
         hpf[i].setCutoffFrequency(filterHpfFreq);
-        hpf[i].setResonance(filterResHpf); // Resonancia individual HPF
+        hpf[i].setResonance(filterResHpf);
     }
 
-    // LEEr KNOBS DE PITCH
+    // LEER KNOBS DE PITCH
     float pitchTrans = apvts->getRawParameterValue("PITCH_TRANS")->load();
     float pitchFine = apvts->getRawParameterValue("PITCH_FINE")->load();
     float pitchScale = apvts->getRawParameterValue("PITCH_SCALE")->load();
 
-    // TONO BASE
     float currentTrans = pitchTrans + pitchFine;
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
     float totalAudioSeconds = audioBuffer->getNumSamples() / getSampleRate();
+
     // LEER LA VENTANA DE ZOOM Y AJUSTAR EL TAMAÑO ---
     float winStart = 0.0f;
     float winLen = 1.0f;
@@ -157,15 +143,40 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         winLen = processor->windowLengthRatio.load();
     }
     float activeAudioSeconds = totalAudioSeconds * winLen;
-    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds); // El Size se adapta a la pantalla!
+    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
 
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
     double samplesBetweenGrains = getSampleRate() / juce::jmax(0.1f, density);
 
+
+    // 🟢 MOVIDO AQUÍ AFUERA (ZONA SEGURA / CONTROL RATE) 🟢
+    // ==============================================================================
+    // Este bloque antes estaba metido en el bucle s. Al sacarlo aquí, la CPU
+    // solo hace estas matemáticas pesadas 1 vez por bloque, no 44100 veces por segundo.
+    // ==============================================================================
+    float eqLowGain = apvts->getRawParameterValue("L1_EQ_LOW")->load();
+    float eqMidLowGain = apvts->getRawParameterValue("L1_EQ_MID_LOW")->load();
+    float eqMidHighGain = apvts->getRawParameterValue("L1_EQ_MID_HIGH")->load();
+    float eqHighGain = apvts->getRawParameterValue("L1_EQ_HIGH")->load();
+    float mixerVolDb = apvts->getRawParameterValue("L1_MIX_VOL")->load();
+
+    auto sr = getSampleRate();
+
+    for (int i = 0; i < 2; ++i) {
+        eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(eqLowGain));
+        eqMidLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidLowGain));
+        eqMidHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 2500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidHighGain));
+        eqHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr, 10000.0f, 0.7f, juce::Decibels::decibelsToGain(eqHighGain));
+    }
+
+    float mixerVolGain = juce::Decibels::decibelsToGain(mixerVolDb);
+    // 🟢 ======================================================================= 🟢
+
+
+    // ZONA ROJA (AUDIO RATE - 44100 Hz)  
     for (int s = 0; s < numSamples; ++s)
     {
         // --- 1.5 CÁLCULO DE POSICIÓN CON MODOS ---
-        //autoScanOffset += (double)scanSpeed / getSampleRate();
         autoScanOffset += (double)scanSpeed / (getSampleRate() * totalAudioSeconds);
         float rawPos = positionKnob + (float)autoScanOffset;
 
@@ -191,54 +202,42 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     grain.isActive = true;
                     grain.currentPosition = 0.0;
 
-                    // Spray de Posición
-                    //float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
-                    //float finalPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
-                    //grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
-
                     // Spray de Posición (actúa sobre el porcentaje local)
                     float randomOffset = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos;
                     float localPos = juce::jlimit(0.0f, 1.0f, currentTargetPos + randomOffset);
 
-                    // --- NUEVO: MAGIA CROP (De pantalla al archivo real) ---
+                    // Magia CROP
                     float finalPos = winStart + (localPos * winLen);
-                    finalPos = juce::jlimit(0.0f, 1.0f, finalPos); // Seguridad absoluta antimadreos
+                    finalPos = juce::jlimit(0.0f, 1.0f, finalPos);
 
                     grain.startSample = (int)(finalPos * (audioBuffer->getNumSamples() - 1));
 
-                    // --- LÓGICA DE PITCH SPRAY CON ESCALAS  ---
+                    // Lógica de Pitch Spray
                     float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
                     int scaleModeInt = (int)pitchScale;
 
-                    if (scaleModeInt == 1) // Octavas
-                    {
+                    if (scaleModeInt == 1) {
                         rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
                     }
-                    else if (scaleModeInt == 2) // Octavas y Quintas
-                    {
+                    else if (scaleModeInt == 2) {
                         int st = (int)std::round(rawPitchRand);
                         int oct = (st / 12) * 12;
                         int rem = std::abs(st % 12);
-
                         if (rem < 4) rem = 0;
                         else if (rem < 10) rem = 7;
                         else { rem = 0; oct += (st < 0 ? -12 : 12); }
-
                         rawPitchRand = oct + (st < 0 ? -rem : rem);
                     }
-                    else if (scaleModeInt == 3) // Pentatónica Menor
-                    {
+                    else if (scaleModeInt == 3) {
                         int st = (int)std::round(rawPitchRand);
                         int oct = (st / 12) * 12;
                         int rem = std::abs(st % 12);
                         int q = 0;
-
                         if (rem <= 1) q = 0;
                         else if (rem <= 4) q = 3;
                         else if (rem <= 6) q = 5;
                         else if (rem <= 8) q = 7;
                         else q = 10;
-
                         rawPitchRand = oct + (st < 0 ? -q : q);
                     }
 
@@ -270,17 +269,13 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 float progress = (float)(grain.currentPosition / grainLength);
 
                 float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                //float square = (progress < 0.02f) ? progress / 0.02f : (progress > 0.98f ? (1.0f - progress) / 0.02f : 1.0f);
                 float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
                 float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
 
-                // --- USAMOS EL NUEVO finalBasePitchRatio AQUÍ ---
-                //int readPos = grain.startSample + (int)(grain.currentPosition * finalBasePitchRatio * grain.pitchRandomRatio);
                 int readPos = grain.startSample + (int)(grain.currentPosition * grain.activePitchRatio);
-
                 int safeReadPos = juce::jlimit(0, audioBuffer->getNumSamples() - 1, readPos);
-                float normalizedPos = (float)safeReadPos / (float)audioBuffer->getNumSamples();
 
+                float normalizedPos = (float)safeReadPos / (float)audioBuffer->getNumSamples();
                 visualGrainPos[grainIndex].store(normalizedPos);
                 visualGrainEnv[grainIndex].store(window);
 
@@ -298,52 +293,28 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             {
                 visualGrainEnv[grainIndex].store(0.0f);
             }
-
             grainIndex++;
         }
 
         // --- 4. FILTROS Y SALIDA ANALÓGICA ---
-
-         // 1º Ajustamos el volumen general según el número de granos vivos
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
             totalL *= gainScale;
             totalR *= gainScale;
         }
 
-        // 2º Pasamos el sonido por los FILTROS globales (LPF y HPF)
+        // Filtros globales (LPF y HPF)
         totalL = hpf[0].processSample(0, totalL);
         totalR = hpf[1].processSample(0, totalR);
 
         totalL = lpf[0].processSample(0, totalL);
         totalR = lpf[1].processSample(0, totalR);
 
-        // 3º Saturación analógica suave para controlar picos ANTES de la EQ
+        // Saturación analógica suave
         totalL = std::tanh(totalL);
         totalR = std::tanh(totalR);
 
-        // ==========================================================
-        // --- MIXER Y EQ DE 4 BANDAS ---
-        // ==========================================================
-        // Leemos los valores de los knobs de la UI
-        float eqLowGain = apvts->getRawParameterValue("L1_EQ_LOW")->load();
-        float eqMidLowGain = apvts->getRawParameterValue("L1_EQ_MID_LOW")->load();
-        float eqMidHighGain = apvts->getRawParameterValue("L1_EQ_MID_HIGH")->load();
-        float eqHighGain = apvts->getRawParameterValue("L1_EQ_HIGH")->load();
-        float mixerVolDb = apvts->getRawParameterValue("L1_MIX_VOL")->load();
-
-        auto sr = getSampleRate();
-
-        // Calculamos la curva de la EQ (Frecuencias fijas)
-        for (int i = 0; i < 2; ++i) {
-            // Fíjate que ahora usamos ".coefficients =" en lugar de ".setCoefficients(...)"
-            eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(eqLowGain));
-            eqMidLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidLowGain));
-            eqMidHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 2500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidHighGain));
-            eqHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr, 10000.0f, 0.7f, juce::Decibels::decibelsToGain(eqHighGain));
-        }
-
-        // Pasamos el audio estéreo por las 4 bandas de la EQ
+        // 🟢 SE MANTIENE AQUÍ DENTRO: Pasar el audio por los filtros ya calculados
         totalL = eqLowFilter[0].processSample(totalL);
         totalR = eqLowFilter[1].processSample(totalR);
 
@@ -356,12 +327,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         totalL = eqHighFilter[0].processSample(totalL);
         totalR = eqHighFilter[1].processSample(totalR);
 
-        // APLICAMOS EL FADER DE VOLUMEN (Convertimos de dB a Ganancia lineal)
-        float mixerVolGain = juce::Decibels::decibelsToGain(mixerVolDb);
+        // 🟢 SE MANTIENE AQUÍ DENTRO: Multiplicar el volumen ya calculado
         totalL *= mixerVolGain;
         totalR *= mixerVolGain;
 
-        // --- ENVOLVENTE ADSR GENERAL (Último paso antes de salir) ---
+        // ENVOLVENTE ADSR GENERAL
         float currentAdsrVolume = ampAdsr.getNextSample();
         totalL *= currentAdsrVolume;
         totalR *= currentAdsrVolume;
@@ -370,7 +340,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);
         outputBuffer.addSample(1, startSample + s, totalR * currentVelocity);
 
-        // Si el ADSR ha llegado a cero, matamos la voz
         if (!ampAdsr.isActive())
         {
             for (int i = 0; i < 128; ++i) {
@@ -379,6 +348,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             clearCurrentNote();
             isPlaying = false;
         }
-    } // <-- Fin del bucle for (int s = 0; s < numSamples; ++s)
+    }
 }
 
