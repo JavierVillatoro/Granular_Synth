@@ -683,11 +683,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_MIX_VOL", "L1 Vol", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.1f, 2.0f), 0.0f));
 
-    // 4 Knobs de Ganancia EQ (-15dB a +15dB)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_LOW", "L1 EQ Low", -15.0f, 15.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_LOW", "L1 EQ Mid-Low", -15.0f, 15.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_HIGH", "L1 EQ Mid-High", -15.0f, 15.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_HIGH", "L1 EQ High", -15.0f, 15.0f, 0.0f));
+    juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
+    eqRange.setSkewForCentre(0.0f);
+
+    // Usamos ese rango especial para los 4 knobs
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_LOW", "L1 EQ Low", eqRange, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_LOW", "L1 EQ Mid-Low", eqRange, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_HIGH", "L1 EQ Mid-High", eqRange, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_HIGH", "L1 EQ High", eqRange, 0.0f));
 
     return { params.begin(), params.end() };
 }

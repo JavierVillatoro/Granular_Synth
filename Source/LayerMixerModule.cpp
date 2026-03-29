@@ -30,7 +30,7 @@ LayerMixerModule::LayerMixerModule(juce::AudioProcessorValueTreeState& apvts, ju
 
     // 2. CONFIGURACIÓN DEL FADER DE VOLUMEN (Con texto "dB")
     volumeFader.setSliderStyle(juce::Slider::LinearVertical);
-    volumeFader.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 45, 16);
+    volumeFader.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 0, 0);  //4516  65 16
     volumeFader.setTextValueSuffix(" dB"); // ¡Magia! Ahora el número lleva el apellido dB
     volumeFader.setColour(juce::Slider::trackColourId, juce::Colours::cyan.withAlpha(0.6f));
     volumeFader.setColour(juce::Slider::backgroundColourId, juce::Colours::black.withAlpha(0.5f));
@@ -70,6 +70,16 @@ void LayerMixerModule::paint(juce::Graphics& g)
     g.drawText("MID-H", eqMidHigh.getBounds().translated(0, 22), juce::Justification::centred, false);
     g.drawText("MID-L", eqMidLow.getBounds().translated(0, 22), juce::Justification::centred, false);
     g.drawText("LOW", eqLow.getBounds().translated(0, 22), juce::Justification::centred, false);
+
+    // --- DIBUJAR EL NÚMERO DEL FADER ---
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.setColour(juce::Colours::cyan);
+
+    // Extraemos el valor del fader y le añadimos " dB" (ej: "-12.5 dB")
+    juce::String volText = juce::String(volumeFader.getValue(), 1) + " dB";
+
+    // Lo dibujamos justo debajo del fader, dándole espacio de sobra para que no ponga "..."
+    g.drawText(volText, volumeFader.getX() - 10, volumeFader.getBottom() + 2, volumeFader.getWidth() + 20, 15, juce::Justification::centred);
 }
 
 void LayerMixerModule::resized()
@@ -81,7 +91,7 @@ void LayerMixerModule::resized()
 
     // De ese bloque, el 35% de la derecha es para el Fader profesional
     auto faderArea = leftSection.removeFromRight(leftSection.getWidth() * 0.35f);
-    volumeFader.setBounds(faderArea.reduced(2, 5));
+    volumeFader.setBounds(faderArea.reduced(2, 12)); // 2 5 
 
     // El resto (65%) es para que los knobs de EQ se luzcan
     auto eqArea = leftSection;
