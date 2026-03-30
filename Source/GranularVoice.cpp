@@ -88,7 +88,9 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
 
 void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
-    if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
+    //if (!isPlaying || audioBuffer->getNumSamples() == 0) return;
+    // Bloquea procesamientos fantasma
+    if (!isPlaying || audioBuffer == nullptr || audioBuffer->getNumSamples() == 0 || getSampleRate() <= 0.0) return;
 
     //  LEER PARÁMETROS GLOBALES
     float positionKnob = apvts->getRawParameterValue("POSITION")->load();
@@ -177,7 +179,8 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     for (int s = 0; s < numSamples; ++s)
     {
         // --- 1.5 CÁLCULO DE POSICIÓN CON MODOS ---
-        autoScanOffset += (double)scanSpeed / (getSampleRate() * totalAudioSeconds);
+        //autoScanOffset += (double)scanSpeed / (getSampleRate() * totalAudioSeconds);
+        autoScanOffset += (double)scanSpeed / (double)audioBuffer->getNumSamples(); //Inmune divisiones por cero
         float rawPos = positionKnob + (float)autoScanOffset;
 
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;
@@ -335,6 +338,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         float currentAdsrVolume = ampAdsr.getNextSample();
         totalL *= currentAdsrVolume;
         totalR *= currentAdsrVolume;
+
+        // LA RED DE SEGURIDAD (Caza cualquier error matemático antes de salir)
+        if (std::isnan(totalL) || std::isinf(totalL)) totalL = 0.0f;
+        if (std::isnan(totalR) || std::isinf(totalR)) totalR = 0.0f;
 
         // Salida al buffer de Ableton
         outputBuffer.addSample(0, startSample + s, totalL * currentVelocity);

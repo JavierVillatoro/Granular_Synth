@@ -707,10 +707,16 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path)
     if (reader != nullptr)
     {
         // Preparamos nuestro "disco duro" (audioBuffer) con el número de canales y la longitud del audio
-        audioBuffer.setSize((int)reader->numChannels, (int)reader->lengthInSamples);
+        //audioBuffer.setSize((int)reader->numChannels, (int)reader->lengthInSamples);
+        juce::AudioBuffer<float> tempBuffer((int)reader->numChannels, (int)reader->lengthInSamples);
 
         // Volcamos toda la información del lector dentro de nuestro audioBuffer
-        reader->read(&audioBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
+        //reader->read(&audioBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
+        reader->read(&tempBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
+
+        suspendProcessing(true);
+        audioBuffer.makeCopyOf(tempBuffer);
+        suspendProcessing(false);
 
         // Mensaje interno para que sepamos que todo ha ido bien (esto no lo ve el usuario)
         DBG("Archivo cargado en la memoria: " + file.getFileName());
