@@ -500,7 +500,7 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
 
 void Granular_SynthAudioProcessorEditor::timerCallback()
 {
-    // Esto le dice a JUCE: "Oye, borra la pantalla y vuelve a llamar a paint()"
+    // Borra la pantalla y vuelve a llamar a paint()"
     repaint();
 }
 

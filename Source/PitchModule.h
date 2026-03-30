@@ -22,7 +22,8 @@ public:
 
 private:
     juce::String layerPrefix; // <-- Identidad
-
+
+
     juce::Slider transKnob;
     juce::Slider fineKnob;
     juce::Slider scaleKnob;
