@@ -68,7 +68,7 @@ private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     MasterModule masterModule;
-    DistModule distModule;
+    //DistModule distModule; lo he declarado abajo adaptado para los prefijos. 
     BpmModule bpmModule;
     LayerControlsModule layer1Controls;
 
@@ -80,15 +80,16 @@ private:
 
     //std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
 
-    EngineModule engineModule{ audioProcessor.apvts };
-    ScanModule scanModule{ audioProcessor.apvts };
-    SprayModule sprayModule{ audioProcessor.apvts };
-    PitchModule pitchModule{ audioProcessor.apvts };
-    FilterModule filterModule{ audioProcessor.apvts };
-    EnvelopeModule envelopeModule{ audioProcessor.apvts };
-    SpaceModule spaceModule{ audioProcessor.apvts };
-    LfoModule lfoModule{ audioProcessor.apvts };
-    LayerMixerModule mixerModule1;
+    EngineModule engineModule{ audioProcessor.apvts, "L1_" };
+    ScanModule scanModule{ audioProcessor.apvts, "L1_" };
+    SprayModule sprayModule{ audioProcessor.apvts, "L1_" };
+    PitchModule pitchModule{ audioProcessor.apvts, "L1_" };
+    FilterModule filterModule{ audioProcessor.apvts, "L1_" };
+    EnvelopeModule envelopeModule{ audioProcessor.apvts, "L1_" };
+    SpaceModule spaceModule{ audioProcessor.apvts, "L1_" };
+    LfoModule lfoModule{ audioProcessor.apvts }; // (LFO es global, sin prefijo)
+    DistModule distModule{ audioProcessor.apvts, "L1_" };
+    LayerMixerModule mixerModule1{ audioProcessor.apvts, "L1_" };
 
     // --- VARIABLES DE ZOOM Y NAVEGACIN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10

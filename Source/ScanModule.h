@@ -14,20 +14,20 @@
 class ScanModule : public juce::Component
 {
 public:
-    // El constructor necesita el cerebro (apvts) para conectar los cables
-    ScanModule(juce::AudioProcessorValueTreeState& apvts);
+    // AÑADIDO: El parámetro juce::String prefix
+    ScanModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~ScanModule() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
-    // --- LOS 3 BOTONES ---
+    juce::String layerPrefix; // <-- Guarda la identidad
+
     juce::Slider posKnob;
     juce::Slider speedKnob;
     juce::Slider dirKnob;
 
-    // --- LOS 3 CABLES --- (Nombres corregidos para que coincidan con tu .cpp)
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> posAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> speedAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> dirAttach;

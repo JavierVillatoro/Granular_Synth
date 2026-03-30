@@ -14,7 +14,8 @@
 class FilterModule : public juce::Component, public juce::Timer
 {
 public:
-    FilterModule(juce::AudioProcessorValueTreeState& apvts);
+    //FilterModule(juce::AudioProcessorValueTreeState& apvts);
+    FilterModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~FilterModule() override;
 
     void paint(juce::Graphics&) override;
@@ -26,6 +27,7 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
+    juce::String layerPrefix;
 
     // --- LOS 4 KNOBS ---
     juce::Slider lpfKnob, resLpfKnob;

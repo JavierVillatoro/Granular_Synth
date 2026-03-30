@@ -10,65 +10,52 @@
 
 #include "EnvelopeModule.h"
 
-EnvelopeModule::EnvelopeModule(juce::AudioProcessorValueTreeState& apvts)
-    : apvtsRef(apvts)
+EnvelopeModule::EnvelopeModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
-    // Hacemos que la pantalla se actualice a 30fps para que los gráficos sean fluidos
     startTimerHz(30);
 }
 
 EnvelopeModule::~EnvelopeModule() {}
 
-void EnvelopeModule::timerCallback()
-{
-    repaint(); // Redibuja los gráficos si movemos algo
-}
+void EnvelopeModule::timerCallback() { repaint(); }
 
 void EnvelopeModule::paint(juce::Graphics& g)
 {
     auto area = getLocalBounds();
-
-    // Dividimos el espacio en dos mitades perfectas (Arriba y Abajo)
     auto ampArea = area.removeFromTop(area.getHeight() / 2);
-    auto env2Area = area; // Lo que sobra es la mitad de abajo
+    auto env2Area = area;
 
-    // Leemos los valores actuales del Cerebro (APVTS)
-    float aA = apvtsRef.getRawParameterValue("AMP_A")->load();
-    float aD = apvtsRef.getRawParameterValue("AMP_D")->load();
-    float aS = apvtsRef.getRawParameterValue("AMP_S")->load();
-    float aR = apvtsRef.getRawParameterValue("AMP_R")->load();
+    // LECTURA DINÁMICA CON PREFIJO PARA EL AMP (Capa 1/2/3...)
+    float aA = apvtsRef.getRawParameterValue(layerPrefix + "AMP_A")->load();
+    float aD = apvtsRef.getRawParameterValue(layerPrefix + "AMP_D")->load();
+    float aS = apvtsRef.getRawParameterValue(layerPrefix + "AMP_S")->load();
+    float aR = apvtsRef.getRawParameterValue(layerPrefix + "AMP_R")->load();
 
+    // LECTURA GLOBAL PARA EL ENV2 (SIN PREFIJO)
     float e2A = apvtsRef.getRawParameterValue("ENV2_A")->load();
     float e2D = apvtsRef.getRawParameterValue("ENV2_D")->load();
     float e2S = apvtsRef.getRawParameterValue("ENV2_S")->load();
     float e2R = apvtsRef.getRawParameterValue("ENV2_R")->load();
 
-    // Dibujamos la línea separadora
     g.setColour(juce::Colours::white.withAlpha(0.1f));
     g.drawLine(area.getX(), ampArea.getBottom(), area.getRight(), ampArea.getBottom(), 1.0f);
 
-    // ====================================================================
-    // --- COLORES: Local (Cyan) vs Global (Gris Titanio) ---
-    // ====================================================================
     juce::Colour layerColor = juce::Colours::cyan;
-    juce::Colour globalColor = juce::Colour(0xffd0d0d0);
+    juce::Colour globalColor = juce::Colour(0xffd0d0d0); // Gris Titanio
 
-    // Pintamos los gráficos pasándoles el color como variable final
     drawEnvelope(g, ampArea.reduced(5), "AMP", aA, aD, aS, aR, layerColor);
     drawEnvelope(g, env2Area.reduced(5), "ENV 2", e2A, e2D, e2S, e2R, globalColor);
 }
 
 void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name,
-    float a, float d, float s, float r, juce::Colour envColor) // <-- AÑADIDO envColor
+    float a, float d, float s, float r, juce::Colour envColor)
 {
-    // 1. Textos Minimalistas
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.setFont(juce::Font(12.0f, juce::Font::bold));
     g.drawText(name, bounds.withHeight(15), juce::Justification::topLeft, false);
 
-    // 2. MATEMÁTICAS DEL DIBUJO
     float totalVisualTime = 15.0f;
-
     float startX = bounds.getX();
     float bottomY = bounds.getBottom();
     float width = bounds.getWidth();
@@ -83,53 +70,43 @@ void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds
     releaseX = juce::jlimit(startX, (float)bounds.getRight(), releaseX);
     float sustainY = bottomY - (height * s);
 
-    // 3. CREAMOS LA FORMA VECTORIAL
     juce::Path envPath;
-    envPath.startNewSubPath(startX, bottomY);          // Inicio
-    envPath.lineTo(attackX, topY);                     // Pico
-    envPath.lineTo(decayX, sustainY);                  // Caída
-    envPath.lineTo(sustainX, sustainY);                // Sustain
-    envPath.lineTo(releaseX, bottomY);                 // Final
+    envPath.startNewSubPath(startX, bottomY);
+    envPath.lineTo(attackX, topY);
+    envPath.lineTo(decayX, sustainY);
+    envPath.lineTo(sustainX, sustainY);
+    envPath.lineTo(releaseX, bottomY);
 
-    // 4. EL TOQUE SERUM (Usamos la variable envColor)
-    g.setColour(envColor.withAlpha(0.2f)); // Relleno suave
+    g.setColour(envColor.withAlpha(0.2f));
     g.fillPath(envPath);
-
-    g.setColour(envColor.withAlpha(0.9f)); // Borde Brillante
+    g.setColour(envColor.withAlpha(0.9f));
     g.strokePath(envPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 
-    // Dibujamos los circulitos blancos
     float dotSize = 8.0f;
     g.setColour(juce::Colours::white);
-
     g.fillEllipse(attackX - dotSize / 2, topY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(decayX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(releaseX - dotSize / 2, bottomY - dotSize / 2, dotSize, dotSize);
 }
 
-void EnvelopeModule::resized()
-{
-    // No necesitamos componentes hijo, todo se dibuja en el paint!
-}
-
-// =================================================================================
-// --- EVENTOS DE RATÓN (ESTILO SERUM) ---
-// =================================================================================
+void EnvelopeModule::resized() {}
 
 void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
 {
-    activeNode = -1; // Reseteamos
+    activeNode = -1;
     auto area = getLocalBounds();
     auto ampArea = area.removeFromTop(area.getHeight() / 2);
     auto env2Area = area;
 
-    // Función lambda para comprobar si hemos cazado algún punto blanco
-    auto checkHits = [&](juce::Rectangle<int> bounds, juce::String prefix, int baseIndex)
+    // AÑADIDO: 'isGlobal' para saber si le ponemos el prefijo de capa o no
+    auto checkHits = [&](juce::Rectangle<int> bounds, juce::String baseParamName, int baseIndex, bool isGlobal)
         {
-            float a = apvtsRef.getRawParameterValue(prefix + "_A")->load();
-            float d = apvtsRef.getRawParameterValue(prefix + "_D")->load();
-            float s = apvtsRef.getRawParameterValue(prefix + "_S")->load();
-            float r = apvtsRef.getRawParameterValue(prefix + "_R")->load();
+            juce::String prefixToUse = isGlobal ? "" : layerPrefix;
+
+            float a = apvtsRef.getRawParameterValue(prefixToUse + baseParamName + "_A")->load();
+            float d = apvtsRef.getRawParameterValue(prefixToUse + baseParamName + "_D")->load();
+            float s = apvtsRef.getRawParameterValue(prefixToUse + baseParamName + "_S")->load();
+            float r = apvtsRef.getRawParameterValue(prefixToUse + baseParamName + "_R")->load();
 
             float totalVisualTime = 15.0f;
             float startX = bounds.getX();
@@ -146,53 +123,51 @@ void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
 
             juce::Point<float> mousePos = event.position;
 
-            // Si hacemos clic a menos de 15 píxeles del punto, lo cazamos
             if (mousePos.getDistanceFrom({ attackX, topY }) < 15.0f) { activeNode = baseIndex; startParamX = a; }
             else if (mousePos.getDistanceFrom({ decayX, sustainY }) < 15.0f) { activeNode = baseIndex + 1; startParamX = d; startParamY = s; }
             else if (mousePos.getDistanceFrom({ releaseX, bottomY }) < 15.0f) { activeNode = baseIndex + 2; startParamX = r; }
         };
 
-    checkHits(ampArea.reduced(5), "AMP", 0);   // Comprueba los 3 puntos del AMP
-    checkHits(env2Area.reduced(5), "ENV2", 3); // Comprueba los 3 puntos del ENV 2
+    // AMP es de Capa (isGlobal = false), ENV2 es Global (isGlobal = true)
+    checkHits(ampArea.reduced(5), "AMP", 0, false);
+    checkHits(env2Area.reduced(5), "ENV2", 3, true);
 }
 
 void EnvelopeModule::mouseDrag(const juce::MouseEvent& event)
 {
-    if (activeNode == -1) return; // Si no cazamos nada, salimos
+    if (activeNode == -1) return;
 
-    // Calculamos cuánto se ha movido el ratón desde el clic inicial
     float deltaX = event.getDistanceFromDragStartX();
     float deltaY = event.getDistanceFromDragStartY();
 
-    // Sensibilidad del ratón: 50 píxeles movidos = 1 segundo de tiempo
     float timeChange = deltaX * 0.02f;
-    // Sensibilidad Y: 100 píxeles = Todo el rango de Sustain (0 a 1)
     float sustainChange = -deltaY * 0.01f;
 
-    // Función rápida para enviar el valor actualizado al motor de audio
-    auto updateParam = [&](juce::String id, float startVal, float change, float min, float max) {
-        if (auto* p = apvtsRef.getParameter(id))
+    // AÑADIDO: 'isGlobal' al actualizar el parámetro
+    auto updateParam = [&](juce::String id, float startVal, float change, float min, float max, bool isGlobal) {
+        juce::String prefixToUse = isGlobal ? "" : layerPrefix;
+        if (auto* p = apvtsRef.getParameter(prefixToUse + id))
             p->setValueNotifyingHost(p->convertTo0to1(juce::jlimit(min, max, startVal + change)));
         };
 
-    // Aplicamos los cambios dependiendo de qué punto agarramos
-    if (activeNode == 0)      updateParam("AMP_A", startParamX, timeChange, 0.01f, 5.0f);
+    // AMP (isGlobal = false)
+    if (activeNode == 0)      updateParam("AMP_A", startParamX, timeChange, 0.01f, 5.0f, false);
     else if (activeNode == 1) {
-        updateParam("AMP_D", startParamX, timeChange, 0.01f, 5.0f); // Mover X cambia Decay
-        updateParam("AMP_S", startParamY, sustainChange, 0.0f, 1.0f); // Mover Y cambia Sustain
+        updateParam("AMP_D", startParamX, timeChange, 0.01f, 5.0f, false);
+        updateParam("AMP_S", startParamY, sustainChange, 0.0f, 1.0f, false);
     }
-    else if (activeNode == 2) updateParam("AMP_R", startParamX, timeChange, 0.01f, 5.0f);
+    else if (activeNode == 2) updateParam("AMP_R", startParamX, timeChange, 0.01f, 5.0f, false);
 
-    // Lo mismo para el Envelope 2
-    else if (activeNode == 3) updateParam("ENV2_A", startParamX, timeChange, 0.01f, 5.0f);
+    // ENV 2 (isGlobal = true)
+    else if (activeNode == 3) updateParam("ENV2_A", startParamX, timeChange, 0.01f, 5.0f, true);
     else if (activeNode == 4) {
-        updateParam("ENV2_D", startParamX, timeChange, 0.01f, 5.0f);
-        updateParam("ENV2_S", startParamY, sustainChange, 0.0f, 1.0f);
+        updateParam("ENV2_D", startParamX, timeChange, 0.01f, 5.0f, true);
+        updateParam("ENV2_S", startParamY, sustainChange, 0.0f, 1.0f, true);
     }
-    else if (activeNode == 5) updateParam("ENV2_R", startParamX, timeChange, 0.01f, 5.0f);
+    else if (activeNode == 5) updateParam("ENV2_R", startParamX, timeChange, 0.01f, 5.0f, true);
 }
 
 void EnvelopeModule::mouseUp(const juce::MouseEvent& event)
 {
-    activeNode = -1; // Soltamos el punto
+    activeNode = -1;
 }

@@ -14,11 +14,13 @@
 class SprayModule : public juce::Component
 {
 public:
-    SprayModule(juce::AudioProcessorValueTreeState& apvts);
+    // AÑADIDO: El prefijo de capa
+    SprayModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     void resized() override;
 
 private:
-    // Usaremos los nombres exactos que pide tu compilador
+    juce::String layerPrefix; // <-- Identidad
+
     juce::Slider posSprayKnob;
     juce::Slider panSprayKnob;
     juce::Slider pitchSprayKnob;

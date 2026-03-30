@@ -14,7 +14,8 @@
 class DistModule : public juce::Component
 {
 public:
-    DistModule(juce::AudioProcessorValueTreeState& apvts);
+    // AÑADIDO: Prefijo de capa
+    DistModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~DistModule() override;
 
     void paint(juce::Graphics&) override;
@@ -22,8 +23,8 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
+    juce::String layerPrefix; // <-- Identidad
 
-    // --- Controles Visuales ---
     juce::Slider driveKnob;
     juce::Slider mixKnob;
     juce::ComboBox typeCombo;

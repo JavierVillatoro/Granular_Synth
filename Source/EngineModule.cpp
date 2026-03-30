@@ -10,34 +10,37 @@
 
 #include "EngineModule.h"
 
-EngineModule::EngineModule(juce::AudioProcessorValueTreeState& apvts)
+// AÑADIDO: Recibimos y guardamos el prefijo
+EngineModule::EngineModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
+    : layerPrefix(prefix)
 {
     // --- SIZE (Izquierda) ---
     sizeKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     sizeKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(sizeKnob);
-    sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GRAIN_SIZE", sizeKnob);
+    // USAMOS EL PREFIJO
+    sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "GRAIN_SIZE", sizeKnob);
 
     // --- DENSITY (Centro) ---
     densityKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     densityKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(densityKnob);
-    densityAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "DENSITY", densityKnob);
+    // USAMOS EL PREFIJO
+    densityAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "DENSITY", densityKnob);
 
     // --- SHAPE (Derecha) ---
     shapeKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
     shapeKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(shapeKnob);
-    shapeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SHAPE", shapeKnob);
+    // USAMOS EL PREFIJO
+    shapeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SHAPE", shapeKnob);
 }
 
 void EngineModule::resized()
 {
     auto area = getLocalBounds().reduced(10);
-    int widthUnit = area.getWidth() / 3; // Dividimos la caja en 3 trozos iguales
+    int widthUnit = area.getWidth() / 3;
 
-    // Colocamos cada knob de izquierda a derecha. 
-    // removeFromLeft va cortando el rectángulo como si fuera una barra de pan.
     sizeKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
     densityKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
     shapeKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));

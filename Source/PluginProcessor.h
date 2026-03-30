@@ -24,7 +24,8 @@ public:
 
     //==============================================================================
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
-    void loadFile(const juce::String& path);
+    //void loadFile(const juce::String& path);
+    void loadFile(const juce::String& path, int layerIndex);
 
     juce::AudioFormatManager& getFormatManager() { return formatManager; }
     void releaseResources() override;
@@ -60,19 +61,43 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    juce::Synthesiser& getSynthesiser() { return synth; }
+    //juce::Synthesiser& getSynthesiser() { return synth; }
 
-    juce::AudioBuffer<float>& getAudioBuffer() { return audioBuffer; }
-    bool isAudioLoaded = false;
+    //juce::AudioBuffer<float>& getAudioBuffer() { return audioBuffer; }
+    //bool isAudioLoaded = false;
 
     // Memoria ventana de zoom
+    //std::atomic<float> windowStartRatio{ 0.0f };
+    //std::atomic<float> windowLengthRatio{ 1.0f };
+
+    //std::vector<LfoNode> savedLfoNodes;
+    //bool isLfoSaved = false;
+
+    //juce::String lastLoadedFilePath = "";
+
+    juce::Synthesiser& getSynthesiser() { return synth; }
+
+    // ==========================================================
+    // --- DISCOS DUROS PARA LAS CAPAS ---
+    // ==========================================================
+    juce::AudioBuffer<float> audioBufferL1;
+    juce::AudioBuffer<float> audioBufferL2;
+
+    juce::AudioBuffer<float>& getAudioBufferL1() { return audioBufferL1; }
+    juce::AudioBuffer<float>& getAudioBufferL2() { return audioBufferL2; }
+
+    bool isAudioLoadedL1 = false;
+    bool isAudioLoadedL2 = false;
+
+    juce::String lastLoadedFilePathL1 = "";
+    juce::String lastLoadedFilePathL2 = "";
+
+    // Memoria ventana de zoom (¡Pronto tendremos que duplicar esto también!)
     std::atomic<float> windowStartRatio{ 0.0f };
     std::atomic<float> windowLengthRatio{ 1.0f };
 
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;
-
-    juce::String lastLoadedFilePath = "";
 
     // Estas variables guardan el valor exacto del LFO en este preciso instante.
     // Las Voces Granulares las leerán para saber cómo tienen que moverse.
@@ -100,7 +125,7 @@ private:
     //==============================================================================
     //juce::AudioProcessorValueTreeState apvts;
     juce::AudioFormatManager formatManager;
-    juce::AudioBuffer<float> audioBuffer;
+    //juce::AudioBuffer<float> audioBuffer;
     //==============================================================================
 
     juce::Synthesiser synth;

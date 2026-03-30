@@ -14,12 +14,15 @@
 class PitchModule : public juce::Component
 {
 public:
-    PitchModule(juce::AudioProcessorValueTreeState& apvts);
+    // AADIDO: Prefijo de capa
+    //PitchModule(juce::AudioProcessorValueTreeState& apvts juce::String prefix);
+    PitchModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~PitchModule() override;
-
     void resized() override;
 
 private:
+    juce::String layerPrefix; // <-- Identidad
+
     juce::Slider transKnob;
     juce::Slider fineKnob;
     juce::Slider scaleKnob;

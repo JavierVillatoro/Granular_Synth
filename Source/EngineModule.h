@@ -14,10 +14,15 @@
 class EngineModule : public juce::Component
 {
 public:
-    EngineModule(juce::AudioProcessorValueTreeState& apvts);
+    // AADIDO: El parmetro juce::String prefix
+    //EngineModule(juce::AudioProcessorValueTreeState& apvtsuce::String prefix);
+    EngineModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     void resized() override;
 
 private:
+    juce::String layerPrefix; // <-- Guarda la identidad de la capa
+
+ 
     juce::Slider sizeKnob;
     juce::Slider densityKnob;
     juce::Slider shapeKnob;

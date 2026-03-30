@@ -14,7 +14,9 @@
 class EnvelopeModule : public juce::Component, public juce::Timer
 {
 public:
-    EnvelopeModule(juce::AudioProcessorValueTreeState& apvts);
+    // AADIDO: Prefijo de capa
+    //EnvelopeModule(juce::AudioProcessorValueTreeState& apvts juce::String prefix));
+    EnvelopeModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~EnvelopeModule() override;
 
     void paint(juce::Graphics&) override;
@@ -27,13 +29,12 @@ public:
 
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
+   juce::String layerPrefix; // <-- Identidad
 
-    // Mouse memory
-    int activeNode = -1; // 0=AmpA, 1=AmpD/S, 2=AmpR,  3=Env2A, 4=Env2D/S, 5=Env2R
+    int activeNode = -1;
     float startParamX = 0.0f;
     float startParamY = 0.0f;
 
-    // Funcin interna para dibujar cada envolvente de forma elegante
     void drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds, juce::String name,
         float a, float d, float s, float r, juce::Colour envColor);
 

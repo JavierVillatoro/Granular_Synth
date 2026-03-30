@@ -10,7 +10,9 @@
 
 #include "PitchModule.h"
 
-PitchModule::PitchModule(juce::AudioProcessorValueTreeState& apvts)
+// AÑADIDO: Recibimos y guardamos el prefijo
+PitchModule::PitchModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
+    : layerPrefix(prefix)
 {
     auto setupKnob = [this](juce::Slider& k) {
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -22,9 +24,10 @@ PitchModule::PitchModule(juce::AudioProcessorValueTreeState& apvts)
     setupKnob(fineKnob);
     setupKnob(scaleKnob);
 
-    transAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "PITCH_TRANS", transKnob);
-    fineAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "PITCH_FINE", fineKnob);
-    scaleAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "PITCH_SCALE", scaleKnob);
+    // USAMOS PREFIJO DINÁMICO
+    transAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_TRANS", transKnob);
+    fineAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_FINE", fineKnob);
+    scaleAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_SCALE", scaleKnob);
 }
 
 PitchModule::~PitchModule() {}

@@ -31,9 +31,14 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     synth.addSound(new GranularSound());
 
     // 2. Contratamos a 8 "Voces" 
+    //for (int i = 0; i < 8; ++i)
+    //{
+        //synth.addVoice(new GranularVoice(&audioBuffer, &apvts));
+    //}
+    // 2. Contratamos a 8 "Voces" 
     for (int i = 0; i < 8; ++i)
     {
-        synth.addVoice(new GranularVoice(&audioBuffer, &apvts));
+        synth.addVoice(new GranularVoice(&audioBufferL1, &audioBufferL2, &apvts));
     }
 }
 
@@ -362,9 +367,9 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // ==========================================================
     // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---
     // ==========================================================
-    float driveParam = apvts.getRawParameterValue("DIST_DRIVE")->load(); // 0.0 a 100.0
-    float mixParam = apvts.getRawParameterValue("DIST_MIX")->load() / 100.0f; // Lo pasamos a 0.0 - 1.0
-    int typeParam = (int)apvts.getRawParameterValue("DIST_TYPE")->load(); // 0, 1, 2, 3
+    float driveParam = apvts.getRawParameterValue("L1_DIST_DRIVE")->load(); // 0.0 a 100.0
+    float mixParam = apvts.getRawParameterValue("L1_DIST_MIX")->load() / 100.0f; // Lo pasamos a 0.0 - 1.0
+    int typeParam = (int)apvts.getRawParameterValue("L1_DIST_TYPE")->load(); // 0, 1, 2, 3
 
     // Solo procesamos si el Mix es mayor que 0 (ahorramos CPU si está apagado)
     if (mixParam > 0.001f)
@@ -424,7 +429,7 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // ==========================================================
     float size = apvts.getRawParameterValue("SPACE_SIZE")->load();
     float fback = apvts.getRawParameterValue("SPACE_FBACK")->load();
-    float mix = apvts.getRawParameterValue("SPACE_MIX")->load();
+    float mix = apvts.getRawParameterValue("L1_SPACE_MIX")->load();
 
     // Configuramos los parámetros para un sonido "Lush" y abierto
     reverbParams.roomSize = size;
@@ -514,188 +519,96 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // 1. POSITION
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
-
-    // 2. GRAIN SIZE (De 0.0 a 1.0 del archivo)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 0.3f), 0.1f));
-
-    // 3. SCAN SPEED
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SCAN_SPEED", "Scan Speed", juce::NormalisableRange<float>(-2.0f, 2.0f, 0.01f), 0.0f));
-
-    // 4. SPRAY POSITION
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SPRAY_POS", "Position Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
-
-    // 5. DENSITY
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "DENSITY", "Density", juce::NormalisableRange<float>(1.0f, 120.0f, 0.1f, 0.5f), 20.0f));
-
-    // 6. SHAPE (¡ESTE ES EL QUE FALTABA!)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SHAPE", "Shape", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
-
-    // SPRAY PAN: 0.0 (Todo al centro) a 1.0 (Repartido por todo el estéreo)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SPRAY_PAN", "Pan Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SPRAY_PITCH", "Pitch Spray", juce::NormalisableRange<float>(0.0f, 12.0f, 0.01f), 0.0f));
-
-    // SCAN MODE (Dir): 0 = Forward, 1 = Reverse, 2 = Ping-Pong
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "SCAN_MODE", "Scan Mode", juce::NormalisableRange<float>(0.0f, 2.0f, 1.0f), 0.0f));
-
-    // --- PITCH MODULE ---
-    // Transpose: de -24 a +24 semitonos (usamos pasos de 1 para que sean notas exactas)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "PITCH_TRANS", "Transpose", juce::NormalisableRange<float>(-24.0f, 24.0f, 1.0f), 0.0f));
-
-    // Fine: de -1.0 a +1.0 (representa -100 a +100 cents)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "PITCH_FINE", "Fine Tune", juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));
-
-    // Scale: Modos de cuantización (0 = Libre, 1 = Octavas, 2 = Quintas, 3 = Pentatónica)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "PITCH_SCALE", "Scale Mode", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
-
-    // --- FILTER MODULE ---
-    // LPF Freq: Empieza abierto del todo (20000 Hz) para dejar pasar el sonido
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "FILTER_LPF", "LPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f));
-
-    // Resonancia LPF: De 0.707 (Plano/Neutro) a 2.5 (Pico)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "FILTER_RES_LPF", "LPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
-
-    // HPF Freq: Empieza cerrado abajo (20 Hz) para no cortar los graves al principio
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "FILTER_HPF", "HPF Freq", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
-
-    // Resonancia HPF: De 0.707 (Plano/Neutro) a 2.5 (Pico)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "FILTER_RES_HPF", "HPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
-    // --- SPACE MODULE (REVERB) ---
-    // Size: Tamaño de la sala (0.0 = armario, 1.0 = catedral infinita)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
-
-    // Fback (Damping/Absorción): Define si la cola es oscura y cálida (0.0) o brillante y metálica (1.0)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_FBACK", "Feedback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
-
-    // Mix: 0.0 = 100% Seco, 1.0 = 100% Mojado
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_MIX", "Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
-
-    // --- AMP ENVELOPE (Tiempos en segundos, Sustain de 0 a 1) ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_A", "Amp Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_D", "Amp Decay", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_S", "Amp Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("AMP_R", "Amp Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
-
-    // --- ENVELOPE 2 (Para la futura Matriz de Modulación) ---
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_A", "Env2 Attack", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_D", "Env2 Decay", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_S", "Env2 Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_R", "Env2 Release", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
-
     // ==============================================================================
-    // --- LFO 1 (GLOBAL ---
+    // 1. PARÁMETROS GLOBALES (LFOs, Master, Reverb Size, etc.)
     // ==============================================================================
-
-    // Subdivisiones Musicales (El reloj principal por ahora)
     juce::StringArray beatDivisions = { "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "LFO1_BEAT", "Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
-
-    // Forma de Onda
     juce::StringArray waveShapes = { "Sine", "Triangle", "Saw", "Square", "S&H" };
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "LFO1_WAVE", "Waveform", waveShapes, 0)); // El 0 es Sine
 
-    // Amplitude (Depth) - Controla el tamaño de la onda
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "LFO1_DEPTH", "Amp", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>("LFO1_BEAT", "LFO 1 Rate", beatDivisions, 5));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>("LFO1_WAVE", "LFO 1 Wave", waveShapes, 0));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("LFO1_DEPTH", "LFO 1 Amp", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("LFO1_JITTER", "LFO 1 Jitter", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
-    // Jitter 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "LFO1_JITTER", "Jitter", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterChoice>("LFO2_BEAT", "LFO 2 Rate", beatDivisions, 5));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("LFO_RETRIG", "LFO Retrig", false));
 
-    // --- LFO 2 (VECTOR) ---
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "LFO2_BEAT", "LFO 2 Rate", beatDivisions, 5)); // El 5 es "1/4" por defecto
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("MASTER_VOL", "Master Vol", juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f, 2.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("LIMITER_THRESH", "Limiter", juce::NormalisableRange<float>(-6.0f, 0.0f, 0.1f), -0.3f));
 
-    // RETRIG
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        "LFO_RETRIG", "LFO Retrigger", false));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Reverb Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_FBACK", "Reverb Fback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
 
-    // ==============================================================================
-    // --- MASTER & LIMITER GLOBALES ---
-    // ==============================================================================
-    // Master Volume: de -60dB (silencio casi total) a +12dB (por si el sonido original es muy bajo)
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "MASTER_VOL", "Master Vol (dB)", juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f, 2.0f), 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("MANUAL_BPM", "BPM", juce::NormalisableRange<float>(20.0f, 300.0f, 0.1f), 120.0f));
+    params.push_back(std::make_unique<juce::AudioParameterBool>("SYNC_TO_DAW", "DAW Sync", true));
 
-    // Limiter Threshold (Ceiling)
-    // Por defecto en -0.3dB para dejar un pequeño margen de seguridad antes del 0 digital absoluto.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "LIMITER_THRESH", "Limit Ceiling", juce::NormalisableRange<float>(-6.0f, 0.0f, 0.1f), -0.3f));//antes -20
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_A", "Env2 A", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_D", "Env2 D", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_S", "Env2 S", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_R", "Env2 R", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
     // ==============================================================================
-    // --- DISTORTION (CAPA 1) ---
+    // 2. FUNCIÓN GENERADORA DE CAPAS (Crea todo el ADN de una capa al instante)
     // ==============================================================================
-    // DRIVE: De 0 a 100%. Cuanto más alto, más destrozamos la señal.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "DIST_DRIVE", "Drive", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+    auto addLayerParameters = [&](juce::String prefix)
+        {
+            // Controles Base
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_PLAY", "Play", false));
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MIDI", "MIDI", true));
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_HOLD", "Hold", false));
 
-    // MIX: De 0 a 100%. 0 = Señal limpia, 100 = Solo distorsión.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "DIST_MIX", "Mix", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+            // Granular Engine
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 0.3f), 0.1f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SCAN_SPEED", "Scan Speed", juce::NormalisableRange<float>(-2.0f, 2.0f, 0.01f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPRAY_POS", "Pos Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DENSITY", "Density", juce::NormalisableRange<float>(1.0f, 120.0f, 0.1f, 0.5f), 20.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SHAPE", "Shape", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPRAY_PAN", "Pan Spray", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPRAY_PITCH", "Pitch Spray", juce::NormalisableRange<float>(0.0f, 12.0f, 0.01f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SCAN_MODE", "Scan Mode", juce::NormalisableRange<float>(0.0f, 2.0f, 1.0f), 0.0f));
 
-    // TYPE: Un menú con nuestras 4 opciones destructivas.
-    params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        "DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
+            // Pitch
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_PITCH_TRANS", "Transpose", juce::NormalisableRange<float>(-24.0f, 24.0f, 1.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_PITCH_FINE", "Fine", juce::NormalisableRange<float>(-1.0f, 1.0f, 0.01f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_PITCH_SCALE", "Scale", juce::NormalisableRange<float>(0.0f, 3.0f, 1.0f), 0.0f));
 
-    // ==============================================================================
-    // --- GLOBAL BPM & SYNC ---
-    // ==============================================================================
-    // Manual BPM: Rango estándar de 20 a 300 BPM. Por defecto 120.
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "MANUAL_BPM", "Manual BPM", juce::NormalisableRange<float>(20.0f, 300.0f, 0.1f), 120.0f));
+            // Filter
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_FILTER_LPF", "LPF", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20000.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_FILTER_RES_LPF", "LPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_FILTER_HPF", "HPF", juce::NormalisableRange<float>(20.0f, 20000.0f, 1.0f, 0.3f), 20.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_FILTER_RES_HPF", "HPF Res", juce::NormalisableRange<float>(0.707f, 2.5f, 0.01f), 0.707f));
 
-    // Botón de DAW Sync (True = Lee el DAW, False = Lee el Knob manual)
-    params.push_back(std::make_unique<juce::AudioParameterBool>(
-        "SYNC_TO_DAW", "DAW Sync", true));
+            // Envelopes
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_A", "Amp A", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.1f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_D", "Amp D", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_S", "Amp S", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_R", "Amp R", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
-    // ==============================================================================
-    // --- CONTROLES DE CAPA 1 (Play, MIDI, Hold) ---
-    // ==============================================================================
-    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_PLAY", "L1 Play", false));
-    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_MIDI", "L1 MIDI", true)); // MIDI encendido por defecto
-    params.push_back(std::make_unique<juce::AudioParameterBool>("L1_HOLD", "L1 Hold", false));
+            // Effects (Distortion & Reverb Mix)
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DIST_DRIVE", "Drive", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DIST_MIX", "Dist Mix", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPACE_MIX", "Reverb Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
 
-    // ==========================================================
-    // --- MIXER & EQ (Capa 1) ---
-    // ==========================================================
-    // Volumen Fader (+6dB) con Skew para tacto natural (curva dB)
-    // -inf dB es 0.0, 0dB es aprox 0.75, +6dB es 1.0. 
+            // Mixer & EQ
+            juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
+            eqRange.setSkewForCentre(0.0f);
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_MIX_VOL", "Vol", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.1f, 2.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_LOW", "EQ Low", eqRange, 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_LOW", "EQ Mid-L", eqRange, 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_HIGH", "EQ Mid-H", eqRange, 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_HIGH", "EQ High", eqRange, 0.0f));
+        };
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_MIX_VOL", "L1 Vol", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.1f, 2.0f), 0.0f));
-
-    juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
-    eqRange.setSkewForCentre(0.0f);
-
-    // Usamos ese rango especial para los 4 knobs
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_LOW", "L1 EQ Low", eqRange, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_LOW", "L1 EQ Mid-Low", eqRange, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_MID_HIGH", "L1 EQ Mid-High", eqRange, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("L1_EQ_HIGH", "L1 EQ High", eqRange, 0.0f));
+    // 3. ¡CREAMOS LAS 2 CAPAS CON UNA SOLA LÍNEA DE CÓDIGO CADA UNA!
+    addLayerParameters("L1");
+    addLayerParameters("L2");
 
     return { params.begin(), params.end() };
 }
 
-void Granular_SynthAudioProcessor::loadFile(const juce::String& path)
+void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerIndex)
 {
     // 1. Convertimos la ruta de texto en un "Archivo" real que JUCE entienda
     juce::File file(path);
@@ -703,25 +616,31 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path)
     // 2. Le pedimos a nuestro manager que intente crear un "lector" para este archivo
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
 
-    // 3. Si el lector se ha creado con éxito (es decir, si el archivo era un wav, mp3, flac válido)
+    // 3. Si el lector se ha creado con éxito
     if (reader != nullptr)
     {
-        // Preparamos nuestro "disco duro" (audioBuffer) con el número de canales y la longitud del audio
-        //audioBuffer.setSize((int)reader->numChannels, (int)reader->lengthInSamples);
+        // Creamos nuestro disco duro temporal
         juce::AudioBuffer<float> tempBuffer((int)reader->numChannels, (int)reader->lengthInSamples);
-
-        // Volcamos toda la información del lector dentro de nuestro audioBuffer
-        //reader->read(&audioBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
         reader->read(&tempBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
 
+        // Apagamos el motor 1 microsegundo
         suspendProcessing(true);
-        audioBuffer.makeCopyOf(tempBuffer);
+        
+        // ¡LA MAGIA MULTICAPA! Elegimos a qué disco duro va el audio según la capa
+        if (layerIndex == 1) {
+            audioBufferL1.makeCopyOf(tempBuffer);
+            isAudioLoadedL1 = true;
+            lastLoadedFilePathL1 = path;
+        } 
+        else if (layerIndex == 2) {
+            audioBufferL2.makeCopyOf(tempBuffer);
+            isAudioLoadedL2 = true;
+            lastLoadedFilePathL2 = path;
+        }
+
+        // Volvemos a encender
         suspendProcessing(false);
-
-        // Mensaje interno para que sepamos que todo ha ido bien (esto no lo ve el usuario)
-        DBG("Archivo cargado en la memoria: " + file.getFileName());
+        
+        DBG("Archivo cargado en Capa " + juce::String(layerIndex) + ": " + file.getFileName());
     }
-
-    isAudioLoaded = true;
-    lastLoadedFilePath = path;
 }

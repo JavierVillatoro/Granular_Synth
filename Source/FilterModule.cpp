@@ -10,7 +10,9 @@
 
 #include "FilterModule.h"
 
-FilterModule::FilterModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts)
+// 1. CONSTRUCTOR ACTUALIZADO: Recibe y guarda el layerPrefix
+FilterModule::FilterModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
     // Función lambda para no repetir código al configurar los knobs
     auto setupKnob = [this](juce::Slider& slider, const juce::String& paramID, std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attach) {
@@ -20,12 +22,12 @@ FilterModule::FilterModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef
         attach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, paramID, slider);
         };
 
-    // Configuramos y conectamos los 4 knobs
-    setupKnob(hpfKnob, "FILTER_HPF", hpfAttach);
-    setupKnob(resHpfKnob, "FILTER_RES_HPF", resHpfAttach);
+    // Configuramos y conectamos los 4 knobs usando el prefijo dinámico
+    setupKnob(hpfKnob, layerPrefix + "FILTER_HPF", hpfAttach);
+    setupKnob(resHpfKnob, layerPrefix + "FILTER_RES_HPF", resHpfAttach);
 
-    setupKnob(lpfKnob, "FILTER_LPF", lpfAttach);
-    setupKnob(resLpfKnob, "FILTER_RES_LPF", resLpfAttach);
+    setupKnob(lpfKnob, layerPrefix + "FILTER_LPF", lpfAttach);
+    setupKnob(resLpfKnob, layerPrefix + "FILTER_RES_LPF", resLpfAttach);
 
     startTimerHz(30);
 }
@@ -71,8 +73,6 @@ void FilterModule::resized()
     graphArea = area.reduced(5);
 }
 
-// ... (deja tu función paint tal y como la tengas por ahora, la cambiaremos en el próximo paso)
-// ... (añade las funciones mouseDown y mouseDrag vacías al final si no las tenías)
 void FilterModule::mouseDown(const juce::MouseEvent& event)
 {
     // Solo actuamos si el clic está dentro del rectángulo de la gráfica
@@ -91,15 +91,16 @@ void FilterModule::mouseDown(const juce::MouseEvent& event)
         return graphArea.getY() + (yNorm * graphArea.getHeight());
         };
 
-    float baseHpf = apvtsRef.getRawParameterValue("FILTER_HPF")->load();
-    float baseHRes = apvtsRef.getRawParameterValue("FILTER_RES_HPF")->load();
-    float baseLpf = apvtsRef.getRawParameterValue("FILTER_LPF")->load();
-    float baseLRes = apvtsRef.getRawParameterValue("FILTER_RES_LPF")->load();
+    // LEEMOS CON PREFIJO DINÁMICO
+    float baseHpf = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_HPF")->load();
+    float baseHRes = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_HPF")->load();
+    float baseLpf = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_LPF")->load();
+    float baseLRes = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_LPF")->load();
 
     juce::Point<float> hpfDot(getDotX(baseHpf), getDotY(baseHRes));
     juce::Point<float> lpfDot(getDotX(baseLpf), getDotY(baseLRes));
 
-    juce::Point<float> mousePos((float)event.x, (float)event.y); 
+    juce::Point<float> mousePos((float)event.x, (float)event.y);
 
     // Si pulsamos cerca (radio de 20px para que sea fácil acertar) de un punto
     float hitRadius = 20.0f;
@@ -114,6 +115,7 @@ void FilterModule::mouseDown(const juce::MouseEvent& event)
         draggedDot = -1; // Clic en el aire
     }
 }
+
 void FilterModule::mouseDrag(const juce::MouseEvent& event)
 {
     // Si no tenemos ningún punto enganchado, salimos
@@ -128,12 +130,10 @@ void FilterModule::mouseDrag(const juce::MouseEvent& event)
     proportionY = juce::jlimit(0.0f, 1.0f, proportionY);
 
     // Convertimos proporción X a Hercios (Logarítmico)
-    // freq = min * (max/min)^proportion
     float newFreq = 20.0f * std::pow(1000.0f, proportionX);
     newFreq = juce::jlimit(20.0f, 20000.0f, newFreq);
 
     // Convertimos proporción Y a Resonancia (Y arriba es 0, así que invertimos con 1.0-)
-    // Mapeamos el 0-1 a nuestro rango del knob (0.707 a 2.5)
     float newRes = juce::jmap(1.0f - proportionY, 0.0f, 1.0f, 0.707f, 2.5f);
     newRes = juce::jlimit(0.707f, 2.5f, newRes);
 
@@ -147,8 +147,6 @@ void FilterModule::mouseDrag(const juce::MouseEvent& event)
         resLpfKnob.setValue(newRes);
     }
 }
-
-// Pégalo al final de FilterModule.cpp
 
 void FilterModule::paint(juce::Graphics& g)
 {
@@ -169,10 +167,11 @@ void FilterModule::paint(juce::Graphics& g)
     // ==========================================================
     // 3. MATEMÁTICA ANALÓGICA DEL FILTRO (Curvas suaves)
     // ==========================================================
-    float hpfVal = apvtsRef.getRawParameterValue("FILTER_HPF")->load();
-    float hResVal = apvtsRef.getRawParameterValue("FILTER_RES_HPF")->load();
-    float lpfVal = apvtsRef.getRawParameterValue("FILTER_LPF")->load();
-    float lResVal = apvtsRef.getRawParameterValue("FILTER_RES_LPF")->load();
+    // LEEMOS CON PREFIJO DINÁMICO
+    float hpfVal = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_HPF")->load();
+    float hResVal = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_HPF")->load();
+    float lpfVal = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_LPF")->load();
+    float lResVal = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_LPF")->load();
 
     juce::Path filterCurve;
     filterCurve.startNewSubPath(graphArea.getX(), graphArea.getBottom());
@@ -185,35 +184,22 @@ void FilterModule::paint(juce::Graphics& g)
         float gTotal = 1.0f;
 
         // --- CÁLCULO HPF (High Pass Filter - Corta Graves) ---
-        // Fórmula de magnitud: H(s) = s^2 / (s^2 + s/Q + 1) -> Magnitud = f^2 / sqrt((f^2 - fc^2)^2 + (f*fc/Q)^2)
-        // Reorganizando para evitar divisiones por cero con frecuencias muy bajas
         float hQVal = juce::jmap(hResVal, 0.707f, 2.5f, 0.707f, 8.0f);
         float hRatio = currentFreq / hpfVal;
         float hRatioSq = hRatio * hRatio;
-
-        // Evitamos división por cero si currentFreq es muy, muy pequeño
         float hDenom = std::sqrt(std::pow(1.0f - hRatioSq, 2.0f) + (hRatioSq / (hQVal * hQVal)));
-
-        // La ganancia del HPF es 0 en DC y tiende a 1 en altas frecuencias.
-        // Si el denominador es muy pequeño, evitamos que la ganancia explote.
         float hGainMagnitude = (hDenom > 1e-6f) ? (hRatioSq / hDenom) : 0.0f;
-
         gTotal *= hGainMagnitude;
 
         // --- CÁLCULO LPF (Low Pass Filter - Corta Agudos) ---
-        // Fórmula de magnitud: H(s) = 1 / (s^2 + s/Q + 1) -> Magnitud = fc^2 / sqrt((fc^2 - f^2)^2 + (f*fc/Q)^2)
         float lQVal = juce::jmap(lResVal, 0.707f, 2.5f, 0.707f, 8.0f);
         float lRatio = currentFreq / lpfVal;
         float lRatioSq = lRatio * lRatio;
-
         float lDenom = std::sqrt(std::pow(1.0f - lRatioSq, 2.0f) + (lRatioSq / (lQVal * lQVal)));
-
-        float lGainMagnitude = (lDenom > 1e-6f) ? (1.0f / lDenom) : 1.0f; // Si f -> 0, ganancia -> 1
-
+        float lGainMagnitude = (lDenom > 1e-6f) ? (1.0f / lDenom) : 1.0f;
         gTotal *= lGainMagnitude;
 
-        // Convertimos a decibelios y limitamos para no salir de la pantalla
-        // Un piso de ruido de -60dB suele quedar mejor visualmente que -40dB
+        // Convertimos a decibelios y limitamos
         float totalDb = 20.0f * std::log10(juce::jmax(gTotal, 1e-6f));
         totalDb = juce::jlimit(-60.0f, 20.0f, totalDb);
 
@@ -236,7 +222,7 @@ void FilterModule::paint(juce::Graphics& g)
     g.setColour(juce::Colours::cyan.brighter());
     g.strokePath(filterCurve, juce::PathStrokeType(2.0f));
 
-    //White points
+    // PUNTOS BLANCOS
     auto getDotX = [&](float freq) {
         float minF = 20.0f, maxF = 20000.0f;
         float proportion = std::log10(freq / minF) / std::log10(maxF / minF);
@@ -244,20 +230,16 @@ void FilterModule::paint(juce::Graphics& g)
         };
 
     auto getDotY = [&](float qVal) {
-        // Mapeamos Q (0.7-2.5) a una altura visual. Usamos una aproximación para
-        // que el punto se sitúe visualmente sobre el pico de la montaña cyan.
-        // dB pico aprox = 20 * log10(Q)
         float qDb = 20.0f * std::log10(juce::jmax(qVal, 0.707f));
-        // Mapeamos esos dBs (aprox 0dB a 8dB) a píxeles en el tercio superior
-        float yNorm = juce::jmap(qDb, -2.0f, 15.0f, 0.8f, 0.0f); // 0dB está al 80% de altura de la caja
+        float yNorm = juce::jmap(qDb, -2.0f, 15.0f, 0.8f, 0.0f);
         return graphArea.getY() + (yNorm * graphArea.getHeight());
         };
 
-    // Obtenemos valores base reales (del knob, sin modulación)
-    float baseHpf = apvtsRef.getRawParameterValue("FILTER_HPF")->load();
-    float baseHRes = apvtsRef.getRawParameterValue("FILTER_RES_HPF")->load();
-    float baseLpf = apvtsRef.getRawParameterValue("FILTER_LPF")->load();
-    float baseLRes = apvtsRef.getRawParameterValue("FILTER_RES_LPF")->load();
+    // LEEMOS CON PREFIJO DINÁMICO
+    float baseHpf = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_HPF")->load();
+    float baseHRes = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_HPF")->load();
+    float baseLpf = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_LPF")->load();
+    float baseLRes = apvtsRef.getRawParameterValue(layerPrefix + "FILTER_RES_LPF")->load();
 
     juce::Point<float> hpfDot(getDotX(baseHpf), getDotY(baseHRes));
     juce::Point<float> lpfDot(getDotX(baseLpf), getDotY(baseLRes));

@@ -15,7 +15,7 @@
 Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_SynthAudioProcessor& p)
     : AudioProcessorEditor(&p), audioProcessor(p),
     masterModule(p.apvts, p),
-    distModule(p.apvts),
+    //distModule(p.apvts),
     bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
     mixerModule1(p.apvts, "L1_"),
     layer1Controls(p.apvts, "L1_"),
@@ -44,9 +44,9 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
     // (para que sepa cuándo tiene que mover la línea blanca)
-    audioProcessor.apvts.addParameterListener("POSITION", this);
-    audioProcessor.apvts.addParameterListener("GRAIN_SIZE", this);
-    audioProcessor.apvts.addParameterListener("SHAPE", this);
+    audioProcessor.apvts.addParameterListener("L1_POSITION", this);
+    audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
+    audioProcessor.apvts.addParameterListener("L1_SHAPE", this);
 
     startTimerHz(30);
 
@@ -54,18 +54,17 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     // --- CURA PARA LA AMNESIA DE LA ONDA DE AUDIO ---
     // ==========================================================
     // Le preguntamos al Motor si ya tenía un audio cargado de antes
-    if (audioProcessor.isAudioLoaded && audioProcessor.lastLoadedFilePath.isNotEmpty())
+    if (audioProcessor.isAudioLoadedL1 && audioProcessor.lastLoadedFilePathL1.isNotEmpty())
     {
-        // Si es así, le decimos a nuestro dibujante (thumbnail) que vuelva a cargar ese archivo visualmente
-        thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePath)));
+        thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL1)));
     }
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 {
-    audioProcessor.apvts.removeParameterListener("POSITION", this);
-    audioProcessor.apvts.removeParameterListener("GRAIN_SIZE", this);
-    audioProcessor.apvts.removeParameterListener("SHAPE", this);
+    audioProcessor.apvts.removeParameterListener("L1_POSITION", this);
+    audioProcessor.apvts.removeParameterListener("L1_GRAIN_SIZE", this);
+    audioProcessor.apvts.removeParameterListener("L1_SHAPE", this);
     thumbnail.removeChangeListener(this);
 }
 
@@ -101,9 +100,9 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         thumbnail.drawChannel(g, layer1Area.reduced(2), startTime, endTime, 0, 1.0f);
 
         // --- DIBUJAR CURSOR Y FORMA DEL GRANO ---
-        auto positionParam = audioProcessor.apvts.getRawParameterValue("POSITION");
-        auto grainSizeParam = audioProcessor.apvts.getRawParameterValue("GRAIN_SIZE");
-        auto shapeParamVal = audioProcessor.apvts.getRawParameterValue("SHAPE");
+        auto positionParam = audioProcessor.apvts.getRawParameterValue("L1_POSITION");
+        auto grainSizeParam = audioProcessor.apvts.getRawParameterValue("L1_GRAIN_SIZE");
+        auto shapeParamVal = audioProcessor.apvts.getRawParameterValue("L1_SHAPE");
 
         if (positionParam != nullptr && grainSizeParam != nullptr && shapeParamVal != nullptr)
         {
@@ -406,7 +405,7 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
     juce::String filePath = files[0];
 
     // TODO: ¡Aquí le enviaremos esta ruta al Processor para que la lea y dibuje la forma de onda!
-    audioProcessor.loadFile(filePath);
+    audioProcessor.loadFile(filePath, 1);
 
     thumbnail.setSource(new juce::FileInputSource(juce::File(filePath)));
 }
@@ -486,7 +485,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         //normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
 
         // 4. Actualizamos el knob y el motor de audio
-        if (auto* posParam = audioProcessor.apvts.getParameter("POSITION"))
+        if (auto* posParam = audioProcessor.apvts.getParameter("L1_POSITION"))
         {
             posParam->setValueNotifyingHost(normalizedPos);
         }

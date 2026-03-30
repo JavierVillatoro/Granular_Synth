@@ -31,8 +31,8 @@ class GranularVoice : public juce::SynthesiserVoice
 {
 public:
     // ¡NUEVO CONSTRUCTOR! Recibe el audio y los parámetros
-    GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
-
+    //GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
+    GranularVoice(juce::AudioBuffer<float>* bufferL1, juce::AudioBuffer<float>* bufferL2, juce::AudioProcessorValueTreeState* apvtsToUse);
     float currentLfo1Value = 0.0f;
     float currentLfo2Value = 0.0f;
 
@@ -75,7 +75,12 @@ private:
     float pitchRatio = 1.0f;
 
     // Aquí guardamos las llaves para usarlas luego en la cocina
-    juce::AudioBuffer<float>* audioBuffer;
+    //juce::AudioBuffer<float>* audioBuffer;
+    //juce::AudioProcessorValueTreeState* apvts;
+
+    // Aquí guardamos las llaves de los DOS discos duros
+    juce::AudioBuffer<float>* audioBufferL1;
+    juce::AudioBuffer<float>* audioBufferL2;
     juce::AudioProcessorValueTreeState* apvts;
 
     // FILTROS ANALÓGICOS ESTÉREO
