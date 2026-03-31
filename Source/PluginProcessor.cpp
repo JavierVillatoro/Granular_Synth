@@ -28,7 +28,9 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     // --- INICIALIZAR EL SINTETIZADOR MIDI ---
 
     // 1. Le damos a la orquesta la partitura (nuestra clase Sound que permite tocar cualquier nota)
-    synth.addSound(new GranularSound());
+    //synth.addSound(new GranularSound());
+    synthL1.addSound(new GranularSound());
+    synthL2.addSound(new GranularSound());
 
     // 2. Contratamos a 8 "Voces" 
     //for (int i = 0; i < 8; ++i)
@@ -36,9 +38,19 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
         //synth.addVoice(new GranularVoice(&audioBuffer, &apvts));
     //}
     // 2. Contratamos a 8 "Voces" 
-    for (int i = 0; i < 8; ++i)
-    {
-        synth.addVoice(new GranularVoice(&audioBufferL1, &audioBufferL2, &apvts));
+    //for (int i = 0; i < 8; ++i)
+    //{
+        //synth.addVoice(new GranularVoice(&audioBufferL1, &audioBufferL2, &apvts));
+    //}
+
+    // 2. Contratamos a 16 "Voces" Inteligentes
+    for (int i = 0; i < 8; ++i) {
+        // El Equipo A (8 voces que miran al Disco Duro 1 y leen los knobs L1)
+        synthL1.addVoice(new GranularVoice(&audioBufferL1, &apvts, "L1_"));
+    }
+    for (int i = 0; i < 8; ++i) {
+        // El Equipo B (8 voces que miran al Disco Duro 2 y leen los knobs L2)
+        synthL2.addVoice(new GranularVoice(&audioBufferL2, &apvts, "L2_"));
     }
 }
 
@@ -126,7 +138,9 @@ void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesP
     masterLimiter.setRelease(10.0f); // 10ms para que sea rápido protegiendo picos
 
     // 4. Preparamos el sintetizador
-    synth.setCurrentPlaybackSampleRate(sampleRate);
+    //synth.setCurrentPlaybackSampleRate(sampleRate);
+    synthL1.setCurrentPlaybackSampleRate(sampleRate);
+    synthL2.setCurrentPlaybackSampleRate(sampleRate);
 }
 
 void Granular_SynthAudioProcessor::releaseResources()
@@ -228,7 +242,7 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // 4. Limpieza del HOLD
     if (!isHoldOn && lastHoldState)
     {
-        synth.allNotesOff(0, true);
+        synthL1.allNotesOff(0, true);
     }
     lastHoldState = isHoldOn;
 
@@ -343,9 +357,22 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     globalLfo1Value = lfo1Output * amp1;
 
     // LFO1 to voices 
-    for (int i = 0; i < synth.getNumVoices(); ++i) {
-        if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
-            voice->currentLfo1Value = globalLfo1Value; // 
+    //for (int i = 0; i < synth.getNumVoices(); ++i) {
+        //if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
+           // voice->currentLfo1Value = globalLfo1Value; // 
+            //voice->currentLfo2Value = globalLfo2Value;
+        //}
+    //}
+    // LFO1 y LFO2 a las voces de ambos equipos
+    for (int i = 0; i < synthL1.getNumVoices(); ++i) {
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL1.getVoice(i))) {
+            voice->currentLfo1Value = globalLfo1Value;
+            voice->currentLfo2Value = globalLfo2Value;
+        }
+    }
+    for (int i = 0; i < synthL2.getNumVoices(); ++i) {
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL2.getVoice(i))) {
+            voice->currentLfo1Value = globalLfo1Value;
             voice->currentLfo2Value = globalLfo2Value;
         }
     }
@@ -362,7 +389,15 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // Él leerá el MIDI, verá qué teclas has pulsado, y le dirá a las Voces que rellenen el buffer de audio.
     //synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
     // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
-    synth.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+    //synth.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+
+    // 2. ¡Dejamos que los dos Directores de Orquesta rellenen el buffer!
+    // La Capa 1 lee tu teclado MIDI normal (processedMidi)
+    synthL1.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+
+    // La Capa 2 por ahora lee un buffer vacío (pronto le daremos su propio MIDI)
+    juce::MidiBuffer emptyMidi;
+    synthL2.renderNextBlock(buffer, emptyMidi, 0, buffer.getNumSamples());
 
     // ==========================================================
     // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---

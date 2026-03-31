@@ -71,11 +71,13 @@ private:
     //DistModule distModule; lo he declarado abajo adaptado para los prefijos. 
     BpmModule bpmModule;
     LayerControlsModule layer1Controls;
+    LayerControlsModule layer2Controls;
 
     Granular_SynthAudioProcessor& audioProcessor;
 
     juce::AudioThumbnailCache thumbnailCache; 
     juce::AudioThumbnail thumbnail;
+    juce::AudioThumbnail thumbnailL2;
     //juce::Slider positionKnob;
 
     //std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
@@ -94,6 +96,10 @@ private:
     // --- VARIABLES DE ZOOM Y NAVEGACIN ---
     double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10
     double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qu	 parte del audio est a la izquierda de la pantalla
+
+    double zoomFactorL2 = 1.0;          
+    double viewStartRatioL2 = 0.0;
+
     int lastDragX = 0;
 
     juce::Rectangle<int> matrixArea;

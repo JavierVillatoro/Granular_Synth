@@ -75,7 +75,9 @@ public:
 
     //juce::String lastLoadedFilePath = "";
 
-    juce::Synthesiser& getSynthesiser() { return synth; }
+    //juce::Synthesiser& getSynthesiser() { return synth; }
+    juce::Synthesiser& getSynthesiserL1() { return synthL1; }
+    juce::Synthesiser& getSynthesiserL2() { return synthL2; }
 
     // ==========================================================
     // --- DISCOS DUROS PARA LAS CAPAS ---
@@ -128,7 +130,9 @@ private:
     //juce::AudioBuffer<float> audioBuffer;
     //==============================================================================
 
-    juce::Synthesiser synth;
+    //juce::Synthesiser synth;
+    juce::Synthesiser synthL1;
+    juce::Synthesiser synthL2;
 
     juce::dsp::Reverb masterReverb;
     juce::Reverb::Parameters reverbParams;

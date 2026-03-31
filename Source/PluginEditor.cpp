@@ -19,10 +19,13 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
     mixerModule1(p.apvts, "L1_"),
     layer1Controls(p.apvts, "L1_"),
+    layer2Controls(p.apvts, "L2_"),
     thumbnailCache(5),
-    thumbnail(512, p.getFormatManager(), thumbnailCache)
+    thumbnail(512, p.getFormatManager(), thumbnailCache),
+    thumbnailL2(512, p.getFormatManager(), thumbnailCache)
 {
     thumbnail.addChangeListener(this);
+    thumbnailL2.addChangeListener(this);
     setSize(1200, 750);
 
     // --- NUESTRA NUEVA ARQUITECTURA MODULAR ---
@@ -40,6 +43,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(distModule);
     addAndMakeVisible(bpmModule);
     addAndMakeVisible(layer1Controls);
+    addAndMakeVisible(layer2Controls);
     addAndMakeVisible(mixerModule1);
 
     // 2. Le decimos a esta pantalla principal que "escuche" si el parámetro POSITION cambia
@@ -47,6 +51,11 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
     audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L1_SHAPE", this);
+
+    // Escuchas Capa 2 (NUEVO)
+    audioProcessor.apvts.addParameterListener("L2_POSITION", this);
+    audioProcessor.apvts.addParameterListener("L2_GRAIN_SIZE", this);
+    audioProcessor.apvts.addParameterListener("L2_SHAPE", this);
 
     startTimerHz(30);
 
@@ -58,14 +67,24 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     {
         thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL1)));
     }
+    if (audioProcessor.isAudioLoadedL2 && audioProcessor.lastLoadedFilePathL2.isNotEmpty()) {
+        thumbnailL2.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL2)));
+    }
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 {
+    // --- Limpieza Capa 1 ---
     audioProcessor.apvts.removeParameterListener("L1_POSITION", this);
     audioProcessor.apvts.removeParameterListener("L1_GRAIN_SIZE", this);
     audioProcessor.apvts.removeParameterListener("L1_SHAPE", this);
     thumbnail.removeChangeListener(this);
+
+    // --- Limpieza Capa 2 (NUEVO) ---
+    audioProcessor.apvts.removeParameterListener("L2_POSITION", this);
+    audioProcessor.apvts.removeParameterListener("L2_GRAIN_SIZE", this);
+    audioProcessor.apvts.removeParameterListener("L2_SHAPE", this);
+    thumbnailL2.removeChangeListener(this);
 }
 
 //==============================================================================
@@ -168,12 +187,12 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         // ==========================================================
         // --- MAGIA VISUAL DE LOS GRANOS ANIMADOS ---
         // ==========================================================
-        auto& synth = audioProcessor.getSynthesiser();
+        auto& synthL1 = audioProcessor.getSynthesiserL1();
 
         // Recorremos todas las voces (por si tocas acordes)
-        for (int i = 0; i < synth.getNumVoices(); ++i)
+        for (int i = 0; i < synthL1.getNumVoices(); ++i)
         {
-            if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i)))
+            if (auto* voice = dynamic_cast<GranularVoice*>(synthL1.getVoice(i)))
             {
                 for (int g_idx = 0; g_idx < 128; ++g_idx)
                 {
@@ -211,9 +230,113 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         g.setFont(20.0f);
         //g.drawText("Capa 1: Arrastra Audio", layer1Area, juce::Justification::centred, false);
     }
+    // ==========================================================
+    // --- DIBUJO DE LA CAPA 2 (MAGENTA) ---
+    // ==========================================================
+    auto layer2Area = wavesArea.removeFromTop(layerHeight); // Cogemos el 2º cuarto de pantalla
+    g.setColour(juce::Colours::magenta.withAlpha(0.6f));
+    g.drawRect(layer2Area, 2);
 
+    if (thumbnailL2.getNumChannels() > 0)
+    {
+        double totalAudioSecondsL2 = thumbnailL2.getTotalLength();
+        double visibleSecondsL2 = totalAudioSecondsL2 / zoomFactorL2;
+        double startTimeL2 = viewStartRatioL2 * totalAudioSecondsL2;
+        double endTimeL2 = startTimeL2 + visibleSecondsL2;
+
+        g.setColour(juce::Colours::magenta);
+        thumbnailL2.drawChannel(g, layer2Area.reduced(2), startTimeL2, endTimeL2, 0, 1.0f);
+
+        // --- DIBUJAR CURSOR Y FORMA DEL GRANO L2 ---
+        auto posParamL2 = audioProcessor.apvts.getRawParameterValue("L2_POSITION");
+        auto sizeParamL2 = audioProcessor.apvts.getRawParameterValue("L2_GRAIN_SIZE");
+        auto shapeParamL2 = audioProcessor.apvts.getRawParameterValue("L2_SHAPE");
+
+        if (posParamL2 != nullptr && sizeParamL2 != nullptr && shapeParamL2 != nullptr)
+        {
+            float currentPositionL2 = posParamL2->load();
+            float sizeRatioL2 = sizeParamL2->load();
+            float shapeValueL2 = shapeParamL2->load();
+
+            float winStartL2 = audioProcessor.windowStartRatio.load(); // Por ahora usamos el zoom global
+            float winLenL2 = audioProcessor.windowLengthRatio.load();
+
+            float absolutePosL2 = winStartL2 + (currentPositionL2 * winLenL2);
+            double cursorTimeSecondsL2 = absolutePosL2 * totalAudioSecondsL2;
+
+            float activeAudioSecondsL2 = (float)totalAudioSecondsL2 * winLenL2;
+            float grainSizeSecondsL2 = juce::jmax(0.01f, sizeRatioL2 * activeAudioSecondsL2);
+
+            float cursorXL2 = layer2Area.getX() + ((cursorTimeSecondsL2 - startTimeL2) / visibleSecondsL2) * layer2Area.getWidth();
+            float grainWidthPixelsL2 = (grainSizeSecondsL2 / visibleSecondsL2) * layer2Area.getWidth();
+            grainWidthPixelsL2 = juce::jmax(3.0f, grainWidthPixelsL2);
+
+            juce::Rectangle<float> grainWindowL2(cursorXL2 - (grainWidthPixelsL2 / 2.0f),
+                layer2Area.getY(), grainWidthPixelsL2, layer2Area.getHeight());
+
+            juce::Path grainPathL2;
+            grainPathL2.startNewSubPath(grainWindowL2.getX(), grainWindowL2.getBottom());
+
+            for (float x = 0; x <= grainWindowL2.getWidth(); x += 1.0f) {
+                float progress = x / grainWindowL2.getWidth();
+                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
+                float amplitude = (hann * (1.0f - shapeValueL2)) + (square * shapeValueL2);
+                float yPos = grainWindowL2.getBottom() - (amplitude * grainWindowL2.getHeight());
+                grainPathL2.lineTo(grainWindowL2.getX() + x, yPos);
+            }
+            grainPathL2.lineTo(grainWindowL2.getRight(), grainWindowL2.getBottom());
+            grainPathL2.closeSubPath();
+
+            g.setColour(juce::Colours::magenta.withAlpha(0.3f));
+            g.fillPath(grainPathL2);
+            g.setColour(juce::Colours::magenta.withAlpha(0.8f));
+            g.strokePath(grainPathL2, juce::PathStrokeType(1.5f));
+
+            g.setColour(juce::Colours::white.withAlpha(0.9f));
+            g.drawLine(cursorXL2, layer2Area.getY(), cursorXL2, layer2Area.getBottom(), 2.0f);
+        }
+
+        // --- MAGIA VISUAL DE LOS GRANOS ANIMADOS L2 ---
+        auto& synthL2 = audioProcessor.getSynthesiserL2(); // ¡Llamamos al Jefe 2!
+        for (int i = 0; i < synthL2.getNumVoices(); ++i)
+        {
+            if (auto* voice = dynamic_cast<GranularVoice*>(synthL2.getVoice(i)))
+            {
+                for (int g_idx = 0; g_idx < 128; ++g_idx)
+                {
+                    float env = voice->visualGrainEnv[g_idx].load();
+                    if (env > 0.001f)
+                    {
+                        float pos = voice->visualGrainPos[g_idx].load();
+                        double grainTimeSeconds = pos * totalAudioSecondsL2;
+                        float xPixel = layer2Area.getX() + ((grainTimeSeconds - startTimeL2) / visibleSecondsL2) * layer2Area.getWidth();
+
+                        if (xPixel >= layer2Area.getX() && xPixel <= layer2Area.getRight())
+                        {
+                            float maxLineHeight = layer2Area.getHeight() * 0.8f;
+                            float currentHeight = maxLineHeight * env;
+                            float yCenter = layer2Area.getCentreY();
+                            float yStart = yCenter - (currentHeight / 2.0f);
+
+                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
+                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        g.setColour(juce::Colours::white.withAlpha(0.5f));
+        g.setFont(20.0f);
+        //g.drawText("Capa 2: Arrastra Audio", layer2Area, juce::Justification::centred, false);
+    }
+
+    // Dibujamos los dos huecos vacíos que quedan abajo
     g.setColour(juce::Colours::white.withAlpha(0.1f));
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 2; ++i) // AHORA SON 2, NO 3
     {
         g.drawRect(wavesArea.removeFromTop(layerHeight), 1);
     }
@@ -253,7 +376,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         juce::StringArray {"Trans", "Fine", "Scale"},      // Pitch
         juce::StringArray {"", "", ""},                    // LFO
         juce::StringArray {"", "", "", ""},                // Envelope
-        juce::StringArray {"", "", ""},           // Filter
+        juce::StringArray {"", "", ""},            // Filter
         juce::StringArray {"Size", "Fback", "Mix"}         // Space
     };
 
@@ -310,11 +433,15 @@ void Granular_SynthAudioProcessorEditor::resized()
     // Lo que sobra en 'bounds' es el rectángulo gigante de las ondas.
     auto wavesArea = bounds;
 
-    // Calculamos el trozo exacto de la primera capa (1/4 del alto total)
-    auto layer1Area = wavesArea.removeFromTop(wavesArea.getHeight() / 4);
+    int layerHeight = wavesArea.getHeight() / 4;
 
-    // Ponemos nuestro módulo flotando a 10px del borde, con 150px de ancho y 20px de alto
+    // Capa 1 (Cyan)
+    auto layer1Area = wavesArea.removeFromTop(layerHeight);
     layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 150, 20);
+
+    // Capa 2 (Magenta) - NUEVO
+    auto layer2Area = wavesArea.removeFromTop(layerHeight);
+    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 150, 20);
     // ==========================================================
 
     // ==========================================================
@@ -397,17 +524,28 @@ bool Granular_SynthAudioProcessorEditor::isInterestedInFileDrag(const juce::Stri
 // 2. ¿Qué pasa cuando finalmente sueltas el clic del ratón?
 void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& files, int x, int y)
 {
-    // Nos aseguramos de que no esté vacío
-    if (files.isEmpty())
-        return;
-
-    // Nos quedamos con el primer archivo que hayas soltado (su ruta en el disco duro)
+    if (files.isEmpty()) return;
     juce::String filePath = files[0];
 
-    // TODO: ¡Aquí le enviaremos esta ruta al Processor para que la lea y dibuje la forma de onda!
-    audioProcessor.loadFile(filePath, 1);
+    // Calculamos dónde están las capas visualmente
+    auto bounds = getLocalBounds();
+    bounds.removeFromBottom(300);
+    bounds.removeFromRight(350);
+    int layerHeight = bounds.getHeight() / 4;
 
-    thumbnail.setSource(new juce::FileInputSource(juce::File(filePath)));
+    // ¿Dónde soltó el ratón el usuario?
+    if (y < layerHeight)
+    {
+        // Cayó en la Capa 1
+        audioProcessor.loadFile(filePath, 1);
+        thumbnail.setSource(new juce::FileInputSource(juce::File(filePath)));
+    }
+    else if (y >= layerHeight && y < layerHeight * 2)
+    {
+        // Cayó en la Capa 2
+        audioProcessor.loadFile(filePath, 2);
+        thumbnailL2.setSource(new juce::FileInputSource(juce::File(filePath)));
+    }
 }
 
 //==============================================================================

@@ -11,38 +11,25 @@
 #include "GranularVoice.h"
 #include "PluginProcessor.h"
 
-// 1. EL CONSTRUCTOR: Guardamos las llaves
-//GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse)
-//{
-    //audioBuffer = buffer;
-    //apvts = apvtsToUse;
-//}
-// 1. EL CONSTRUCTOR: Guardamos las llaves
-GranularVoice::GranularVoice(juce::AudioBuffer<float>* bufferL1, juce::AudioBuffer<float>* bufferL2, juce::AudioProcessorValueTreeState* apvtsToUse)
+// 1. EL CONSTRUCTOR: Guardamos las llaves y el prefijo
+GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse, juce::String prefix)
 {
-    audioBufferL1 = bufferL1;
-    audioBufferL2 = bufferL2;
+    myBuffer = buffer;
     apvts = apvtsToUse;
+    myPrefix = prefix;
 }
 
-// 2. ¿PODEMOS TOCAR ESTO? Sí, aceptamos todo.
 bool GranularVoice::canPlaySound(juce::SynthesiserSound* sound)
 {
     return dynamic_cast<GranularSound*>(sound) != nullptr;
 }
 
-
-// 4. TECLA SOLTADA (Note Off)
 void GranularVoice::stopNote(float velocity, bool allowTailOff)
 {
-    if (allowTailOff)
-    {
-        // NO cortamos el sonido. Le decimos al ADSR que inicie el Release.
+    if (allowTailOff) {
         ampAdsr.noteOff();
     }
-    else
-    {
-        // Solo cortamos de golpe si el programa anfitrión entra en pánico (Panic Stop)
+    else {
         clearCurrentNote();
         ampAdsr.reset();
         isPlaying = false;
@@ -58,71 +45,58 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
     currentVelocity = velocity;
     pitchRatio = std::pow(2.0, (midiNoteNumber - 60) / 12.0);
 
-    // Reset grains
     for (int i = 0; i < 128; ++i) {
         grains[i].isActive = false;
-        visualGrainEnv[i].store(0.0f); // Apaga los fantasmas
+        visualGrainEnv[i].store(0.0f);
     }
 
     samplesUntilNextGrain = 0.0;
     autoScanOffset = 0.0;
 
-
-    // Reset Filter
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = getSampleRate();
-    spec.maximumBlockSize = 1; // Procesamos muestra a muestra
-    spec.numChannels = 1;      // Un filtro por canal
+    spec.maximumBlockSize = 1;
+    spec.numChannels = 1;
 
-    for (int i = 0; i < 2; ++i)
-    {
-        // Low Pass
+    for (int i = 0; i < 2; ++i) {
         lpf[i].prepare(spec);
         lpf[i].setType(juce::dsp::StateVariableTPTFilterType::lowpass);
         lpf[i].reset();
-
-        // High Pass
         hpf[i].prepare(spec);
         hpf[i].setType(juce::dsp::StateVariableTPTFilterType::highpass);
         hpf[i].reset();
     }
-    
+
     ampAdsr.setSampleRate(getSampleRate());
     ampAdsr.noteOn();
 }
 
-// --------------------------------------------------------------------------
-
 void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
-    // 🟢 1. ESCUDO CON audioBufferL1 🟢
-    if (!isPlaying || audioBufferL1 == nullptr || audioBufferL1->getNumSamples() == 0 || getSampleRate() <= 0.0) return;
+    if (!isPlaying || myBuffer == nullptr || myBuffer->getNumSamples() == 0 || getSampleRate() <= 0.0) return;
 
-    // 🟢 2. LEER PARÁMETROS GLOBALES (Con prefijo L1_) 🟢
-    float positionKnob = apvts->getRawParameterValue("L1_POSITION")->load();
-    float sizeRatio = apvts->getRawParameterValue("L1_GRAIN_SIZE")->load();
-    float scanSpeed = apvts->getRawParameterValue("L1_SCAN_SPEED")->load();
-    float sprayPos = apvts->getRawParameterValue("L1_SPRAY_POS")->load();
-    float density = apvts->getRawParameterValue("L1_DENSITY")->load();
-    float shapeParam = apvts->getRawParameterValue("L1_SHAPE")->load();
-    float sprayPan = apvts->getRawParameterValue("L1_SPRAY_PAN")->load();
-    float sprayPitch = apvts->getRawParameterValue("L1_SPRAY_PITCH")->load();
-    float scanMode = apvts->getRawParameterValue("L1_SCAN_MODE")->load();
+    // 🟢 2. LEER PARÁMETROS DINÁMICAMENTE (Usa el prefijo asignado) 🟢
+    float positionKnob = apvts->getRawParameterValue(myPrefix + "POSITION")->load();
+    float sizeRatio = apvts->getRawParameterValue(myPrefix + "GRAIN_SIZE")->load();
+    float scanSpeed = apvts->getRawParameterValue(myPrefix + "SCAN_SPEED")->load();
+    float sprayPos = apvts->getRawParameterValue(myPrefix + "SPRAY_POS")->load();
+    float density = apvts->getRawParameterValue(myPrefix + "DENSITY")->load();
+    float shapeParam = apvts->getRawParameterValue(myPrefix + "SHAPE")->load();
+    float sprayPan = apvts->getRawParameterValue(myPrefix + "SPRAY_PAN")->load();
+    float sprayPitch = apvts->getRawParameterValue(myPrefix + "SPRAY_PITCH")->load();
+    float scanMode = apvts->getRawParameterValue(myPrefix + "SCAN_MODE")->load();
 
-    float filterLpfFreq = apvts->getRawParameterValue("L1_FILTER_LPF")->load();
-    float filterResLpf = apvts->getRawParameterValue("L1_FILTER_RES_LPF")->load();
-    float filterHpfFreq = apvts->getRawParameterValue("L1_FILTER_HPF")->load();
-    float filterResHpf = apvts->getRawParameterValue("L1_FILTER_RES_HPF")->load();
+    float filterLpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_LPF")->load();
+    float filterResLpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_LPF")->load();
+    float filterHpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_HPF")->load();
+    float filterResHpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_HPF")->load();
 
-    ampAdsrParams.attack = apvts->getRawParameterValue("L1_AMP_A")->load();
-    ampAdsrParams.decay = apvts->getRawParameterValue("L1_AMP_D")->load();
-    ampAdsrParams.sustain = apvts->getRawParameterValue("L1_AMP_S")->load();
-    ampAdsrParams.release = apvts->getRawParameterValue("L1_AMP_R")->load();
+    ampAdsrParams.attack = apvts->getRawParameterValue(myPrefix + "AMP_A")->load();
+    ampAdsrParams.decay = apvts->getRawParameterValue(myPrefix + "AMP_D")->load();
+    ampAdsrParams.sustain = apvts->getRawParameterValue(myPrefix + "AMP_S")->load();
+    ampAdsrParams.release = apvts->getRawParameterValue(myPrefix + "AMP_R")->load();
     ampAdsr.setParameters(ampAdsrParams);
 
-    // ==========================================================
-    // --- INYECCIÓN TEMPORAL: LFO 1 + LFO 2 AL FILTRO LPF ---
-    // ==========================================================
     float modFromLfo1 = currentLfo1Value * 2000.0f;
     float modFromLfo2 = (currentLfo2Value - 0.5f) * 4000.0f;
     float modulatedLpfFreq = filterLpfFreq + modFromLfo1 + modFromLfo2;
@@ -135,21 +109,19 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         hpf[i].setResonance(filterResHpf);
     }
 
-    // LEER KNOBS DE PITCH (Con prefijo L1_)
-    float pitchTrans = apvts->getRawParameterValue("L1_PITCH_TRANS")->load();
-    float pitchFine = apvts->getRawParameterValue("L1_PITCH_FINE")->load();
-    float pitchScale = apvts->getRawParameterValue("L1_PITCH_SCALE")->load();
+    float pitchTrans = apvts->getRawParameterValue(myPrefix + "PITCH_TRANS")->load();
+    float pitchFine = apvts->getRawParameterValue(myPrefix + "PITCH_FINE")->load();
+    float pitchScale = apvts->getRawParameterValue(myPrefix + "PITCH_SCALE")->load();
 
     float currentTrans = pitchTrans + pitchFine;
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
-    // 🟢 3. USAR audioBufferL1 PARA LOS CÁLCULOS DE TIEMPO 🟢
-    float totalAudioSeconds = audioBufferL1->getNumSamples() / getSampleRate();
+    float totalAudioSeconds = myBuffer->getNumSamples() / getSampleRate();
 
-    // LEER LA VENTANA DE ZOOM Y AJUSTAR EL TAMAÑO ---
     float winStart = 0.0f;
     float winLen = 1.0f;
     if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor)) {
+        // En el futuro separaremos el zoom, por ahora usamos el global
         winStart = processor->windowStartRatio.load();
         winLen = processor->windowLengthRatio.load();
     }
@@ -159,15 +131,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
     double samplesBetweenGrains = getSampleRate() / juce::jmax(0.1f, density);
 
-
-    // ==============================================================================
-    // --- ZONA SEGURA (CONTROL RATE): CÁLCULOS PESADOS DE LA EQ Y MIXER ---
-    // ==============================================================================
-    float eqLowGain = apvts->getRawParameterValue("L1_EQ_LOW")->load();
-    float eqMidLowGain = apvts->getRawParameterValue("L1_EQ_MID_LOW")->load();
-    float eqMidHighGain = apvts->getRawParameterValue("L1_EQ_MID_HIGH")->load();
-    float eqHighGain = apvts->getRawParameterValue("L1_EQ_HIGH")->load();
-    float mixerVolDb = apvts->getRawParameterValue("L1_MIX_VOL")->load();
+    float eqLowGain = apvts->getRawParameterValue(myPrefix + "EQ_LOW")->load();
+    float eqMidLowGain = apvts->getRawParameterValue(myPrefix + "EQ_MID_LOW")->load();
+    float eqMidHighGain = apvts->getRawParameterValue(myPrefix + "EQ_MID_HIGH")->load();
+    float eqHighGain = apvts->getRawParameterValue(myPrefix + "EQ_HIGH")->load();
+    float mixerVolDb = apvts->getRawParameterValue(myPrefix + "MIX_VOL")->load();
 
     auto sr = getSampleRate();
 
@@ -179,14 +147,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     }
 
     float mixerVolGain = juce::Decibels::decibelsToGain(mixerVolDb);
-    // ======================================================================= 
 
-
-    // ZONA ROJA (AUDIO RATE - 44100 Hz)  
     for (int s = 0; s < numSamples; ++s)
     {
-        // 🟢 4. USAR audioBufferL1 PARA ESCANEO 🟢
-        autoScanOffset += (double)scanSpeed / (double)audioBufferL1->getNumSamples();
+        autoScanOffset += (double)scanSpeed / (double)myBuffer->getNumSamples();
         float rawPos = positionKnob + (float)autoScanOffset;
 
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;
@@ -200,7 +164,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             currentTargetPos = juce::jlimit(0.0f, 1.0f, triangle);
         }
 
-        // --- SCHEDULER (NACIMIENTO DE GRANOS) ---
         samplesUntilNextGrain -= 1.0;
         if (samplesUntilNextGrain <= 0.0)
         {
@@ -217,8 +180,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     float finalPos = winStart + (localPos * winLen);
                     finalPos = juce::jlimit(0.0f, 1.0f, finalPos);
 
-                    // 🟢 5. USAR audioBufferL1 PARA START SAMPLE 🟢
-                    grain.startSample = (int)(finalPos * (audioBufferL1->getNumSamples() - 1));
+                    grain.startSample = (int)(finalPos * (myBuffer->getNumSamples() - 1));
 
                     float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
                     int scaleModeInt = (int)pitchScale;
@@ -230,9 +192,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                         int st = (int)std::round(rawPitchRand);
                         int oct = (st / 12) * 12;
                         int rem = std::abs(st % 12);
-                        if (rem < 4) rem = 0;
-                        else if (rem < 10) rem = 7;
-                        else { rem = 0; oct += (st < 0 ? -12 : 12); }
+                        if (rem < 4) rem = 0; else if (rem < 10) rem = 7; else { rem = 0; oct += (st < 0 ? -12 : 12); }
                         rawPitchRand = oct + (st < 0 ? -rem : rem);
                     }
                     else if (scaleModeInt == 3) {
@@ -240,11 +200,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                         int oct = (st / 12) * 12;
                         int rem = std::abs(st % 12);
                         int q = 0;
-                        if (rem <= 1) q = 0;
-                        else if (rem <= 4) q = 3;
-                        else if (rem <= 6) q = 5;
-                        else if (rem <= 8) q = 7;
-                        else q = 10;
+                        if (rem <= 1) q = 0; else if (rem <= 4) q = 3; else if (rem <= 6) q = 5; else if (rem <= 8) q = 7; else q = 10;
                         rawPitchRand = oct + (st < 0 ? -q : q);
                     }
 
@@ -261,7 +217,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             samplesUntilNextGrain += samplesBetweenGrains;
         }
 
-        // --- PROCESAMIENTO DE AUDIO ---
         float totalL = 0.0f;
         float totalR = 0.0f;
         int activeCount = 0;
@@ -279,17 +234,15 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
 
                 int readPos = grain.startSample + (int)(grain.currentPosition * grain.activePitchRatio);
+                int safeReadPos = juce::jlimit(0, myBuffer->getNumSamples() - 1, readPos);
 
-                // 🟢 6. USAR audioBufferL1 PARA LIMITES Y LECTURA 🟢
-                int safeReadPos = juce::jlimit(0, audioBufferL1->getNumSamples() - 1, readPos);
-
-                float normalizedPos = (float)safeReadPos / (float)audioBufferL1->getNumSamples();
+                float normalizedPos = (float)safeReadPos / (float)myBuffer->getNumSamples();
                 visualGrainPos[grainIndex].store(normalizedPos);
                 visualGrainEnv[grainIndex].store(window);
 
-                if (readPos >= 0 && readPos < audioBufferL1->getNumSamples())
+                if (readPos >= 0 && readPos < myBuffer->getNumSamples())
                 {
-                    float sample = audioBufferL1->getReadPointer(0)[readPos] * window;
+                    float sample = myBuffer->getReadPointer(0)[readPos] * window;
                     totalL += sample * grain.panL;
                     totalR += sample * grain.panR;
                 }
@@ -304,7 +257,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             grainIndex++;
         }
 
-        // --- FILTROS Y SALIDA ANALÓGICA ---
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
             totalL *= gainScale;
@@ -322,13 +274,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
         totalL = eqLowFilter[0].processSample(totalL);
         totalR = eqLowFilter[1].processSample(totalR);
-
         totalL = eqMidLowFilter[0].processSample(totalL);
         totalR = eqMidLowFilter[1].processSample(totalR);
-
         totalL = eqMidHighFilter[0].processSample(totalL);
         totalR = eqMidHighFilter[1].processSample(totalR);
-
         totalL = eqHighFilter[0].processSample(totalL);
         totalR = eqHighFilter[1].processSample(totalR);
 

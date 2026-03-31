@@ -12,6 +12,7 @@
 #include <JuceHeader.h>
 #include <array>
 #include <atomic>
+#include <cmath>
 
 class Granular_SynthAudioProcessor;
 
@@ -22,7 +23,6 @@ class GranularSound : public juce::SynthesiserSound
 public:
     bool appliesToNote(int midiNoteNumber) override { return true; }
     bool appliesToChannel(int midiChannel) override { return true; }
-
 };
 
 // ==============================================================================
@@ -30,9 +30,9 @@ public:
 class GranularVoice : public juce::SynthesiserVoice
 {
 public:
-    // ¡NUEVO CONSTRUCTOR! Recibe el audio y los parámetros
-    //GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse);
-    GranularVoice(juce::AudioBuffer<float>* bufferL1, juce::AudioBuffer<float>* bufferL2, juce::AudioProcessorValueTreeState* apvtsToUse);
+    // EL NUEVO CONSTRUCTOR UNIVERSAL
+    GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse, juce::String prefix);
+
     float currentLfo1Value = 0.0f;
     float currentLfo2Value = 0.0f;
 
@@ -47,51 +47,39 @@ public:
     void renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override;
 
 private:
-    
     struct Grain
     {
-        bool isActive = false;      // ¿Está sonando o está en la reserva?
-        double currentPosition = 0; // Por dónde va leyendo el audio (de 0 a grainLength)
-        int startSample = 0;        // La "foto" de dónde empezó a leer en el archivo
-        //float randomPan = 0.5f;     // SPRAY de paneo
+        bool isActive = false;
+        double currentPosition = 0;
+        int startSample = 0;
         float randomPitch = 1.0f;
-        float pitchRandomRatio = 1.0f;// SPRAY_PITCH
-        float panL = 1.0f; 
+        float pitchRandomRatio = 1.0f;
+        float panL = 1.0f;
         float panR = 1.0f;
         float activePitchRatio = 1.0f;
     };
 
-    // --- EL EJÉRCITO ---
     static constexpr int maxGrains = 128;
     std::array<Grain, maxGrains> grains;
 
-    // --- TEMPORIZADOR PARA DISPARAR GRANOS (DENSITY) ---
     double samplesUntilNextGrain = 0.0;
 
-    // --- VARIABLES GLOBALES DEL MOTOR ---
     bool isPlaying = false;
     double autoScanOffset = 0.0;
     float currentVelocity = 0.0f;
     float pitchRatio = 1.0f;
 
-    // Aquí guardamos las llaves para usarlas luego en la cocina
-    //juce::AudioBuffer<float>* audioBuffer;
-    //juce::AudioProcessorValueTreeState* apvts;
-
-    // Aquí guardamos las llaves de los DOS discos duros
-    juce::AudioBuffer<float>* audioBufferL1;
-    juce::AudioBuffer<float>* audioBufferL2;
+    // --- LAS LLAVES PRIVADAS DE ESTA VOZ ---
+    juce::AudioBuffer<float>* myBuffer;
     juce::AudioProcessorValueTreeState* apvts;
+    juce::String myPrefix; // Guardará "L1_" o "L2_" o "L3_"
 
-    // FILTROS ANALÓGICOS ESTÉREO
-    juce::dsp::StateVariableTPTFilter<float> lpf[2]; // 0 = L, 1 = R
-    juce::dsp::StateVariableTPTFilter<float> hpf[2]; // 0 = L, 1 = R
+    juce::dsp::StateVariableTPTFilter<float> lpf[2];
+    juce::dsp::StateVariableTPTFilter<float> hpf[2];
 
-    // ENV_AMP
     juce::ADSR ampAdsr;
     juce::ADSR::Parameters ampAdsrParams;
 
-    // --- FILTROS EQ 4 BANDAS (Estéreo) ---
     juce::dsp::IIR::Filter<float> eqLowFilter[2];
     juce::dsp::IIR::Filter<float> eqMidLowFilter[2];
     juce::dsp::IIR::Filter<float> eqMidHighFilter[2];
