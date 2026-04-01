@@ -341,6 +341,15 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         g.drawRect(wavesArea.removeFromTop(layerHeight), 1);
     }
 
+    // --- RESALTAR LA CAPA ACTIVA ---
+    g.setColour(juce::Colours::white.withAlpha(0.8f));
+    if (activeLayer == 1) {
+        g.drawRect(layer1Area, 2);
+    }
+    else if (activeLayer == 2) {
+        g.drawRect(layer2Area, 2);
+    }
+
     // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES (Derecha)
     g.setColour(juce::Colour(0xff121212));
     g.fillRect(rightMixerArea); // Mantenemos el fondo oscuro
@@ -602,38 +611,91 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     auto bounds = getLocalBounds();
     bounds.removeFromBottom(300);
     bounds.removeFromRight(350);
-    auto layer1Area = bounds.removeFromTop(bounds.getHeight() / 4);
 
+    int layerHeight = bounds.getHeight() / 4;
+    auto layer1Area = bounds.removeFromTop(layerHeight);
+    auto layer2Area = bounds.removeFromTop(layerHeight);
+
+    // ==========================================
+    // --- LÓGICA DE CAPA 1 ---
+    // ==========================================
     if (layer1Area.contains(event.getPosition()))
     {
-        // 1. ¿En qué pixel de la pantalla hemos hecho clic?
-        float clickX = event.getPosition().x - layer1Area.getX();
-
-        // 2. ¿Qué porcentaje de la pantalla representa ese pixel? (De 0.0 a 1.0)
-        float ratioInView = clickX / (float)layer1Area.getWidth();
-
-        // 3. MAGIA: Convertimos ese clic en pantalla a la posición real del audio,
-        // teniendo en cuenta el nivel de Zoom y el desplazamiento actual.
-        //float visibleRatio = 1.0f / zoomFactor;
-        //float normalizedPos = viewStartRatio + (ratioInView * visibleRatio);
-
-        // 3. MAGIA CROP: Convertimos el clic directo al valor del knob (0.0 a 1.0 de la pantalla visible)
-        float normalizedPos = juce::jlimit(0.0f, 1.0f, ratioInView);
-
-        //normalizedPos = juce::jlimit(0.0f, 1.0f, normalizedPos);
-
-        // 4. Actualizamos el knob y el motor de audio
-        if (auto* posParam = audioProcessor.apvts.getParameter("L1_POSITION"))
+        // 1. Si no estaba seleccionada, la seleccionamos y NO movemos el cursor
+        if (activeLayer != 1)
         {
-            posParam->setValueNotifyingHost(normalizedPos);
+            activeLayer = 1;
+            repaint();
+            return; // Cortamos la ejecución aquí
         }
+
+        // 2. Si YA estaba seleccionada, movemos el cursor libremente
+        float clickX = event.getPosition().x - layer1Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer1Area.getWidth());
+
+        if (auto* posParam = audioProcessor.apvts.getParameter("L1_POSITION"))
+            posParam->setValueNotifyingHost(ratioInView);
+
+        repaint();
+    }
+    // ==========================================
+    // --- LÓGICA DE CAPA 2 ---
+    // ==========================================
+    else if (layer2Area.contains(event.getPosition()))
+    {
+        // 1. Si no estaba seleccionada, la seleccionamos y NO movemos el cursor
+        if (activeLayer != 2)
+        {
+            activeLayer = 2;
+            repaint();
+            return; // Cortamos la ejecución aquí
+        }
+
+        // 2. Si YA estaba seleccionada, movemos el cursor libremente
+        float clickX = event.getPosition().x - layer2Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer2Area.getWidth());
+
+        if (auto* posParam = audioProcessor.apvts.getParameter("L2_POSITION"))
+            posParam->setValueNotifyingHost(ratioInView);
+
+        repaint();
     }
 }
 
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
 {
-    // Al arrastrar, llamamos exactamente a la misma lógica que al hacer clic
-    mouseDown(event);
+    // Al arrastrar, ya NO llamamos a mouseDown directamente porque si no
+    // el primer milímetro de arrastre nos cortaría la ejecución (por el return; de arriba).
+    // Queremos que si ya estamos arrastrando, mueva el cursor obligatoriamente.
+
+    auto bounds = getLocalBounds();
+    bounds.removeFromBottom(300);
+    bounds.removeFromRight(350);
+
+    int layerHeight = bounds.getHeight() / 4;
+    auto layer1Area = bounds.removeFromTop(layerHeight);
+    auto layer2Area = bounds.removeFromTop(layerHeight);
+
+    if (layer1Area.contains(event.getPosition()) && activeLayer == 1)
+    {
+        float clickX = event.getPosition().x - layer1Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer1Area.getWidth());
+
+        if (auto* posParam = audioProcessor.apvts.getParameter("L1_POSITION"))
+            posParam->setValueNotifyingHost(ratioInView);
+
+        repaint();
+    }
+    else if (layer2Area.contains(event.getPosition()) && activeLayer == 2)
+    {
+        float clickX = event.getPosition().x - layer2Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer2Area.getWidth());
+
+        if (auto* posParam = audioProcessor.apvts.getParameter("L2_POSITION"))
+            posParam->setValueNotifyingHost(ratioInView);
+
+        repaint();
+    }
 }
 
 void Granular_SynthAudioProcessorEditor::timerCallback()

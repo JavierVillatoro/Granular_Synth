@@ -102,6 +102,8 @@ private:
 
     int lastDragX = 0;
 
+    int activeLayer = 1; // 1 para Cyan, 2 para Magenta
+
     juce::Rectangle<int> matrixArea;
     juce::Rectangle<int> mixerArea;
     juce::Rectangle<int> masterArea;
