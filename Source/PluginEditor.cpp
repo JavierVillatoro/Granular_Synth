@@ -625,6 +625,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (activeLayer != 1)
         {
             activeLayer = 1;
+            engineModule.setLayer(1); // ¡Avisamos al módulo Engine!
             repaint();
             return; // Cortamos la ejecución aquí
         }
@@ -647,6 +648,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (activeLayer != 2)
         {
             activeLayer = 2;
+            engineModule.setLayer(2); // ¡Avisamos al módulo Engine!
             repaint();
             return; // Cortamos la ejecución aquí
         }

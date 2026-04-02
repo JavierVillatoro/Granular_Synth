@@ -14,15 +14,16 @@
 class EngineModule : public juce::Component
 {
 public:
-    // AADIDO: El parmetro juce::String prefix
-    //EngineModule(juce::AudioProcessorValueTreeState& apvtsuce::String prefix);
     EngineModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     void resized() override;
 
+    // NUEVO: La funcin que llama el Editor al hacer clic
+    void setLayer(int layerIndex);
+
 private:
+    juce::AudioProcessorValueTreeState& apvtsRef; // Guardamos el APVTS para reconectar
     juce::String layerPrefix; // <-- Guarda la identidad de la capa
 
- 
     juce::Slider sizeKnob;
     juce::Slider densityKnob;
     juce::Slider shapeKnob;
