@@ -201,64 +201,79 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     }
 
     // ==========================================================
-    // --- LÓGICA DE CAPA 1: PLAY / MIDI / HOLD ---
+    // --- LÓGICA DE CAPA 1 (CYAN) ---
     // ==========================================================
-    bool isPlayOn = apvts.getRawParameterValue("L1_PLAY")->load() > 0.5f;
-    bool isMidiOn = apvts.getRawParameterValue("L1_MIDI")->load() > 0.5f;
-    bool isHoldOn = apvts.getRawParameterValue("L1_HOLD")->load() > 0.5f;
+    bool isPlayOnL1 = apvts.getRawParameterValue("L1_PLAY")->load() > 0.5f;
+    bool isMidiOnL1 = apvts.getRawParameterValue("L1_MIDI")->load() > 0.5f;
+    bool isHoldOnL1 = apvts.getRawParameterValue("L1_HOLD")->load() > 0.5f;
 
-    // 1. Creamos un buffer MIDI limpio (nuestro "portero")
-    juce::MidiBuffer processedMidi;
+    juce::MidiBuffer processedMidiL1;
 
-    // 2. Filtramos lo que viene del DAW / Teclado
-    for (const auto metadata : midiMessages)
-    {
+    for (const auto metadata : midiMessages) {
         auto message = metadata.getMessage();
-        int samplePos = metadata.samplePosition;
-
-        if (isMidiOn)
-        {
-            // Si HOLD está encendido, tiramos a la basura las órdenes de "Soltar Tecla"
-            if (isHoldOn && message.isNoteOff()) {
-                continue;
-            }
-
-            // Si pasa el filtro, lo metemos en nuestro buffer limpio
-            processedMidi.addEvent(message, samplePos);
+        if (isMidiOnL1) {
+            if (isHoldOnL1 && message.isNoteOff()) continue;
+            processedMidiL1.addEvent(message, metadata.samplePosition);
         }
     }
 
-    // 3. Lógica del botón PLAY (Inyectar el Drone C3)
-    if (isPlayOn && !lastPlayState)
-    {
-        processedMidi.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    if (isPlayOnL1 && !lastPlayState) {
+        processedMidiL1.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
     }
-    else if (!isPlayOn && lastPlayState)
-    {
-        processedMidi.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+    else if (!isPlayOnL1 && lastPlayState) {
+        processedMidiL1.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     }
-    lastPlayState = isPlayOn;
+    lastPlayState = isPlayOnL1;
 
-    // 4. Limpieza del HOLD
-    if (!isHoldOn && lastHoldState)
-    {
+    if (!isHoldOnL1 && lastHoldState) {
         synthL1.allNotesOff(0, true);
     }
-    lastHoldState = isHoldOn;
+    lastHoldState = isHoldOnL1;
 
     // ==========================================================
-    // --- LÓGICA DE RETRIGGER DEL LFO (Actualizada) ---
+    // --- LÓGICA DE CAPA 2 (MAGENTA) ---
+    // ==========================================================
+    bool isPlayOnL2 = apvts.getRawParameterValue("L2_PLAY")->load() > 0.5f;
+    bool isMidiOnL2 = apvts.getRawParameterValue("L2_MIDI")->load() > 0.5f;
+    bool isHoldOnL2 = apvts.getRawParameterValue("L2_HOLD")->load() > 0.5f;
+
+    juce::MidiBuffer processedMidiL2;
+
+    for (const auto metadata : midiMessages) {
+        auto message = metadata.getMessage();
+        if (isMidiOnL2) {
+            if (isHoldOnL2 && message.isNoteOff()) continue;
+            processedMidiL2.addEvent(message, metadata.samplePosition);
+        }
+    }
+
+    if (isPlayOnL2 && !lastPlayStateL2) {
+        // Usamos Canal 1 para que el motor interno no se confunda
+        processedMidiL2.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    }
+    else if (!isPlayOnL2 && lastPlayStateL2) {
+        processedMidiL2.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+    }
+    lastPlayStateL2 = isPlayOnL2;
+
+    if (!isHoldOnL2 && lastHoldStateL2) {
+        synthL2.allNotesOff(0, true);
+    }
+    lastHoldStateL2 = isHoldOnL2;
+
+    // ==========================================================
+    // --- LÓGICA DE RETRIGGER DEL LFO (Corregida por ti) ---
     // ==========================================================
     bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
 
-    // ¡OJO! Ahora leemos de 'processedMidi', no de 'midiMessages'
-    for (const auto metadata : processedMidi)
+    if (retrigLfo)
     {
-        auto message = metadata.getMessage();
-        if (message.isNoteOn() && retrigLfo)
-        {
-            lfo1Phase = 0.0f;
-            lfo2Phase = 0.0f;
+        // El LFO reinicia si CUALQUIERA de las dos capas activas recibe una nota
+        for (const auto metadata : processedMidiL1) {
+            if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; }
+        }
+        for (const auto metadata : processedMidiL2) {
+            if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; }
         }
     }
 
@@ -393,11 +408,14 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
 
     // 2. ¡Dejamos que los dos Directores de Orquesta rellenen el buffer!
     // La Capa 1 lee tu teclado MIDI normal (processedMidi)
-    synthL1.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+    //synthL1.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
 
     // La Capa 2 por ahora lee un buffer vacío (pronto le daremos su propio MIDI)
-    juce::MidiBuffer emptyMidi;
-    synthL2.renderNextBlock(buffer, emptyMidi, 0, buffer.getNumSamples());
+    //juce::MidiBuffer emptyMidi;
+    //synthL2.renderNextBlock(buffer, emptyMidi, 0, buffer.getNumSamples());
+    // 2. ¡Dejamos que los dos Directores de Orquesta rellenen el buffer!
+    synthL1.renderNextBlock(buffer, processedMidiL1, 0, buffer.getNumSamples());
+    synthL2.renderNextBlock(buffer, processedMidiL2, 0, buffer.getNumSamples());
 
     // ==========================================================
     // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---

@@ -160,5 +160,8 @@ private:
     bool lastPlayState = false;
     bool lastHoldState = false;
 
+    bool lastPlayStateL2 = false;
+    bool lastHoldStateL2 = false;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
 };
