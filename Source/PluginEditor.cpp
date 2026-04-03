@@ -129,8 +129,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float sizeRatio = grainSizeParam->load();
             float shapeValue = shapeParamVal->load(); // Leemos el Shape actual
 
-            float winStart = audioProcessor.windowStartRatio.load();
-            float winLen = audioProcessor.windowLengthRatio.load();
+            //float winStart = audioProcessor.windowStartRatio.load();
+            //float winLen = audioProcessor.windowLengthRatio.load();
+
+            float winStart = audioProcessor.windowStartRatioL1.load();
+            float winLen = audioProcessor.windowLengthRatioL1.load();
 
             // 1. Posición real de la línea en el archivo entero
             float absolutePos = winStart + (currentPosition * winLen);
@@ -258,8 +261,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float sizeRatioL2 = sizeParamL2->load();
             float shapeValueL2 = shapeParamL2->load();
 
-            float winStartL2 = audioProcessor.windowStartRatio.load(); // Por ahora usamos el zoom global
-            float winLenL2 = audioProcessor.windowLengthRatio.load();
+            //float winStartL2 = audioProcessor.windowStartRatio.load(); // Por ahora usamos el zoom global
+            //float winLenL2 = audioProcessor.windowLengthRatio.load();
+
+            float winStartL2 = audioProcessor.windowStartRatioL2.load();
+            float winLenL2 = audioProcessor.windowLengthRatioL2.load();
 
             float absolutePosL2 = winStartL2 + (currentPositionL2 * winLenL2);
             double cursorTimeSecondsL2 = absolutePosL2 * totalAudioSecondsL2;
@@ -569,40 +575,53 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
 
 void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
 {
-    if (thumbnail.getTotalLength() > 0.0)
+    auto bounds = getLocalBounds();
+    bounds.removeFromBottom(300);
+    bounds.removeFromRight(350);
+
+    int layerHeight = bounds.getHeight() / 4;
+    auto layer1Area = bounds.removeFromTop(layerHeight);
+    auto layer2Area = bounds.removeFromTop(layerHeight);
+
+    // ==========================================================
+    // --- ZOOM CAPA 1 (CYAN) ---
+    // ==========================================================
+    if (layer1Area.contains(event.getPosition()) && thumbnail.getTotalLength() > 0.0)
     {
-        // 1. Recreamos el área de la onda para saber si el ratón está dentro
-        auto bounds = getLocalBounds();
-        bounds.removeFromBottom(300);
-        bounds.removeFromRight(350);
-        auto layer1Area = bounds.removeFromTop(bounds.getHeight() / 4);
+        double mouseX = event.getPosition().x - layer1Area.getX();
+        double mouseRatioInView = mouseX / (double)layer1Area.getWidth();
+        double timeUnderMouse = viewStartRatio + (mouseRatioInView / zoomFactor);
 
-        if (layer1Area.contains(event.getPosition()))
-        {
-            // 2. ¿En qué píxel relativo de la caja azul está el ratón?
-            double mouseX = event.getPosition().x - layer1Area.getX();
+        double zoomMultiplier = (wheel.deltaY > 0) ? 1.2 : 1.0 / 1.2;
+        double newZoomFactor = juce::jlimit(1.0, 50.0, zoomFactor * zoomMultiplier);
 
-            // ¿Qué porcentaje de la pantalla (0.0 a 1.0) es ese píxel?
-            double mouseRatioInView = mouseX / (double)layer1Area.getWidth();
+        viewStartRatio = timeUnderMouse - (mouseRatioInView / newZoomFactor);
+        viewStartRatio = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactor), viewStartRatio);
+        zoomFactor = newZoomFactor;
 
-            // 3. MAGIA: ¿Qué porcentaje del audio TOTAL está debajo del ratón AHORA MISMO?
-            double timeUnderMouse = viewStartRatio + (mouseRatioInView / zoomFactor);
+        audioProcessor.windowStartRatioL1.store((float)viewStartRatio);
+        audioProcessor.windowLengthRatioL1.store(1.0f / (float)zoomFactor);
+        repaint();
+    }
+    // ==========================================================
+    // --- ZOOM CAPA 2 (MAGENTA) ---
+    // ==========================================================
+    else if (layer2Area.contains(event.getPosition()) && thumbnailL2.getTotalLength() > 0.0)
+    {
+        double mouseX = event.getPosition().x - layer2Area.getX();
+        double mouseRatioInView = mouseX / (double)layer2Area.getWidth();
+        double timeUnderMouse = viewStartRatioL2 + (mouseRatioInView / zoomFactorL2);
 
-            // 4. Calculamos el nuevo nivel de Zoom
-            double zoomMultiplier = (wheel.deltaY > 0) ? 1.2 : 1.0 / 1.2;
-            double newZoomFactor = juce::jlimit(1.0, 50.0, zoomFactor * zoomMultiplier);
+        double zoomMultiplier = (wheel.deltaY > 0) ? 1.2 : 1.0 / 1.2;
+        double newZoomFactorL2 = juce::jlimit(1.0, 50.0, zoomFactorL2 * zoomMultiplier);
 
-            // 5. Ajustamos el inicio de la vista para que 'timeUnderMouse' siga bajo el ratón
-            viewStartRatio = timeUnderMouse - (mouseRatioInView / newZoomFactor);
+        viewStartRatioL2 = timeUnderMouse - (mouseRatioInView / newZoomFactorL2);
+        viewStartRatioL2 = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactorL2), viewStartRatioL2);
+        zoomFactorL2 = newZoomFactorL2;
 
-            // 6. Limitamos para no salirnos por los bordes izquierdo (0.0) o derecho
-            viewStartRatio = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactor), viewStartRatio);
-            zoomFactor = newZoomFactor;
-
-            audioProcessor.windowStartRatio.store((float)viewStartRatio);
-            audioProcessor.windowLengthRatio.store(1.0f / (float)zoomFactor);
-            repaint();
-        }
+        audioProcessor.windowStartRatioL2.store((float)viewStartRatioL2);
+        audioProcessor.windowLengthRatioL2.store(1.0f / (float)zoomFactorL2);
+        repaint();
     }
 }
 

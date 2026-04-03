@@ -95,8 +95,16 @@ public:
     juce::String lastLoadedFilePathL2 = "";
 
     // Memoria ventana de zoom (¡Pronto tendremos que duplicar esto también!)
-    std::atomic<float> windowStartRatio{ 0.0f };
-    std::atomic<float> windowLengthRatio{ 1.0f };
+    //std::atomic<float> windowStartRatio{ 0.0f };
+    //std::atomic<float> windowLengthRatio{ 1.0f };
+
+    // Cámara Capa 1
+    std::atomic<float> windowStartRatioL1{ 0.0f };
+    std::atomic<float> windowLengthRatioL1{ 1.0f };
+
+    // Cámara Capa 2
+    std::atomic<float> windowStartRatioL2{ 0.0f };
+    std::atomic<float> windowLengthRatioL2{ 1.0f };
 
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;
