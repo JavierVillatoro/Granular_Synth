@@ -61,21 +61,6 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    //juce::Synthesiser& getSynthesiser() { return synth; }
-
-    //juce::AudioBuffer<float>& getAudioBuffer() { return audioBuffer; }
-    //bool isAudioLoaded = false;
-
-    // Memoria ventana de zoom
-    //std::atomic<float> windowStartRatio{ 0.0f };
-    //std::atomic<float> windowLengthRatio{ 1.0f };
-
-    //std::vector<LfoNode> savedLfoNodes;
-    //bool isLfoSaved = false;
-
-    //juce::String lastLoadedFilePath = "";
-
-    //juce::Synthesiser& getSynthesiser() { return synth; }
     juce::Synthesiser& getSynthesiserL1() { return synthL1; }
     juce::Synthesiser& getSynthesiserL2() { return synthL2; }
 
@@ -94,10 +79,8 @@ public:
     juce::String lastLoadedFilePathL1 = "";
     juce::String lastLoadedFilePathL2 = "";
 
-    // Memoria ventana de zoom (¡Pronto tendremos que duplicar esto también!)
-    //std::atomic<float> windowStartRatio{ 0.0f };
-    //std::atomic<float> windowLengthRatio{ 1.0f };
-
+    // Memoria ventana de zoom 
+   
     // Cámara Capa 1
     std::atomic<float> windowStartRatioL1{ 0.0f };
     std::atomic<float> windowLengthRatioL1{ 1.0f };

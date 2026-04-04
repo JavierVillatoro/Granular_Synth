@@ -118,17 +118,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     float totalAudioSeconds = myBuffer->getNumSamples() / getSampleRate();
 
-    //float winStart = 0.0f;
-    //float winLen = 1.0f;
-    //if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor)) {
-        // En el futuro separaremos el zoom, por ahora usamos el global
-        //winStart = processor->windowStartRatio.load();
-        //winLen = processor->windowLengthRatio.load();
-    //}
     float winStart = 0.0f;
     float winLen = 1.0f;
     if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor)) {
-        // ¡CADA EQUIPO MIRA POR SU PROPIA CÁMARA!
+        // Propia camara para cada layer
         if (myPrefix == "L1_") {
             winStart = processor->windowStartRatioL1.load();
             winLen = processor->windowLengthRatioL1.load();

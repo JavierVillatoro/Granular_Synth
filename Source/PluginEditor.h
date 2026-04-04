@@ -61,8 +61,7 @@ public:
     }
 
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
-    //void mouseDown(const juce::MouseEvent& event) override;
-    //void mouseDrag(const juce::MouseEvent& event) override;
+    
 
 private:
     // This reference is provided as a quick way for your editor to
