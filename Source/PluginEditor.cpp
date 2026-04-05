@@ -16,7 +16,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     : AudioProcessorEditor(&p), audioProcessor(p),
     masterModule(p.apvts, p),
     //distModule(p.apvts),
-    bpmModule(p.apvts), // <-- 1. Inicializamos el nuevo módulo aquí (CON coma)
+    bpmModule(p.apvts), 
     mixerModule1(p.apvts, "L1_"),
     layer1Controls(p.apvts, "L1_"),
     layer2Controls(p.apvts, "L2_"),
@@ -637,7 +637,13 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (activeLayer != 1)
         {
             activeLayer = 1;
-            engineModule.setLayer(1); // ¡Avisamos al módulo Engine!
+
+            // ¡Avisamos a todos los módulos!
+            engineModule.setLayer(1);
+            scanModule.setLayer(1);
+            sprayModule.setLayer(1);
+            pitchModule.setLayer(1);
+
             repaint();
             return; // Cortamos la ejecución aquí
         }
@@ -660,7 +666,13 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (activeLayer != 2)
         {
             activeLayer = 2;
-            engineModule.setLayer(2); // ¡Avisamos al módulo Engine!
+
+            // ¡Avisamos a todos los módulos!
+            engineModule.setLayer(2);
+            scanModule.setLayer(2);
+            sprayModule.setLayer(2);
+            pitchModule.setLayer(2);
+
             repaint();
             return; // Cortamos la ejecución aquí
         }

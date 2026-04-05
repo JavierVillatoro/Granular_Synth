@@ -10,9 +10,8 @@
 
 #include "ScanModule.h"
 
-// AÑADIDO: Recibimos y guardamos el prefijo
 ScanModule::ScanModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
-    : layerPrefix(prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
     auto setupKnob = [this](juce::Slider& k) {
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -24,13 +23,34 @@ ScanModule::ScanModule(juce::AudioProcessorValueTreeState& apvts, juce::String p
     setupKnob(speedKnob);
     setupKnob(dirKnob);
 
-    // USAMOS EL PREFIJO
-    posAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "POSITION", posKnob);
-    speedAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SCAN_SPEED", speedKnob);
-    dirAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SCAN_MODE", dirKnob);
+    setLayer(1); // Arrancamos en Capa 1
 }
 
 ScanModule::~ScanModule() {}
+
+void ScanModule::setLayer(int layerIndex)
+{
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
+
+    posKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    speedKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    dirKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+
+    posKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    speedKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    dirKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    posAttach.reset();
+    speedAttach.reset();
+    dirAttach.reset();
+
+    posAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "POSITION", posKnob);
+    speedAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SCAN_SPEED", speedKnob);
+    dirAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SCAN_MODE", dirKnob);
+}
 
 void ScanModule::paint(juce::Graphics& g)
 {

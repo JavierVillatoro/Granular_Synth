@@ -10,9 +10,8 @@
 
 #include "SprayModule.h"
 
-// AÑADIDO: Recibimos y guardamos el prefijo
 SprayModule::SprayModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
-    : layerPrefix(prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
     auto setupKnob = [this](juce::Slider& k) {
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -24,10 +23,31 @@ SprayModule::SprayModule(juce::AudioProcessorValueTreeState& apvts, juce::String
     setupKnob(pitchSprayKnob);
     setupKnob(panSprayKnob);
 
-    // USAMOS EL PREFIJO DINÁMICO
-    posSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SPRAY_POS", posSprayKnob);
-    pitchSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SPRAY_PITCH", pitchSprayKnob);
-    panSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SPRAY_PAN", panSprayKnob);
+    setLayer(1);
+}
+
+void SprayModule::setLayer(int layerIndex)
+{
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
+
+    posSprayKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    pitchSprayKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    panSprayKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+
+    posSprayKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    pitchSprayKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    panSprayKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    posSprayAttach.reset();
+    pitchSprayAttach.reset();
+    panSprayAttach.reset();
+
+    posSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPRAY_POS", posSprayKnob);
+    pitchSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPRAY_PITCH", pitchSprayKnob);
+    panSprayAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPRAY_PAN", panSprayKnob);
 }
 
 void SprayModule::resized()

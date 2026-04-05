@@ -14,15 +14,18 @@
 class ScanModule : public juce::Component
 {
 public:
-    // AÑADIDO: El parámetro juce::String prefix
     ScanModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~ScanModule() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    // NUEVA FUNCIÓN PARA CAMBIAR DE CAPA
+    void setLayer(int layerIndex);
+
 private:
-    juce::String layerPrefix; // <-- Guarda la identidad
+    juce::AudioProcessorValueTreeState& apvtsRef;
+    juce::String layerPrefix;
 
     juce::Slider posKnob;
     juce::Slider speedKnob;

@@ -10,9 +10,8 @@
 
 #include "PitchModule.h"
 
-// AÑADIDO: Recibimos y guardamos el prefijo
 PitchModule::PitchModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
-    : layerPrefix(prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
     auto setupKnob = [this](juce::Slider& k) {
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -24,13 +23,34 @@ PitchModule::PitchModule(juce::AudioProcessorValueTreeState& apvts, juce::String
     setupKnob(fineKnob);
     setupKnob(scaleKnob);
 
-    // USAMOS PREFIJO DINÁMICO
-    transAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_TRANS", transKnob);
-    fineAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_FINE", fineKnob);
-    scaleAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "PITCH_SCALE", scaleKnob);
+    setLayer(1);
 }
 
 PitchModule::~PitchModule() {}
+
+void PitchModule::setLayer(int layerIndex)
+{
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
+
+    transKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    fineKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    scaleKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+
+    transKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    fineKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    scaleKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    transAttach.reset();
+    fineAttach.reset();
+    scaleAttach.reset();
+
+    transAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "PITCH_TRANS", transKnob);
+    fineAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "PITCH_FINE", fineKnob);
+    scaleAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "PITCH_SCALE", scaleKnob);
+}
 
 void PitchModule::resized()
 {
