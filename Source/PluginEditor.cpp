@@ -52,7 +52,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L1_SHAPE", this);
 
-    // Escuchas Capa 2 (NUEVO)
+    // Escuchas Capa 2 
     audioProcessor.apvts.addParameterListener("L2_POSITION", this);
     audioProcessor.apvts.addParameterListener("L2_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L2_SHAPE", this);
@@ -129,9 +129,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float sizeRatio = grainSizeParam->load();
             float shapeValue = shapeParamVal->load(); // Leemos el Shape actual
 
-            //float winStart = audioProcessor.windowStartRatio.load();
-            //float winLen = audioProcessor.windowLengthRatio.load();
-
             float winStart = audioProcessor.windowStartRatioL1.load();
             float winLen = audioProcessor.windowLengthRatioL1.load();
 
@@ -154,7 +151,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 grainWidthPixels,
                 layer1Area.getHeight());
 
-            // --- AQUÍ EMPIEZA EL DIBUJO DINÁMICO DEL SHAPE ---
+            // --- DIBUJO DINÁMICO DEL SHAPE ---
             juce::Path grainPath;
             grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
 
@@ -164,8 +161,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
                 // Hann (Campana)
                 float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                // Square (Trapecio con mini-fade de 5% para que no sea un bloque puro)
-                //float square = (progress < 0.05f) ? progress / 0.05f : (progress > 0.95f ? (1.0f - progress) / 0.05f : 1.0f);
+                // Square (Trapecio, mini_fade no click)
                 float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
                 float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
                 float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
@@ -188,7 +184,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         }
 
         // ==========================================================
-        // --- MAGIA VISUAL DE LOS GRANOS ANIMADOS ---
+        // --- VISUAL DE LOS GRAINS ---
         // ==========================================================
         auto& synthL1 = audioProcessor.getSynthesiserL1();
 
@@ -260,9 +256,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float currentPositionL2 = posParamL2->load();
             float sizeRatioL2 = sizeParamL2->load();
             float shapeValueL2 = shapeParamL2->load();
-
-            //float winStartL2 = audioProcessor.windowStartRatio.load(); // Por ahora usamos el zoom global
-            //float winLenL2 = audioProcessor.windowLengthRatio.load();
 
             float winStartL2 = audioProcessor.windowStartRatioL2.load();
             float winLenL2 = audioProcessor.windowLengthRatioL2.load();
