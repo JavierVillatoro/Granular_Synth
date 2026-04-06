@@ -37,7 +37,7 @@ void EngineModule::setLayer(int layerIndex)
     // Capa 1 = Cyan (Barra y Punto)
     // Capa 2 = Magenta (Barra) y Rosa (Punto)
     juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
 
     // Actualizamos la barra
     sizeKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
