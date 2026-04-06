@@ -24,36 +24,30 @@
 #include "LayerControlsModule.h"
 #include "LayerMixerModule.h"
 
-//==============================================================================
-/**
-*/
-class Granular_SynthAudioProcessorEditor  : public juce::AudioProcessorEditor,
-                                            public juce::FileDragAndDropTarget,
-                                            public juce::ChangeListener,
-                                            public juce::AudioProcessorValueTreeState::Listener,
-                                            public juce::Timer
+class Granular_SynthAudioProcessorEditor : public juce::AudioProcessorEditor,
+    public juce::FileDragAndDropTarget,
+    public juce::ChangeListener,
+    public juce::AudioProcessorValueTreeState::Listener,
+    public juce::Timer
 {
 public:
-    Granular_SynthAudioProcessorEditor (Granular_SynthAudioProcessor&);
+    Granular_SynthAudioProcessorEditor(Granular_SynthAudioProcessor&);
     ~Granular_SynthAudioProcessorEditor() override;
 
-    //==============================================================================
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics&) override;
     void resized() override;
-
     void timerCallback() override;
 
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
-    
+
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
-    void changeListenerCallback(juce::ChangeBroadcaster* source) override; // Cuando audio listo para dibujarse
+    void changeListenerCallback(juce::ChangeBroadcaster* source) override;
 
     void parameterChanged(const juce::String& parameterID, float newValue) override
     {
-        // Aadimos "SHAPE" a la condicin
         if (parameterID == "POSITION" || parameterID == "GRAIN_SIZE" || parameterID == "SHAPE")
         {
             juce::MessageManager::callAsync([this] { repaint(); });
@@ -61,25 +55,21 @@ public:
     }
 
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
-    
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
     MasterModule masterModule;
-    //DistModule distModule; lo he declarado abajo adaptado para los prefijos. 
     BpmModule bpmModule;
+
     LayerControlsModule layer1Controls;
     LayerControlsModule layer2Controls;
+    LayerControlsModule layer3Controls;
 
     Granular_SynthAudioProcessor& audioProcessor;
 
-    juce::AudioThumbnailCache thumbnailCache; 
+    juce::AudioThumbnailCache thumbnailCache;
     juce::AudioThumbnail thumbnail;
     juce::AudioThumbnail thumbnailL2;
-    //juce::Slider positionKnob;
-
-    //std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> positionAttachment;
+    juce::AudioThumbnail thumbnailL3;
 
     EngineModule engineModule{ audioProcessor.apvts, "L1_" };
     ScanModule scanModule{ audioProcessor.apvts, "L1_" };
@@ -88,20 +78,21 @@ private:
     FilterModule filterModule{ audioProcessor.apvts, "L1_" };
     EnvelopeModule envelopeModule{ audioProcessor.apvts, "L1_" };
     SpaceModule spaceModule{ audioProcessor.apvts, "L1_" };
-    LfoModule lfoModule{ audioProcessor.apvts }; // (LFO es global, sin prefijo)
+    LfoModule lfoModule{ audioProcessor.apvts };
     DistModule distModule{ audioProcessor.apvts, "L1_" };
     LayerMixerModule mixerModule1{ audioProcessor.apvts, "L1_" };
 
-    // --- VARIABLES DE ZOOM Y NAVEGACIN ---
-    double zoomFactor = 1.0;     // 1.0 = vista completa, 10.0 = zoom x10
-    double viewStartRatio = 0.0; // De 0.0 a 1.0, indica qu	 parte del audio est a la izquierda de la pantalla
+    double zoomFactor = 1.0;
+    double viewStartRatio = 0.0;
 
-    double zoomFactorL2 = 1.0;          
+    double zoomFactorL2 = 1.0;
     double viewStartRatioL2 = 0.0;
 
-    int lastDragX = 0;
+    double zoomFactorL3 = 1.0;
+    double viewStartRatioL3 = 0.0;
 
-    int activeLayer = 1; // 1 para Cyan, 2 para Magenta
+    int lastDragX = 0;
+    int activeLayer = 1;
 
     juce::Rectangle<int> matrixArea;
     juce::Rectangle<int> mixerArea;
@@ -109,5 +100,5 @@ private:
     juce::Rectangle<int> distArea;
     juce::Rectangle<int> bpmArea;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessorEditor)
 };

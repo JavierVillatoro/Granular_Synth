@@ -31,6 +31,7 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     //synth.addSound(new GranularSound());
     synthL1.addSound(new GranularSound());
     synthL2.addSound(new GranularSound());
+    synthL3.addSound(new GranularSound());
 
     // 2. Contratamos a 8 "Voces" 
     //for (int i = 0; i < 8; ++i)
@@ -132,10 +133,12 @@ void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesP
     // 1. Damos el tamaño correcto a nuestros cables internos
     renderBufferL1.setSize(spec.numChannels, samplesPerBlock);
     renderBufferL2.setSize(spec.numChannels, samplesPerBlock);
+    renderBufferL3.setSize(spec.numChannels, samplesPerBlock);
 
     // 2. Preparamos las Reverbs gemelas
     reverbL1.prepare(spec);
     reverbL2.prepare(spec);
+    reverbL3.prepare(spec);
 
     // 3. Preparamos el Limitador
     masterLimiter.prepare(spec);
@@ -144,6 +147,7 @@ void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesP
     // 4. Preparamos el sintetizador
     synthL1.setCurrentPlaybackSampleRate(sampleRate);
     synthL2.setCurrentPlaybackSampleRate(sampleRate);
+    synthL3.setCurrentPlaybackSampleRate(sampleRate);
 }
 
 void Granular_SynthAudioProcessor::releaseResources()
@@ -626,6 +630,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // 3. ¡CREAMOS LAS 2 CAPAS CON UNA SOLA LÍNEA DE CÓDIGO CADA UNA!
     addLayerParameters("L1");
     addLayerParameters("L2");
+    addLayerParameters("L3");
 
     return { params.begin(), params.end() };
 }
@@ -658,6 +663,11 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
             audioBufferL2.makeCopyOf(tempBuffer);
             isAudioLoadedL2 = true;
             lastLoadedFilePathL2 = path;
+        }
+        else if (layerIndex == 3) {
+            audioBufferL3.makeCopyOf(tempBuffer);
+            isAudioLoadedL3 = true;
+            lastLoadedFilePathL3 = path;
         }
 
         // Volvemos a encender

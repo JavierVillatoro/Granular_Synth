@@ -12,35 +12,27 @@
 #include "GranularVoice.h"
 #include "LfoModule.h"
 
-//==============================================================================
-/**
-*/
-class Granular_SynthAudioProcessor  : public juce::AudioProcessor
+class Granular_SynthAudioProcessor : public juce::AudioProcessor
 {
 public:
-    //==============================================================================
     Granular_SynthAudioProcessor();
     ~Granular_SynthAudioProcessor() override;
 
-    //==============================================================================
-    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
-    //void loadFile(const juce::String& path);
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void loadFile(const juce::String& path, int layerIndex);
 
     juce::AudioFormatManager& getFormatManager() { return formatManager; }
     void releaseResources() override;
 
-   #ifndef JucePlugin_PreferredChannelConfigurations
-    bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
-   #endif
+#ifndef JucePlugin_PreferredChannelConfigurations
+    bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
+#endif
 
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
 
-    //==============================================================================
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
 
-    //==============================================================================
     const juce::String getName() const override;
 
     bool acceptsMidi() const override;
@@ -48,113 +40,88 @@ public:
     bool isMidiEffect() const override;
     double getTailLengthSeconds() const override;
 
-    //==============================================================================
     int getNumPrograms() override;
     int getCurrentProgram() override;
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
-    void changeProgramName (int index, const juce::String& newName) override;
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
+    void changeProgramName(int index, const juce::String& newName) override;
 
-    //==============================================================================
-    void getStateInformation (juce::MemoryBlock& destData) override;
-    void setStateInformation (const void* data, int sizeInBytes) override;
+    void getStateInformation(juce::MemoryBlock& destData) override;
+    void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // --- LOS 3 JEFES ---
     juce::Synthesiser& getSynthesiserL1() { return synthL1; }
     juce::Synthesiser& getSynthesiserL2() { return synthL2; }
+    juce::Synthesiser& getSynthesiserL3() { return synthL3; }
 
-    // ==========================================================
     // --- DISCOS DUROS PARA LAS CAPAS ---
-    // ==========================================================
     juce::AudioBuffer<float> audioBufferL1;
     juce::AudioBuffer<float> audioBufferL2;
+    juce::AudioBuffer<float> audioBufferL3;
 
     juce::AudioBuffer<float>& getAudioBufferL1() { return audioBufferL1; }
     juce::AudioBuffer<float>& getAudioBufferL2() { return audioBufferL2; }
+    juce::AudioBuffer<float>& getAudioBufferL3() { return audioBufferL3; }
 
     bool isAudioLoadedL1 = false;
     bool isAudioLoadedL2 = false;
+    bool isAudioLoadedL3 = false;
 
     juce::String lastLoadedFilePathL1 = "";
     juce::String lastLoadedFilePathL2 = "";
+    juce::String lastLoadedFilePathL3 = "";
 
-    // Memoria ventana de zoom 
-   
-    // Cámara Capa 1
+    // --- CÁMARAS DE ZOOM INDEPENDIENTES ---
     std::atomic<float> windowStartRatioL1{ 0.0f };
     std::atomic<float> windowLengthRatioL1{ 1.0f };
 
-    // Cámara Capa 2
     std::atomic<float> windowStartRatioL2{ 0.0f };
     std::atomic<float> windowLengthRatioL2{ 1.0f };
+
+    std::atomic<float> windowStartRatioL3{ 0.0f };
+    std::atomic<float> windowLengthRatioL3{ 1.0f };
 
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;
 
-    // Estas variables guardan el valor exacto del LFO en este preciso instante.
-    // Las Voces Granulares las leerán para saber cómo tienen que moverse.
-    float globalLfo1Value = 0.0f; // Oscilará entre -1.0 y 1.0
-    float globalLfo2Value = 0.0f; // Oscilará entre 0.0 y 1.0 (Vectorial)
+    float globalLfo1Value = 0.0f;
+    float globalLfo2Value = 0.0f;
 
-    // ==========================================================
-    // --- MEMORIA WAVETABLE PARA EL LFO 2 
-    // ==========================================================
-    static constexpr int LFO_TABLE_SIZE = 2048; // High resolution 
-    std::array<float, LFO_TABLE_SIZE> lfo2Table = { 0.0f }; // Zeros table
+    static constexpr int LFO_TABLE_SIZE = 2048;
+    std::array<float, LFO_TABLE_SIZE> lfo2Table = { 0.0f };
 
-    // --- VARIABLES VISUALES (Los espías para la Interfaz) ---
     std::atomic<float> visualLpfCutoff{ 20000.0f };
     std::atomic<float> visualHpfCutoff{ 20.0f };
-
-    // Mueve estas dos líneas AQUÍ a la zona pública:
     std::atomic<float> visualMeterL{ -60.0f };
     std::atomic<float> visualMeterR{ -60.0f };
 
 private:
-    //==============================================================================
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
-    //==============================================================================
-    //juce::AudioProcessorValueTreeState apvts;
     juce::AudioFormatManager formatManager;
-    //juce::AudioBuffer<float> audioBuffer;
-    //==============================================================================
 
-    //juce::Synthesiser synth;
     juce::Synthesiser synthL1;
     juce::Synthesiser synthL2;
+    juce::Synthesiser synthL3;
 
-    //juce::dsp::Reverb masterReverb;
-    //juce::Reverb::Parameters reverbParams;
-
-    // 2 Motores de Reverb independientes
     juce::dsp::Reverb reverbL1;
     juce::dsp::Reverb reverbL2;
+    juce::dsp::Reverb reverbL3;
 
-    // 2 "Cables" independientes donde procesar los efectos antes de mezclarlos
     juce::AudioBuffer<float> renderBufferL1;
     juce::AudioBuffer<float> renderBufferL2;
+    juce::AudioBuffer<float> renderBufferL3;
 
-    // LIMITER ---
     juce::dsp::Limiter<float> masterLimiter;
 
-    // max_vol channel
-    //std::atomic<float> visualMeterL{ -60.0f };
-    //std::atomic<float> visualMeterR{ -60.0f };
+    float lfo1Phase = 0.0f;
+    float lfo2Phase = 0.0f;
 
-    // ==========================================================
-    // --- RELOJES DSP INTERNOS (PHASE ACCUMULATORS) ---
-    // ==========================================================
-    float lfo1Phase = 0.0f; // El contador de tiempo del LFO 1 (va de 0.0 a 1.0)
-    float lfo2Phase = 0.0f; // El contador de tiempo del LFO 2 (va de 0.0 a 1.0)
-
-    // ==========================================================
-    // --- DATOS DEL ENTORNO (DAW / STANDALONE) ---
-    // ==========================================================
-    double currentSampleRate = 44100.0; // Cuántas "fotos" de audio hacemos por segundo
-    double currentBPM = 120.0;          // El tempo actual (por defecto 120)
-    bool isPlaying = false;             // ¿El DAW está dándole al Play?
+    double currentSampleRate = 44100.0;
+    double currentBPM = 120.0;
+    bool isPlaying = false;
 
     bool lastPlayState = false;
     bool lastHoldState = false;
@@ -162,5 +129,8 @@ private:
     bool lastPlayStateL2 = false;
     bool lastHoldStateL2 = false;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Granular_SynthAudioProcessor)
+    bool lastPlayStateL3 = false;
+    bool lastHoldStateL3 = false;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessor)
 };
