@@ -14,8 +14,6 @@ BpmModule::BpmModule(juce::AudioProcessorValueTreeState& apvts) : apvtsRef(apvts
 {
     // 1. CONFIGURAMOS EL KNOB MANUAL (Estética Global Gris/Blanco)
     bpmKnob.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-    //bpmKnob.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    // Mostramos la caja de texto debajo del knob (60px de ancho, 20px de alto)
     bpmKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 15);
     
     bpmKnob.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
