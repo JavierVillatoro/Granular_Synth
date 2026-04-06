@@ -14,13 +14,16 @@
 class SpaceModule : public juce::Component
 {
 public:
-    // AÑADIDO: El parámetro juce::String prefix
     SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~SpaceModule() override;
     void resized() override;
 
+    // NUEVO: Función para cambiar la capa en tiempo real
+    void setLayer(int layerIndex);
+
 private:
-    juce::String layerPrefix; // <-- Guarda la identidad para el Mix
+    juce::AudioProcessorValueTreeState& apvtsRef;
+    juce::String layerPrefix;
 
     juce::Slider sizeKnob, fbackKnob, mixKnob;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sizeAttach, fbackAttach, mixAttach;

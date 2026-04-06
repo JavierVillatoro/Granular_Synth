@@ -643,6 +643,8 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
             scanModule.setLayer(1);
             sprayModule.setLayer(1);
             pitchModule.setLayer(1);
+            filterModule.setLayer(1);
+            spaceModule.setLayer(1);
 
             repaint();
             return; // Cortamos la ejecución aquí
@@ -672,6 +674,8 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
             scanModule.setLayer(2);
             sprayModule.setLayer(2);
             pitchModule.setLayer(2);
+            filterModule.setLayer(2);
+            spaceModule.setLayer(2);
 
             repaint();
             return; // Cortamos la ejecución aquí

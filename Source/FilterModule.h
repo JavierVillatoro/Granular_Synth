@@ -14,7 +14,6 @@
 class FilterModule : public juce::Component, public juce::Timer
 {
 public:
-    //FilterModule(juce::AudioProcessorValueTreeState& apvts);
     FilterModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~FilterModule() override;
 
@@ -25,9 +24,13 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
 
+    // NUEVO: Función para cambiar la capa en tiempo real
+    void setLayer(int layerIndex);
+
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
     juce::String layerPrefix;
+    int currentLayer = 1; // Para saber qué color pintar en la gráfica
 
     // --- LOS 4 KNOBS ---
     juce::Slider lpfKnob, resLpfKnob;

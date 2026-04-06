@@ -1,8 +1,7 @@
 #include "SpaceModule.h"
 
-// AÑADIDO: Recibimos y guardamos el prefijo
 SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
-    : layerPrefix(prefix)
+    : apvtsRef(apvts), layerPrefix(prefix)
 {
     auto setupKnob = [this](juce::Slider& k) {
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -21,13 +20,30 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
         k.setColour(juce::Slider::thumbColourId, titaniumColor);
         };
 
+    // Size y Feedback son siempre grises (globales)
     setKnobPlatino(sizeKnob);
     setKnobPlatino(fbackKnob);
 
-    // CONECTAMOS: Size y Feedback son globales, Mix lleva prefijo
+    // Los attachments globales se quedan fijos
     sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_SIZE", sizeKnob);
     fbackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_FBACK", fbackKnob);
-    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, layerPrefix + "SPACE_MIX", mixKnob);
+
+    setLayer(1); // Arrancamos en Capa 1
+}
+
+void SpaceModule::setLayer(int layerIndex)
+{
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
+
+    // Solo cambiamos el color y el cable del MIX
+    mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    mixKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    mixAttach.reset();
+    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPACE_MIX", mixKnob);
 }
 
 SpaceModule::~SpaceModule() {}
