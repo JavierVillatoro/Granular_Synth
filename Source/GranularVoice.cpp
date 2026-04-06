@@ -8,10 +8,18 @@
   ==============================================================================
 */
 
+/*
+  ==============================================================================
+
+    GranularVoice.cpp
+
+  ==============================================================================
+*/
+
 #include "GranularVoice.h"
 #include "PluginProcessor.h"
 
-// 1. EL CONSTRUCTOR: Guardamos las llaves y el prefijo
+// 1. EL CONSTRUCTOR
 GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse, juce::String prefix)
 {
     myBuffer = buffer;
@@ -73,9 +81,36 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
 
 void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
-    if (!isPlaying || myBuffer == nullptr || myBuffer->getNumSamples() == 0 || getSampleRate() <= 0.0) return;
+    if (!isPlaying || getSampleRate() <= 0.0) return;
 
-    // 🟢 2. LEER PARÁMETROS DINÁMICAMENTE (Usa el prefijo asignado) 🟢
+    // 1. OBTENEMOS EL PUNTERO AL AUDIO REAL EN ESTE PRECISO INSTANTE
+    juce::AudioBuffer<float>* currentBuffer = nullptr;
+    float winStart = 0.0f;
+    float winLen = 1.0f;
+
+    if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor))
+    {
+        if (myPrefix == "L1_") {
+            currentBuffer = &processor->audioBufferL1;
+            winStart = processor->windowStartRatioL1.load();
+            winLen = processor->windowLengthRatioL1.load();
+        }
+        else if (myPrefix == "L2_") {
+            currentBuffer = &processor->audioBufferL2;
+            winStart = processor->windowStartRatioL2.load();
+            winLen = processor->windowLengthRatioL2.load();
+        }
+        else if (myPrefix == "L3_") {
+            currentBuffer = &processor->audioBufferL3;
+            winStart = processor->windowStartRatioL3.load();
+            winLen = processor->windowLengthRatioL3.load();
+        }
+    }
+
+    // Si el buffer no existe o está vacío, nos callamos
+    if (currentBuffer == nullptr || currentBuffer->getNumSamples() == 0) return;
+
+    // 2. LEER PARÁMETROS DINÁMICAMENTE
     float positionKnob = apvts->getRawParameterValue(myPrefix + "POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue(myPrefix + "GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue(myPrefix + "SCAN_SPEED")->load();
@@ -116,21 +151,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float currentTrans = pitchTrans + pitchFine;
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, currentTrans / 12.0f);
 
-    float totalAudioSeconds = myBuffer->getNumSamples() / getSampleRate();
-
-    float winStart = 0.0f;
-    float winLen = 1.0f;
-    if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor)) {
-        // Propia camara para cada layer
-        if (myPrefix == "L1_") {
-            winStart = processor->windowStartRatioL1.load();
-            winLen = processor->windowLengthRatioL1.load();
-        }
-        else if (myPrefix == "L2_") {
-            winStart = processor->windowStartRatioL2.load();
-            winLen = processor->windowLengthRatioL2.load();
-        }
-    }
+    float totalAudioSeconds = currentBuffer->getNumSamples() / getSampleRate();
     float activeAudioSeconds = totalAudioSeconds * winLen;
     float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
 
@@ -156,7 +177,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     for (int s = 0; s < numSamples; ++s)
     {
-        autoScanOffset += (double)scanSpeed / (double)myBuffer->getNumSamples();
+        autoScanOffset += (double)scanSpeed / (double)currentBuffer->getNumSamples();
         float rawPos = positionKnob + (float)autoScanOffset;
 
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;
@@ -186,7 +207,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     float finalPos = winStart + (localPos * winLen);
                     finalPos = juce::jlimit(0.0f, 1.0f, finalPos);
 
-                    grain.startSample = (int)(finalPos * (myBuffer->getNumSamples() - 1));
+                    grain.startSample = (int)(finalPos * (currentBuffer->getNumSamples() - 1));
 
                     float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
                     int scaleModeInt = (int)pitchScale;
@@ -240,15 +261,15 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                 float window = (hann * (1.0f - shapeParam)) + (square * shapeParam);
 
                 int readPos = grain.startSample + (int)(grain.currentPosition * grain.activePitchRatio);
-                int safeReadPos = juce::jlimit(0, myBuffer->getNumSamples() - 1, readPos);
+                int safeReadPos = juce::jlimit(0, currentBuffer->getNumSamples() - 1, readPos);
 
-                float normalizedPos = (float)safeReadPos / (float)myBuffer->getNumSamples();
+                float normalizedPos = (float)safeReadPos / (float)currentBuffer->getNumSamples();
                 visualGrainPos[grainIndex].store(normalizedPos);
                 visualGrainEnv[grainIndex].store(window);
 
-                if (readPos >= 0 && readPos < myBuffer->getNumSamples())
+                if (readPos >= 0 && readPos < currentBuffer->getNumSamples())
                 {
-                    float sample = myBuffer->getReadPointer(0)[readPos] * window;
+                    float sample = currentBuffer->getReadPointer(0)[readPos] * window;
                     totalL += sample * grain.panL;
                     totalR += sample * grain.panR;
                 }

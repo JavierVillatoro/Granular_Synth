@@ -53,6 +53,10 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
         // El Equipo B (8 voces que miran al Disco Duro 2 y leen los knobs L2)
         synthL2.addVoice(new GranularVoice(&audioBufferL2, &apvts, "L2_"));
     }
+    for (int i = 0; i < 8; ++i) {
+        // El Equipo C (8 voces que miran al Disco Duro 3 y leen los knobs L3)
+        synthL3.addVoice(new GranularVoice(&audioBufferL3, &apvts, "L3_"));
+    }
 }
 
 Granular_SynthAudioProcessor::~Granular_SynthAudioProcessor()
@@ -215,7 +219,6 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     bool isHoldOnL1 = apvts.getRawParameterValue("L1_HOLD")->load() > 0.5f;
 
     juce::MidiBuffer processedMidiL1;
-
     for (const auto metadata : midiMessages) {
         auto message = metadata.getMessage();
         if (isMidiOnL1) {
@@ -224,17 +227,11 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
         }
     }
 
-    if (isPlayOnL1 && !lastPlayState) {
-        processedMidiL1.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
-    }
-    else if (!isPlayOnL1 && lastPlayState) {
-        processedMidiL1.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
-    }
+    if (isPlayOnL1 && !lastPlayState) processedMidiL1.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    else if (!isPlayOnL1 && lastPlayState) processedMidiL1.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayState = isPlayOnL1;
 
-    if (!isHoldOnL1 && lastHoldState) {
-        synthL1.allNotesOff(0, true);
-    }
+    if (!isHoldOnL1 && lastHoldState) synthL1.allNotesOff(0, true);
     lastHoldState = isHoldOnL1;
 
     // ==========================================================
@@ -245,7 +242,6 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     bool isHoldOnL2 = apvts.getRawParameterValue("L2_HOLD")->load() > 0.5f;
 
     juce::MidiBuffer processedMidiL2;
-
     for (const auto metadata : midiMessages) {
         auto message = metadata.getMessage();
         if (isMidiOnL2) {
@@ -254,170 +250,128 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
         }
     }
 
-    if (isPlayOnL2 && !lastPlayStateL2) {
-        // Usamos Canal 1 para que el motor interno no se confunda
-        processedMidiL2.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
-    }
-    else if (!isPlayOnL2 && lastPlayStateL2) {
-        processedMidiL2.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
-    }
+    if (isPlayOnL2 && !lastPlayStateL2) processedMidiL2.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    else if (!isPlayOnL2 && lastPlayStateL2) processedMidiL2.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayStateL2 = isPlayOnL2;
 
-    if (!isHoldOnL2 && lastHoldStateL2) {
-        synthL2.allNotesOff(0, true);
-    }
+    if (!isHoldOnL2 && lastHoldStateL2) synthL2.allNotesOff(0, true);
     lastHoldStateL2 = isHoldOnL2;
 
     // ==========================================================
-    // --- LÓGICA DE RETRIGGER DEL LFO (Corregida por ti) ---
+    // --- LÓGICA DE CAPA 3 (NARANJA) ---
+    // ==========================================================
+    bool isPlayOnL3 = apvts.getRawParameterValue("L3_PLAY")->load() > 0.5f;
+    bool isMidiOnL3 = apvts.getRawParameterValue("L3_MIDI")->load() > 0.5f;
+    bool isHoldOnL3 = apvts.getRawParameterValue("L3_HOLD")->load() > 0.5f;
+
+    juce::MidiBuffer processedMidiL3;
+    for (const auto metadata : midiMessages) {
+        auto message = metadata.getMessage();
+        if (isMidiOnL3) {
+            if (isHoldOnL3 && message.isNoteOff()) continue;
+            processedMidiL3.addEvent(message, metadata.samplePosition);
+        }
+    }
+
+    if (isPlayOnL3 && !lastPlayStateL3) processedMidiL3.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    else if (!isPlayOnL3 && lastPlayStateL3) processedMidiL3.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+    lastPlayStateL3 = isPlayOnL3;
+
+    if (!isHoldOnL3 && lastHoldStateL3) synthL3.allNotesOff(0, true);
+    lastHoldStateL3 = isHoldOnL3;
+
+    // ==========================================================
+    // --- LÓGICA DE RETRIGGER DEL LFO ---
     // ==========================================================
     bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
-
-    if (retrigLfo)
-    {
-        // El LFO reinicia si CUALQUIERA de las dos capas activas recibe una nota
-        for (const auto metadata : processedMidiL1) {
-            if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; }
-        }
-        for (const auto metadata : processedMidiL2) {
-            if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; }
-        }
+    if (retrigLfo) {
+        for (const auto metadata : processedMidiL1) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
+        for (const auto metadata : processedMidiL2) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
+        for (const auto metadata : processedMidiL3) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
     }
 
     // ==========================================================
     // --- 1.5 CÁLCULO DE LOS LFOs (CONTROL RATE) ---
     // ==========================================================
-
-    // 1. Calculamos cuánto tiempo "dura" este bloque de audio en segundos
     float blockDuration = buffer.getNumSamples() / (float)currentSampleRate;
-    float beatsPerSecond = currentBPM / 60.0f; // Ej: 120 BPM = 2 beats por segundo
-
-    // Tabla de conversión (El índice del ComboBox a multiplicador de tempo)
-    // 1/4 (índice 5) significa 1 ciclo por cada beat (negra).
+    float beatsPerSecond = currentBPM / 60.0f;
     auto getBpsMultiplier = [](int idx) -> float {
         switch (idx) {
-        case 0: return 0.03125f; // 8/1
-        case 1: return 0.0625f;  // 4/1
-        case 2: return 0.125f;   // 2/1
-        case 3: return 0.25f;    // 1/1 (Redonda)
-        case 4: return 0.5f;     // 1/2 (Blanca)
-        case 5: return 1.0f;     // 1/4 (Negra - Valor estándar)
-        case 6: return 2.0f;     // 1/8 (Corchea)
-        case 7: return 4.0f;     // 1/16 (Semicorchea)
-        case 8: return 8.0f;     // 1/32 (Fusa)
+        case 0: return 0.03125f; case 1: return 0.0625f;  case 2: return 0.125f;
+        case 3: return 0.25f;    case 4: return 0.5f;     case 5: return 1.0f;
+        case 6: return 2.0f;     case 7: return 4.0f;     case 8: return 8.0f;
         default: return 1.0f;
         }
         };
 
-    // --- AVANZAMOS EL RELOJ DEL LFO 1 ---
     int beatIdx1 = (int)apvts.getRawParameterValue("LFO1_BEAT")->load();
     float freq1 = beatsPerSecond * getBpsMultiplier(beatIdx1);
-
     lfo1Phase += freq1 * blockDuration;
-    if (lfo1Phase >= 1.0f) lfo1Phase -= 1.0f; // Bucle infinito de 0.0 a 1.0
+    if (lfo1Phase >= 1.0f) lfo1Phase -= 1.0f;
 
-    // --- AVANZAMOS EL RELOJ DEL LFO 2 ---
-    //int beatIdx2 = (int)apvts.getRawParameterValue("LFO2_BEAT")->load();
-    //float freq2 = beatsPerSecond * getBpsMultiplier(beatIdx2);
-
-    //lfo2Phase += freq2 * blockDuration;
-    //if (lfo2Phase >= 1.0f) lfo2Phase -= 1.0f;
-
-    // --- AVANZAMOS EL RELOJ DEL LFO 2 ---
     int beatIdx2 = (int)apvts.getRawParameterValue("LFO2_BEAT")->load();
     float freq2 = beatsPerSecond * getBpsMultiplier(beatIdx2);
-
     lfo2Phase += freq2 * blockDuration;
     if (lfo2Phase >= 1.0f) lfo2Phase -= 1.0f;
 
-    // --- MAGIA: WAVETABLE LOOKUP PARA EL LFO 2 ---
-    // 1. Convertimos la fase (0.0 a 1.0) en un índice de la tabla (0 a 2047)
     float tableIndex = lfo2Phase * (LFO_TABLE_SIZE - 1);
-
-    // 2. Buscamos entre qué dos números exactos hemos caído
     int indexA = (int)tableIndex;
     int indexB = indexA + 1;
-    if (indexB >= LFO_TABLE_SIZE) indexB = 0; // Por seguridad
-
-    float frac = tableIndex - (float)indexA; // El decimal (ej: si es 500.2, frac es 0.2)
-
-    // 3. Interpolación Lineal (Mezclamos los dos números para una calidad de audio de estudio)
+    if (indexB >= LFO_TABLE_SIZE) indexB = 0;
+    float frac = tableIndex - (float)indexA;
     float lfo2Output = lfo2Table[indexA] + frac * (lfo2Table[indexB] - lfo2Table[indexA]);
-
-    // Lo mandamos al escaparate público
     globalLfo2Value = lfo2Output;
 
-    // --- GENERAMOS LA FORMA DE ONDA DEL LFO 1 ---
     int waveType = (int)apvts.getRawParameterValue("LFO1_WAVE")->load();
     float lfo1Output = 0.0f;
 
     if (waveType == 0)      lfo1Output = std::sin(lfo1Phase * juce::MathConstants<float>::twoPi);
-    else if (waveType == 1) lfo1Output = 2.0f * std::abs(2.0f * lfo1Phase - 1.0f) - 1.0f; // Triángulo
-    else if (waveType == 2) lfo1Output = 1.0f - 2.0f * lfo1Phase; // Sierra invertida
-    else if (waveType == 3) lfo1Output = (lfo1Phase < 0.5f) ? 1.0f : -1.0f; // Cuadrada
-    else if (waveType == 4) { // Sample & Hold (Ruido escalonado)
-        // Solo cambia de valor cuando la fase se reinicia
+    else if (waveType == 1) lfo1Output = 2.0f * std::abs(2.0f * lfo1Phase - 1.0f) - 1.0f;
+    else if (waveType == 2) lfo1Output = 1.0f - 2.0f * lfo1Phase;
+    else if (waveType == 3) lfo1Output = (lfo1Phase < 0.5f) ? 1.0f : -1.0f;
+    else if (waveType == 4) {
         static float lastRand = 0.0f;
         static float lastPhase = 0.0f;
-        if (lfo1Phase < lastPhase) {
-            lastRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
-        }
+        if (lfo1Phase < lastPhase) lastRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
         lastPhase = lfo1Phase;
         lfo1Output = lastRand;
     }
 
-    // Aplicamos el Jitter (Ruido orgánico) al LFO 1
     float jitter1 = apvts.getRawParameterValue("LFO1_JITTER")->load();
     if (jitter1 > 0.0f) {
         float noise = (juce::Random::getSystemRandom().nextFloat() * 2.0f) - 1.0f;
-        lfo1Output += noise * jitter1 * 0.3f; // 0.3f para que el ruido no sea ensordecedor
+        lfo1Output += noise * jitter1 * 0.3f;
         lfo1Output = juce::jlimit(-1.0f, 1.0f, lfo1Output);
     }
 
-    // Aplicamos la amplitud y lo mandamos al escaparate público
     float amp1 = apvts.getRawParameterValue("LFO1_DEPTH")->load();
     globalLfo1Value = lfo1Output * amp1;
 
-    // LFO1 to voices 
-    //for (int i = 0; i < synth.getNumVoices(); ++i) {
-        //if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
-           // voice->currentLfo1Value = globalLfo1Value; // 
-            //voice->currentLfo2Value = globalLfo2Value;
-        //}
-    //}
-    // LFO1 y LFO2 a las voces de ambos equipos
     for (int i = 0; i < synthL1.getNumVoices(); ++i) {
-        if (auto* voice = dynamic_cast<GranularVoice*>(synthL1.getVoice(i))) {
-            voice->currentLfo1Value = globalLfo1Value;
-            voice->currentLfo2Value = globalLfo2Value;
-        }
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL1.getVoice(i))) { voice->currentLfo1Value = globalLfo1Value; voice->currentLfo2Value = globalLfo2Value; }
     }
     for (int i = 0; i < synthL2.getNumVoices(); ++i) {
-        if (auto* voice = dynamic_cast<GranularVoice*>(synthL2.getVoice(i))) {
-            voice->currentLfo1Value = globalLfo1Value;
-            voice->currentLfo2Value = globalLfo2Value;
-        }
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL2.getVoice(i))) { voice->currentLfo1Value = globalLfo1Value; voice->currentLfo2Value = globalLfo2Value; }
     }
-
-    // (El cálculo del LFO 2 lo haremos en el siguiente paso, requiere leer los vectores Bézier)
+    for (int i = 0; i < synthL3.getNumVoices(); ++i) {
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL3.getVoice(i))) { voice->currentLfo1Value = globalLfo1Value; voice->currentLfo2Value = globalLfo2Value; }
+    }
 
     // ==========================================================
     // --- 2. PROCESAMIENTO INDEPENDIENTE DE AUDIO Y EFECTOS ---
     // ==========================================================
     buffer.clear();
 
-    // Limpiamos los cables individuales para evitar ruido antiguo
     renderBufferL1.clear();
     renderBufferL2.clear();
+    renderBufferL3.clear(); // Limpiamos pista naranja
 
-    // 1. Cada Jefe rellena exclusivamente su propia pista de audio
     synthL1.renderNextBlock(renderBufferL1, processedMidiL1, 0, buffer.getNumSamples());
     synthL2.renderNextBlock(renderBufferL2, processedMidiL2, 0, buffer.getNumSamples());
+    synthL3.renderNextBlock(renderBufferL3, processedMidiL3, 0, buffer.getNumSamples()); // Audio L3
 
-    // 2. CÁPSULA DE EFECTOS: Una mini-fábrica para aplicar Dist y Reverb a la capa que le digamos
     auto applyEffectsToLayer = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix, juce::dsp::Reverb& reverb)
         {
-            // --- A. DISTORSIÓN INDEPENDIENTE ---
             float driveParam = apvts.getRawParameterValue(prefix + "DIST_DRIVE")->load();
             float mixDist = apvts.getRawParameterValue(prefix + "DIST_MIX")->load() / 100.0f;
             int typeParam = (int)apvts.getRawParameterValue(prefix + "DIST_TYPE")->load();
@@ -447,7 +401,6 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
                 }
             }
 
-            // --- B. REVERB INDEPENDIENTE ---
             float spaceSize = apvts.getRawParameterValue("SPACE_SIZE")->load();
             float spaceFback = apvts.getRawParameterValue("SPACE_FBACK")->load();
             float mixReverb = apvts.getRawParameterValue(prefix + "SPACE_MIX")->load();
@@ -467,15 +420,16 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
             reverb.process(context);
         };
 
-    // 3. Aplicamos la máquina de efectos a la Capa 1 y a la Capa 2 por separado
     applyEffectsToLayer(renderBufferL1, "L1_", reverbL1);
     applyEffectsToLayer(renderBufferL2, "L2_", reverbL2);
+    applyEffectsToLayer(renderBufferL3, "L3_", reverbL3); // Efectos L3
 
-    // 4. ¡EL GRAN SUMADOR! Volcamos ambas pistas terminadas en los altavoces finales
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
         buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
         buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
+        buffer.addFrom(ch, 0, renderBufferL3, ch, 0, buffer.getNumSamples()); // Master L3
     }
+    
     // ==========================================================
     // --- 3. MASTER VOLUME & BRICKWALL LIMITER ---
     // ==========================================================
@@ -653,7 +607,7 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
         // Apagamos el motor 1 microsegundo
         suspendProcessing(true);
         
-        // ¡LA MAGIA MULTICAPA! Elegimos a qué disco duro va el audio según la capa
+        // Disco duro segun layer
         if (layerIndex == 1) {
             audioBufferL1.makeCopyOf(tempBuffer);
             isAudioLoadedL1 = true;
