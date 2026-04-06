@@ -36,7 +36,7 @@ void SpaceModule::setLayer(int layerIndex)
     layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
 
     juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::dodgerblue : juce::Colours::pink;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
 
     // Solo cambiamos el color y el cable del MIX
     mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);

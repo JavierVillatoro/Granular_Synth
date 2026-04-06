@@ -124,21 +124,24 @@ void Granular_SynthAudioProcessor::changeProgramName (int index, const juce::Str
 void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     currentSampleRate = sampleRate;
-    // 1. Configuramos el "molde" de memoria (ProcessSpec)
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = sampleRate;
     spec.maximumBlockSize = samplesPerBlock;
     spec.numChannels = getTotalNumOutputChannels();
 
-    // 2. Le damos el molde a la Reverb
-    masterReverb.prepare(spec);
+    // 1. Damos el tamaño correcto a nuestros cables internos
+    renderBufferL1.setSize(spec.numChannels, samplesPerBlock);
+    renderBufferL2.setSize(spec.numChannels, samplesPerBlock);
 
-    // 3. ¡LA CURA AL ERROR! Le damos el molde al Limitador para que reserve su memoria
+    // 2. Preparamos las Reverbs gemelas
+    reverbL1.prepare(spec);
+    reverbL2.prepare(spec);
+
+    // 3. Preparamos el Limitador
     masterLimiter.prepare(spec);
-    masterLimiter.setRelease(10.0f); // 10ms para que sea rápido protegiendo picos
+    masterLimiter.setRelease(10.0f);
 
     // 4. Preparamos el sintetizador
-    //synth.setCurrentPlaybackSampleRate(sampleRate);
     synthL1.setCurrentPlaybackSampleRate(sampleRate);
     synthL2.setCurrentPlaybackSampleRate(sampleRate);
 }
@@ -395,114 +398,80 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     // (El cálculo del LFO 2 lo haremos en el siguiente paso, requiere leer los vectores Bézier)
 
     // ==========================================================
-    // --- 2. PROCESAMIENTO DE AUDIO NORMAL ---
+    // --- 2. PROCESAMIENTO INDEPENDIENTE DE AUDIO Y EFECTOS ---
     // ==========================================================
-    // 1. Limpiamos los altavoces por si había ruido viejo
     buffer.clear();
 
-    // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
-    // Él leerá el MIDI, verá qué teclas has pulsado, y le dirá a las Voces que rellenen el buffer de audio.
-    //synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-    // 2. ¡Dejamos que el Director de Orquesta (el Sintetizador) se encargue de todo!
-    //synth.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+    // Limpiamos los cables individuales para evitar ruido antiguo
+    renderBufferL1.clear();
+    renderBufferL2.clear();
 
-    // 2. ¡Dejamos que los dos Directores de Orquesta rellenen el buffer!
-    // La Capa 1 lee tu teclado MIDI normal (processedMidi)
-    //synthL1.renderNextBlock(buffer, processedMidi, 0, buffer.getNumSamples());
+    // 1. Cada Jefe rellena exclusivamente su propia pista de audio
+    synthL1.renderNextBlock(renderBufferL1, processedMidiL1, 0, buffer.getNumSamples());
+    synthL2.renderNextBlock(renderBufferL2, processedMidiL2, 0, buffer.getNumSamples());
 
-    // La Capa 2 por ahora lee un buffer vacío (pronto le daremos su propio MIDI)
-    //juce::MidiBuffer emptyMidi;
-    //synthL2.renderNextBlock(buffer, emptyMidi, 0, buffer.getNumSamples());
-    // 2. ¡Dejamos que los dos Directores de Orquesta rellenen el buffer!
-    synthL1.renderNextBlock(buffer, processedMidiL1, 0, buffer.getNumSamples());
-    synthL2.renderNextBlock(buffer, processedMidiL2, 0, buffer.getNumSamples());
-
-    // ==========================================================
-    // --- 2. EFECTOS DE LA CAPA 1: DISTORSIÓN MULTI-TIPO ---
-    // ==========================================================
-    float driveParam = apvts.getRawParameterValue("L1_DIST_DRIVE")->load(); // 0.0 a 100.0
-    float mixParam = apvts.getRawParameterValue("L1_DIST_MIX")->load() / 100.0f; // Lo pasamos a 0.0 - 1.0
-    int typeParam = (int)apvts.getRawParameterValue("L1_DIST_TYPE")->load(); // 0, 1, 2, 3
-
-    // Solo procesamos si el Mix es mayor que 0 (ahorramos CPU si está apagado)
-    if (mixParam > 0.001f)
-    {
-        // Mapeamos el Drive (0-100) a un multiplicador de ganancia real (1x a 15x de ganancia)
-        float driveMultiplier = juce::jmap(driveParam, 0.0f, 100.0f, 1.0f, 15.0f);
-
-        // AUTO-GAIN: Si multiplicamos por 15, el volumen explota. 
-        // Usamos la raíz cuadrada inversa para bajar el volumen matemáticamente y mantenerlo estable.
-        float autoGain = 1.0f / std::sqrt(driveMultiplier);
-
-        // Variables previas para el Bitcrush (Reducimos de 16 bits a 2 bits según el Drive)
-        float bitCrushDepth = juce::jmap(driveParam, 0.0f, 100.0f, 16.0f, 2.0f);
-        float bitStep = std::pow(2.0f, bitCrushDepth - 1.0f);
-
-        // Recorremos el audio muestra a muestra
-        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+    // 2. CÁPSULA DE EFECTOS: Una mini-fábrica para aplicar Dist y Reverb a la capa que le digamos
+    auto applyEffectsToLayer = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix, juce::dsp::Reverb& reverb)
         {
-            auto* channelData = buffer.getWritePointer(channel);
-            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-            {
-                float cleanSignal = channelData[sample];
-                float distortedSignal = cleanSignal;
+            // --- A. DISTORSIÓN INDEPENDIENTE ---
+            float driveParam = apvts.getRawParameterValue(prefix + "DIST_DRIVE")->load();
+            float mixDist = apvts.getRawParameterValue(prefix + "DIST_MIX")->load() / 100.0f;
+            int typeParam = (int)apvts.getRawParameterValue(prefix + "DIST_TYPE")->load();
 
-                // 1. Apretamos la señal con el Drive
-                float input = cleanSignal * driveMultiplier;
+            if (mixDist > 0.001f) {
+                float driveMult = juce::jmap(driveParam, 0.0f, 100.0f, 1.0f, 15.0f);
+                float autoGain = 1.0f / std::sqrt(driveMult);
+                float bitCrushDepth = juce::jmap(driveParam, 0.0f, 100.0f, 16.0f, 2.0f);
+                float bitStep = std::pow(2.0f, bitCrushDepth - 1.0f);
 
-                // 2. Aplicamos el algoritmo destructivo elegido
-                switch (typeParam)
-                {
-                case 0: // Soft Clip (Saturación analógica, cálida y redonda)
-                    distortedSignal = std::tanh(input);
-                    break;
-                case 1: // Hard Clip (Corte digital puro, muy agresivo)
-                    distortedSignal = juce::jlimit(-1.0f, 1.0f, input);
-                    break;
-                case 2: // Foldback (En vez de cortar, la onda rebota hacia dentro. Sonido metálico/alienígena)
-                    distortedSignal = std::sin(input * juce::MathConstants<float>::halfPi);
-                    break;
-                case 3: // Bitcrush (Estilo Gameboy / Lo-Fi)
-                    distortedSignal = std::round(input * bitStep) / bitStep;
-                    distortedSignal = juce::jlimit(-1.0f, 1.0f, distortedSignal); // Seguridad extra
-                    break;
+                for (int ch = 0; ch < layerBuffer.getNumChannels(); ++ch) {
+                    auto* chData = layerBuffer.getWritePointer(ch);
+                    for (int s = 0; s < layerBuffer.getNumSamples(); ++s) {
+                        float clean = chData[s];
+                        float input = clean * driveMult;
+                        float dist = clean;
+
+                        switch (typeParam) {
+                        case 0: dist = std::tanh(input); break;
+                        case 1: dist = juce::jlimit(-1.0f, 1.0f, input); break;
+                        case 2: dist = std::sin(input * juce::MathConstants<float>::halfPi); break;
+                        case 3: dist = juce::jlimit(-1.0f, 1.0f, std::round(input * bitStep) / bitStep); break;
+                        }
+                        dist *= autoGain;
+                        chData[s] = (clean * (1.0f - mixDist)) + (dist * mixDist);
+                    }
                 }
-
-                // 3. Compensamos el volumen (Auto-Gain)
-                distortedSignal *= autoGain;
-
-                // 4. MIX (Compresión Paralela): Mezclamos la señal limpia con la distorsionada
-                channelData[sample] = (cleanSignal * (1.0f - mixParam)) + (distortedSignal * mixParam);
             }
-        }
+
+            // --- B. REVERB INDEPENDIENTE ---
+            float spaceSize = apvts.getRawParameterValue("SPACE_SIZE")->load();
+            float spaceFback = apvts.getRawParameterValue("SPACE_FBACK")->load();
+            float mixReverb = apvts.getRawParameterValue(prefix + "SPACE_MIX")->load();
+
+            juce::Reverb::Parameters params;
+            params.roomSize = spaceSize;
+            params.damping = 1.0f - spaceFback;
+            params.width = 1.0f;
+            params.freezeMode = 0.0f;
+            params.dryLevel = std::cos(mixReverb * juce::MathConstants<float>::halfPi);
+            params.wetLevel = std::sin(mixReverb * juce::MathConstants<float>::halfPi);
+
+            reverb.setParameters(params);
+
+            juce::dsp::AudioBlock<float> block(layerBuffer);
+            juce::dsp::ProcessContextReplacing<float> context(block);
+            reverb.process(context);
+        };
+
+    // 3. Aplicamos la máquina de efectos a la Capa 1 y a la Capa 2 por separado
+    applyEffectsToLayer(renderBufferL1, "L1_", reverbL1);
+    applyEffectsToLayer(renderBufferL2, "L2_", reverbL2);
+
+    // 4. ¡EL GRAN SUMADOR! Volcamos ambas pistas terminadas en los altavoces finales
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+        buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
+        buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
     }
-
-    // ==========================================================
-    // 2.5 APLICAMOS LA REVERB GLOBAL (ESTILO IMMERSIVE/SHIMMER)
-    // ==========================================================
-    float size = apvts.getRawParameterValue("SPACE_SIZE")->load();
-    float fback = apvts.getRawParameterValue("SPACE_FBACK")->load();
-    float mix = apvts.getRawParameterValue("L1_SPACE_MIX")->load();
-
-    // Configuramos los parámetros para un sonido "Lush" y abierto
-    reverbParams.roomSize = size;
-    // Invertimos fback: Si está a tope (1.0), el damping es 0 (brillante e infinito)
-    reverbParams.damping = 1.0f - fback;
-    reverbParams.width = 1.0f; // Estéreo abierto al máximo (inmersión total)
-    reverbParams.freezeMode = 0.0f;
-
-    // EL TRUCO DE POTENCIA CONSTANTE (Para evitar subidas de volumen extrañas)
-    // Usamos seno y coseno para cruzar el volumen seco y mojado de forma perfecta
-    reverbParams.dryLevel = std::cos(mix * juce::MathConstants<float>::halfPi);
-    reverbParams.wetLevel = std::sin(mix * juce::MathConstants<float>::halfPi);
-
-    masterReverb.setParameters(reverbParams);
-
-    // Pasamos el audio del buffer por el motor de Reverb
-    juce::dsp::AudioBlock<float> audioBlock(buffer);
-    juce::dsp::ProcessContextReplacing<float> context(audioBlock);
-    masterReverb.process(context);
-
     // ==========================================================
     // --- 3. MASTER VOLUME & BRICKWALL LIMITER ---
     // ==========================================================

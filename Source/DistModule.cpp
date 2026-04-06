@@ -10,39 +10,59 @@
 
 #include "DistModule.h"
 
-// AÑADIDO: Recibimos y guardamos el prefijo
 DistModule::DistModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
     : apvtsRef(apvts), layerPrefix(prefix)
 {
-    auto setupKnob = [this](juce::Slider& slider, const juce::String& paramID, std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attach) {
+    auto setupKnob = [this](juce::Slider& slider) {
         slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-
-        slider.setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::cyan.withAlpha(0.7f));
-        slider.setColour(juce::Slider::thumbColourId, juce::Colours::cyan);
-
         addAndMakeVisible(slider);
-        attach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, paramID, slider);
         };
 
-    // USAMOS PREFIJO DINÁMICO
-    setupKnob(driveKnob, layerPrefix + "DIST_DRIVE", driveAttach);
-    setupKnob(mixKnob, layerPrefix + "DIST_MIX", mixAttach);
+    setupKnob(driveKnob);
+    setupKnob(mixKnob);
 
     typeCombo.addItemList({ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 1);
     typeCombo.setJustificationType(juce::Justification::centred);
 
     typeCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
     typeCombo.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
-    typeCombo.setColour(juce::ComboBox::textColourId, juce::Colours::cyan.withAlpha(0.8f));
-    typeCombo.setColour(juce::ComboBox::arrowColourId, juce::Colours::cyan.withAlpha(0.8f));
 
     addAndMakeVisible(typeCombo);
-    // PREFIJO EN COMBOBOX
-    typeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, layerPrefix + "DIST_TYPE", typeCombo);
+
+    setLayer(1); // Arrancamos en la capa 1
 }
 
 DistModule::~DistModule() {}
+
+void DistModule::setLayer(int layerIndex)
+{
+    currentLayer = layerIndex;
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+
+    // Colores Knobs
+    driveKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.7f));
+    driveKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.7f));
+    mixKnob.setColour(juce::Slider::thumbColourId, dotColor);
+
+    // Colores ComboBox (Menú desplegable)
+    typeCombo.setColour(juce::ComboBox::textColourId, layerColor.withAlpha(0.8f));
+    typeCombo.setColour(juce::ComboBox::arrowColourId, layerColor.withAlpha(0.8f));
+
+    // Desenchufar y Enchufar Cables
+    driveAttach.reset();
+    mixAttach.reset();
+    typeAttach.reset();
+
+    driveAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "DIST_DRIVE", driveKnob);
+    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "DIST_MIX", mixKnob);
+    typeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, layerPrefix + "DIST_TYPE", typeCombo);
+}
 
 void DistModule::paint(juce::Graphics& g)
 {

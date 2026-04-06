@@ -14,16 +14,19 @@
 class DistModule : public juce::Component
 {
 public:
-    // AÑADIDO: Prefijo de capa
     DistModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~DistModule() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // NUEVO: Función para cambiar de capa y reconectar
+    void setLayer(int layerIndex);
+
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
-    juce::String layerPrefix; // <-- Identidad
+    juce::String layerPrefix;
+    int currentLayer = 1;
 
     juce::Slider driveKnob;
     juce::Slider mixKnob;

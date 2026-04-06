@@ -125,8 +125,16 @@ private:
     juce::Synthesiser synthL1;
     juce::Synthesiser synthL2;
 
-    juce::dsp::Reverb masterReverb;
-    juce::Reverb::Parameters reverbParams;
+    //juce::dsp::Reverb masterReverb;
+    //juce::Reverb::Parameters reverbParams;
+
+    // 2 Motores de Reverb independientes
+    juce::dsp::Reverb reverbL1;
+    juce::dsp::Reverb reverbL2;
+
+    // 2 "Cables" independientes donde procesar los efectos antes de mezclarlos
+    juce::AudioBuffer<float> renderBufferL1;
+    juce::AudioBuffer<float> renderBufferL2;
 
     // LIMITER ---
     juce::dsp::Limiter<float> masterLimiter;
