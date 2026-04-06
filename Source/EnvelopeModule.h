@@ -14,8 +14,6 @@
 class EnvelopeModule : public juce::Component, public juce::Timer
 {
 public:
-    // AADIDO: Prefijo de capa
-    //EnvelopeModule(juce::AudioProcessorValueTreeState& apvts juce::String prefix));
     EnvelopeModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
     ~EnvelopeModule() override;
 
@@ -27,9 +25,13 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
 
+    // NUEVO: Función para cambiar de capa visual y lógicamente
+    void setLayer(int layerIndex);
+
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
-   juce::String layerPrefix; // <-- Identidad
+    juce::String layerPrefix;
+    int currentLayer = 1; // Para el color
 
     int activeNode = -1;
     float startParamX = 0.0f;

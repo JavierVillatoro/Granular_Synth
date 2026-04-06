@@ -14,16 +14,19 @@
 class LayerMixerModule : public juce::Component
 {
 public:
-    // Le pasamos el APVTS y un "prefijo" (ej: "L1_") para que este módulo sirva para la capa 1, 2, 3...
     LayerMixerModule(juce::AudioProcessorValueTreeState& apvts, juce::String layerPrefix);
     ~LayerMixerModule() override;
 
     void paint(juce::Graphics&) override;
     void resized() override;
 
+    // NUEVO: Para cambiar colores y parámetros al instante
+    void setLayer(int layerIndex);
+
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
     juce::String prefix;
+    int currentLayer = 1;
 
     // --- LOS 4 KNOBS DE EQ ---
     juce::Slider eqLow, eqMidLow, eqMidHigh, eqHigh;

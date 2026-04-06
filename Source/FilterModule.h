@@ -24,13 +24,13 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
 
-    // NUEVO: Función para cambiar la capa en tiempo real
+    // NUEVO: Funcin para cambiar la capa en tiempo real
     void setLayer(int layerIndex);
 
 private:
     juce::AudioProcessorValueTreeState& apvtsRef;
     juce::String layerPrefix;
-    int currentLayer = 1; // Para saber qué color pintar en la gráfica
+    int currentLayer = 1; // Para saber qu	 color pintar en la grfica
 
     // --- LOS 4 KNOBS ---
     juce::Slider lpfKnob, resLpfKnob;

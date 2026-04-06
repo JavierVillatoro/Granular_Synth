@@ -14,9 +14,17 @@ EnvelopeModule::EnvelopeModule(juce::AudioProcessorValueTreeState& apvts, juce::
     : apvtsRef(apvts), layerPrefix(prefix)
 {
     startTimerHz(30);
+    setLayer(1);
 }
 
 EnvelopeModule::~EnvelopeModule() {}
+
+void EnvelopeModule::setLayer(int layerIndex)
+{
+    currentLayer = layerIndex;
+    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+    repaint(); // Forzamos un redibujado para que cambie el color al instante
+}
 
 void EnvelopeModule::timerCallback() { repaint(); }
 
@@ -26,13 +34,11 @@ void EnvelopeModule::paint(juce::Graphics& g)
     auto ampArea = area.removeFromTop(area.getHeight() / 2);
     auto env2Area = area;
 
-    // LECTURA DINÁMICA CON PREFIJO PARA EL AMP (Capa 1/2/3...)
     float aA = apvtsRef.getRawParameterValue(layerPrefix + "AMP_A")->load();
     float aD = apvtsRef.getRawParameterValue(layerPrefix + "AMP_D")->load();
     float aS = apvtsRef.getRawParameterValue(layerPrefix + "AMP_S")->load();
     float aR = apvtsRef.getRawParameterValue(layerPrefix + "AMP_R")->load();
 
-    // LECTURA GLOBAL PARA EL ENV2 (SIN PREFIJO)
     float e2A = apvtsRef.getRawParameterValue("ENV2_A")->load();
     float e2D = apvtsRef.getRawParameterValue("ENV2_D")->load();
     float e2S = apvtsRef.getRawParameterValue("ENV2_S")->load();
@@ -41,8 +47,9 @@ void EnvelopeModule::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.1f));
     g.drawLine(area.getX(), ampArea.getBottom(), area.getRight(), ampArea.getBottom(), 1.0f);
 
-    juce::Colour layerColor = juce::Colours::cyan;
-    juce::Colour globalColor = juce::Colour(0xffd0d0d0); // Gris Titanio
+    // Color maestro según la capa activa
+    juce::Colour layerColor = (currentLayer == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour globalColor = juce::Colour(0xffd0d0d0); // Gris Titanio para el ENV2 (que es global)
 
     drawEnvelope(g, ampArea.reduced(5), "AMP", aA, aD, aS, aR, layerColor);
     drawEnvelope(g, env2Area.reduced(5), "ENV 2", e2A, e2D, e2S, e2R, globalColor);
@@ -98,7 +105,6 @@ void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
     auto ampArea = area.removeFromTop(area.getHeight() / 2);
     auto env2Area = area;
 
-    // AÑADIDO: 'isGlobal' para saber si le ponemos el prefijo de capa o no
     auto checkHits = [&](juce::Rectangle<int> bounds, juce::String baseParamName, int baseIndex, bool isGlobal)
         {
             juce::String prefixToUse = isGlobal ? "" : layerPrefix;
@@ -128,7 +134,6 @@ void EnvelopeModule::mouseDown(const juce::MouseEvent& event)
             else if (mousePos.getDistanceFrom({ releaseX, bottomY }) < 15.0f) { activeNode = baseIndex + 2; startParamX = r; }
         };
 
-    // AMP es de Capa (isGlobal = false), ENV2 es Global (isGlobal = true)
     checkHits(ampArea.reduced(5), "AMP", 0, false);
     checkHits(env2Area.reduced(5), "ENV2", 3, true);
 }
@@ -143,14 +148,12 @@ void EnvelopeModule::mouseDrag(const juce::MouseEvent& event)
     float timeChange = deltaX * 0.02f;
     float sustainChange = -deltaY * 0.01f;
 
-    // AÑADIDO: 'isGlobal' al actualizar el parámetro
     auto updateParam = [&](juce::String id, float startVal, float change, float min, float max, bool isGlobal) {
         juce::String prefixToUse = isGlobal ? "" : layerPrefix;
         if (auto* p = apvtsRef.getParameter(prefixToUse + id))
             p->setValueNotifyingHost(p->convertTo0to1(juce::jlimit(min, max, startVal + change)));
         };
 
-    // AMP (isGlobal = false)
     if (activeNode == 0)      updateParam("AMP_A", startParamX, timeChange, 0.01f, 5.0f, false);
     else if (activeNode == 1) {
         updateParam("AMP_D", startParamX, timeChange, 0.01f, 5.0f, false);
@@ -158,7 +161,6 @@ void EnvelopeModule::mouseDrag(const juce::MouseEvent& event)
     }
     else if (activeNode == 2) updateParam("AMP_R", startParamX, timeChange, 0.01f, 5.0f, false);
 
-    // ENV 2 (isGlobal = true)
     else if (activeNode == 3) updateParam("ENV2_A", startParamX, timeChange, 0.01f, 5.0f, true);
     else if (activeNode == 4) {
         updateParam("ENV2_D", startParamX, timeChange, 0.01f, 5.0f, true);
@@ -167,7 +169,4 @@ void EnvelopeModule::mouseDrag(const juce::MouseEvent& event)
     else if (activeNode == 5) updateParam("ENV2_R", startParamX, timeChange, 0.01f, 5.0f, true);
 }
 
-void EnvelopeModule::mouseUp(const juce::MouseEvent& event)
-{
-    activeNode = -1;
-}
+void EnvelopeModule::mouseUp(const juce::MouseEvent& event) { activeNode = -1; }
