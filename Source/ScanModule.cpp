@@ -23,17 +23,31 @@ ScanModule::ScanModule(juce::AudioProcessorValueTreeState& apvts, juce::String p
     setupKnob(speedKnob);
     setupKnob(dirKnob);
 
-    setLayer(1); // Arrancamos en Capa 1
+    setLayer(1);
 }
 
 ScanModule::~ScanModule() {}
 
 void ScanModule::setLayer(int layerIndex)
 {
-    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+    juce::Colour layerColor;
+    juce::Colour dotColor;
 
-    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    if (layerIndex == 1) {
+        layerPrefix = "L1_";
+        layerColor = juce::Colours::cyan;
+        dotColor = juce::Colours::white;
+    }
+    else if (layerIndex == 2) {
+        layerPrefix = "L2_";
+        layerColor = juce::Colours::magenta;
+        dotColor = juce::Colours::pink;
+    }
+    else if (layerIndex == 3) {
+        layerPrefix = "L3_";
+        layerColor = juce::Colours::orange;
+        dotColor = juce::Colours::whitesmoke; //yellow
+    }
 
     posKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     speedKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
