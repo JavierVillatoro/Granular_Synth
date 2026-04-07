@@ -27,24 +27,13 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
 
     // --- INICIALIZAR EL SINTETIZADOR MIDI ---
 
-    // 1. Le damos a la orquesta la partitura (nuestra clase Sound que permite tocar cualquier nota)
-    //synth.addSound(new GranularSound());
+    // 1. Sound , permite tocar cualquier nota 
     synthL1.addSound(new GranularSound());
     synthL2.addSound(new GranularSound());
     synthL3.addSound(new GranularSound());
 
-    // 2. Contratamos a 8 "Voces" 
-    //for (int i = 0; i < 8; ++i)
-    //{
-        //synth.addVoice(new GranularVoice(&audioBuffer, &apvts));
-    //}
-    // 2. Contratamos a 8 "Voces" 
-    //for (int i = 0; i < 8; ++i)
-    //{
-        //synth.addVoice(new GranularVoice(&audioBufferL1, &audioBufferL2, &apvts));
-    //}
 
-    // 2. Contratamos a 16 "Voces" Inteligentes
+    // 2. Voces
     for (int i = 0; i < 8; ++i) {
         // El Equipo A (8 voces que miran al Disco Duro 1 y leen los knobs L1)
         synthL1.addVoice(new GranularVoice(&audioBufferL1, &apvts, "L1_"));

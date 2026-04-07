@@ -20,7 +20,7 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
 
-    // NUEVO: Para cambiar colores y parámetros al instante
+    // Cambia colores y parámetros al momento
     void setLayer(int layerIndex);
 
 private:
@@ -28,11 +28,11 @@ private:
     juce::String prefix;
     int currentLayer = 1;
 
-    // --- LOS 4 KNOBS DE EQ ---
+    // 4 knobs de eq
     juce::Slider eqLow, eqMidLow, eqMidHigh, eqHigh;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachLow, attachMidLow, attachMidHigh, attachHigh;
 
-    // --- EL FADER PROFESIONAL ---
+    // Fadder
     juce::Slider volumeFader;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachVol;
 
