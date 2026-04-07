@@ -25,7 +25,7 @@ public:
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
 
-    // NUEVO: Función para cambiar de capa visual y lógicamente
+    // NUEVO: Funciara cambiar de capa visual y lgicamente
     void setLayer(int layerIndex);
 
 private:
