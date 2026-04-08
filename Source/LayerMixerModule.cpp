@@ -40,11 +40,25 @@ LayerMixerModule::~LayerMixerModule() {}
 void LayerMixerModule::setLayer(int layerIndex)
 {
     currentLayer = layerIndex;
-    prefix = (layerIndex == 1) ? "L1_" : "L2_";
 
-    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    // Usamos blanco para los puntos de la EQ para mantener legibilidad
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    juce::Colour layerColor;
+    juce::Colour dotColor;
+
+    if (layerIndex == 1) {
+        prefix = "L1_";
+        layerColor = juce::Colours::cyan;
+        dotColor = juce::Colours::white;
+    }
+    else if (layerIndex == 2) {
+        prefix = "L2_";
+        layerColor = juce::Colours::magenta;
+        dotColor = juce::Colours::pink;
+    }
+    else if (layerIndex == 3) {
+        prefix = "L3_";
+        layerColor = juce::Colours::orange;
+        dotColor = juce::Colours::whitesmoke; // Whitesmoke para el contraste perfecto
+    }
 
     eqLow.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.8f));
     eqLow.setColour(juce::Slider::thumbColourId, dotColor);
@@ -75,7 +89,10 @@ void LayerMixerModule::setLayer(int layerIndex)
 
 void LayerMixerModule::paint(juce::Graphics& g)
 {
-    juce::Colour layerColor = (currentLayer == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour layerColor;
+    if (currentLayer == 1) layerColor = juce::Colours::cyan;
+    else if (currentLayer == 2) layerColor = juce::Colours::magenta;
+    else if (currentLayer == 3) layerColor = juce::Colours::orange;
 
     g.fillAll(juce::Colour(0xff121212));
     g.setColour(layerColor.withAlpha(0.3f));

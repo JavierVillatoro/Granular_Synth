@@ -38,10 +38,25 @@ DistModule::~DistModule() {}
 void DistModule::setLayer(int layerIndex)
 {
     currentLayer = layerIndex;
-    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
 
-    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    juce::Colour layerColor;
+    juce::Colour dotColor;
+
+    if (layerIndex == 1) {
+        layerPrefix = "L1_";
+        layerColor = juce::Colours::cyan;
+        dotColor = juce::Colours::white;
+    }
+    else if (layerIndex == 2) {
+        layerPrefix = "L2_";
+        layerColor = juce::Colours::magenta;
+        dotColor = juce::Colours::pink;
+    }
+    else if (layerIndex == 3) {
+        layerPrefix = "L3_";
+        layerColor = juce::Colours::orange;
+        dotColor = juce::Colours::whitesmoke;
+    }
 
     // Colores Knobs
     driveKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.7f));

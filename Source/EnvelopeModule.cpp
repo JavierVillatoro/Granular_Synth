@@ -22,7 +22,11 @@ EnvelopeModule::~EnvelopeModule() {}
 void EnvelopeModule::setLayer(int layerIndex)
 {
     currentLayer = layerIndex;
-    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+
+    if (layerIndex == 1) layerPrefix = "L1_";
+    else if (layerIndex == 2) layerPrefix = "L2_";
+    else if (layerIndex == 3) layerPrefix = "L3_";
+
     repaint(); // Forzamos un redibujado para que cambie el color al instante
 }
 
@@ -48,7 +52,11 @@ void EnvelopeModule::paint(juce::Graphics& g)
     g.drawLine(area.getX(), ampArea.getBottom(), area.getRight(), ampArea.getBottom(), 1.0f);
 
     // Color maestro según la capa activa
-    juce::Colour layerColor = (currentLayer == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    juce::Colour layerColor;
+    if (currentLayer == 1) layerColor = juce::Colours::cyan;
+    else if (currentLayer == 2) layerColor = juce::Colours::magenta;
+    else if (currentLayer == 3) layerColor = juce::Colours::orange;
+
     juce::Colour globalColor = juce::Colour(0xffd0d0d0); // Gris Titanio para el ENV2 (que es global)
 
     drawEnvelope(g, ampArea.reduced(5), "AMP", aA, aD, aS, aR, layerColor);
@@ -90,7 +98,10 @@ void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds
     g.strokePath(envPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 
     float dotSize = 8.0f;
-    g.setColour(juce::Colours::white);
+    // Si es naranja, que los puntitos de la gráfica sean whitesmoke para más visibilidad
+    juce::Colour envDotColor = (envColor == juce::Colours::orange) ? juce::Colours::whitesmoke : juce::Colours::white;
+    g.setColour(envDotColor);
+
     g.fillEllipse(attackX - dotSize / 2, topY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(decayX - dotSize / 2, sustainY - dotSize / 2, dotSize, dotSize);
     g.fillEllipse(releaseX - dotSize / 2, bottomY - dotSize / 2, dotSize, dotSize);
