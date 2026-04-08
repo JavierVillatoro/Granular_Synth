@@ -13,43 +13,56 @@
 FilterModule::FilterModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
     : apvtsRef(apvts), layerPrefix(prefix)
 {
-    auto setupKnob = [this](juce::Slider& slider, const juce::String& paramID, std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attach) {
+    auto setupKnob = [this](juce::Slider& slider) {
         slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         slider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         addAndMakeVisible(slider);
-        // Los attachments los hacemos ahora en setLayer()
         };
 
-    setupKnob(hpfKnob, layerPrefix + "FILTER_HPF", hpfAttach);
-    setupKnob(resHpfKnob, layerPrefix + "FILTER_RES_HPF", resHpfAttach);
-    setupKnob(lpfKnob, layerPrefix + "FILTER_LPF", lpfAttach);
-    setupKnob(resLpfKnob, layerPrefix + "FILTER_RES_LPF", resLpfAttach);
+    setupKnob(hpfKnob);
+    setupKnob(resHpfKnob);
+    setupKnob(lpfKnob);
+    setupKnob(resLpfKnob);
 
-    setLayer(1); // Arrancamos en Capa 1
+    setLayer(1);
     startTimerHz(30);
 }
 
+FilterModule::~FilterModule() {}
+
 void FilterModule::setLayer(int layerIndex)
 {
-    currentLayer = layerIndex;
-    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+    currentLayer = layerIndex; // Guardamos para la función paint()
 
-    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    juce::Colour layerColor;
+    juce::Colour dotColor;
 
-    // Colores de las barras
+    if (layerIndex == 1) {
+        layerPrefix = "L1_";
+        layerColor = juce::Colours::cyan;
+        dotColor = juce::Colours::white;
+    }
+    else if (layerIndex == 2) {
+        layerPrefix = "L2_";
+        layerColor = juce::Colours::magenta;
+        dotColor = juce::Colours::pink;
+    }
+    else if (layerIndex == 3) {
+        layerPrefix = "L3_";
+        layerColor = juce::Colours::orange;
+        dotColor = juce::Colours::whitesmoke;
+    }
+
     hpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     resHpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     lpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     resLpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
 
-    // Colores de los puntitos
     hpfKnob.setColour(juce::Slider::thumbColourId, dotColor);
     resHpfKnob.setColour(juce::Slider::thumbColourId, dotColor);
     lpfKnob.setColour(juce::Slider::thumbColourId, dotColor);
     resLpfKnob.setColour(juce::Slider::thumbColourId, dotColor);
 
-    // Desenchufar y enchufar cables
     hpfAttach.reset(); resHpfAttach.reset();
     lpfAttach.reset(); resLpfAttach.reset();
 
@@ -57,10 +70,11 @@ void FilterModule::setLayer(int layerIndex)
     resHpfAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "FILTER_RES_HPF", resHpfKnob);
     lpfAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "FILTER_LPF", lpfKnob);
     resLpfAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "FILTER_RES_LPF", resLpfKnob);
+
+    repaint(); // Forzamos a dibujar la curva con el nuevo color al instante
 }
 
 void FilterModule::timerCallback() { repaint(); }
-FilterModule::~FilterModule() {}
 
 void FilterModule::resized()
 {
@@ -143,8 +157,11 @@ void FilterModule::mouseDrag(const juce::MouseEvent& event)
 
 void FilterModule::paint(juce::Graphics& g)
 {
-    // Color maestro según la capa activa
-    juce::Colour layerColor = (currentLayer == 1) ? juce::Colours::cyan : juce::Colours::magenta;
+    // MAGIA: El color cambia con la variable 'currentLayer'
+    juce::Colour layerColor;
+    if (currentLayer == 1) layerColor = juce::Colours::cyan;
+    else if (currentLayer == 2) layerColor = juce::Colours::magenta;
+    else if (currentLayer == 3) layerColor = juce::Colours::orange;
 
     g.setColour(layerColor.withAlpha(0.05f));
     g.fillRoundedRectangle(graphArea.toFloat(), 5.0f);
@@ -199,7 +216,6 @@ void FilterModule::paint(juce::Graphics& g)
     filterCurve.lineTo(graphArea.getRight(), graphArea.getBottom());
     filterCurve.closeSubPath();
 
-    // Pintamos la curva con el color de la capa
     g.setColour(layerColor.withAlpha(0.4f));
     g.fillPath(filterCurve);
 

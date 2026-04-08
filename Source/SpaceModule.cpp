@@ -24,29 +24,42 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
     setKnobPlatino(sizeKnob);
     setKnobPlatino(fbackKnob);
 
-    // Los attachments globales se quedan fijos
     sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_SIZE", sizeKnob);
     fbackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_FBACK", fbackKnob);
 
-    setLayer(1); // Arrancamos en Capa 1
+    setLayer(1);
 }
+
+SpaceModule::~SpaceModule() {}
 
 void SpaceModule::setLayer(int layerIndex)
 {
-    layerPrefix = (layerIndex == 1) ? "L1_" : "L2_";
+    juce::Colour layerColor;
+    juce::Colour dotColor;
 
-    juce::Colour layerColor = (layerIndex == 1) ? juce::Colours::cyan : juce::Colours::magenta;
-    juce::Colour dotColor = (layerIndex == 1) ? juce::Colours::white : juce::Colours::pink;
+    if (layerIndex == 1) {
+        layerPrefix = "L1_";
+        layerColor = juce::Colours::cyan;
+        dotColor = juce::Colours::white;
+    }
+    else if (layerIndex == 2) {
+        layerPrefix = "L2_";
+        layerColor = juce::Colours::magenta;
+        dotColor = juce::Colours::pink;
+    }
+    else if (layerIndex == 3) {
+        layerPrefix = "L3_";
+        layerColor = juce::Colours::orange;
+        dotColor = juce::Colours::whitesmoke;
+    }
 
-    // Solo cambiamos el color y el cable del MIX
+    // Solo cambiamos el color y el cable del MIX (el independiente)
     mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     mixKnob.setColour(juce::Slider::thumbColourId, dotColor);
 
     mixAttach.reset();
     mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPACE_MIX", mixKnob);
 }
-
-SpaceModule::~SpaceModule() {}
 
 void SpaceModule::resized()
 {
