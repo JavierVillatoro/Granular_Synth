@@ -57,6 +57,11 @@ void DistModule::setLayer(int layerIndex)
         layerColor = juce::Colours::orange;
         dotColor = juce::Colours::whitesmoke;
     }
+    else if (layerIndex == 4) {
+        layerPrefix = "L4_";
+        layerColor = juce::Colours::lime;
+        dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
+    }
 
     // Colores Knobs
     driveKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.7f));

@@ -57,7 +57,12 @@ void LayerMixerModule::setLayer(int layerIndex)
     else if (layerIndex == 3) {
         prefix = "L3_";
         layerColor = juce::Colours::orange;
-        dotColor = juce::Colours::whitesmoke; // Whitesmoke para el contraste perfecto
+        dotColor = juce::Colours::whitesmoke;
+    }
+    else if (layerIndex == 4) {
+        prefix = "L4_";
+        layerColor = juce::Colours::lime;
+        dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
     }
 
     eqLow.setColour(juce::Slider::rotarySliderFillColourId, layerColor.withAlpha(0.8f));
@@ -93,6 +98,7 @@ void LayerMixerModule::paint(juce::Graphics& g)
     if (currentLayer == 1) layerColor = juce::Colours::cyan;
     else if (currentLayer == 2) layerColor = juce::Colours::magenta;
     else if (currentLayer == 3) layerColor = juce::Colours::orange;
+    else if (currentLayer == 4) layerColor = juce::Colours::lime;
 
     g.fillAll(juce::Colour(0xff121212));
     g.setColour(layerColor.withAlpha(0.3f));
