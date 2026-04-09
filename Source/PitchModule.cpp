@@ -46,7 +46,12 @@ void PitchModule::setLayer(int layerIndex)
     else if (layerIndex == 3) {
         layerPrefix = "L3_";
         layerColor = juce::Colours::orange;
-        dotColor = juce::Colours::whitesmoke; //yellow
+        dotColor = juce::Colours::whitesmoke;
+    }
+    else if (layerIndex == 4) {
+        layerPrefix = "L4_";
+        layerColor = juce::Colours::lime;
+        dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
     }
 
     transKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
