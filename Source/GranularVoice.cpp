@@ -8,18 +8,9 @@
   ==============================================================================
 */
 
-/*
-  ==============================================================================
-
-    GranularVoice.cpp
-
-  ==============================================================================
-*/
-
 #include "GranularVoice.h"
 #include "PluginProcessor.h"
 
-// 1. EL CONSTRUCTOR
 GranularVoice::GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse, juce::String prefix)
 {
     myBuffer = buffer;
@@ -83,7 +74,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 {
     if (!isPlaying || getSampleRate() <= 0.0) return;
 
-    // 1. OBTENEMOS EL PUNTERO AL AUDIO REAL EN ESTE PRECISO INSTANTE
     juce::AudioBuffer<float>* currentBuffer = nullptr;
     float winStart = 0.0f;
     float winLen = 1.0f;
@@ -105,12 +95,16 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             winStart = processor->windowStartRatioL3.load();
             winLen = processor->windowLengthRatioL3.load();
         }
+        // --- LA LÍNEA MÁGICA PARA LA CAPA 4 ---
+        else if (myPrefix == "L4_") {
+            currentBuffer = &processor->audioBufferL4;
+            winStart = processor->windowStartRatioL4.load();
+            winLen = processor->windowLengthRatioL4.load();
+        }
     }
 
-    // Si el buffer no existe o está vacío, nos callamos
     if (currentBuffer == nullptr || currentBuffer->getNumSamples() == 0) return;
 
-    // 2. LEER PARÁMETROS DINÁMICAMENTE
     float positionKnob = apvts->getRawParameterValue(myPrefix + "POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue(myPrefix + "GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue(myPrefix + "SCAN_SPEED")->load();

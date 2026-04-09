@@ -17,6 +17,7 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     juce::Colour mainColor = juce::Colours::cyan;
     if (paramPrefix == "L2_") mainColor = juce::Colours::magenta;
     if (paramPrefix == "L3_") mainColor = juce::Colours::orange;
+    if (paramPrefix == "L4_") mainColor = juce::Colours::lime; // <-- ¡NUESTRA NUEVA CAPA!
 
     auto setupButton = [this, mainColor](juce::TextButton& btn, juce::String text, juce::String paramId, std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>& attach) {
         btn.setButtonText(text);

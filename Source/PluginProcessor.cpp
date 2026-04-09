@@ -31,20 +31,21 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     synthL1.addSound(new GranularSound());
     synthL2.addSound(new GranularSound());
     synthL3.addSound(new GranularSound());
+    synthL4.addSound(new GranularSound());
 
 
     // 2. Voces
     for (int i = 0; i < 8; ++i) {
-        // El Equipo A (8 voces que miran al Disco Duro 1 y leen los knobs L1)
         synthL1.addVoice(new GranularVoice(&audioBufferL1, &apvts, "L1_"));
     }
     for (int i = 0; i < 8; ++i) {
-        // El Equipo B (8 voces que miran al Disco Duro 2 y leen los knobs L2)
         synthL2.addVoice(new GranularVoice(&audioBufferL2, &apvts, "L2_"));
     }
     for (int i = 0; i < 8; ++i) {
-        // El Equipo C (8 voces que miran al Disco Duro 3 y leen los knobs L3)
         synthL3.addVoice(new GranularVoice(&audioBufferL3, &apvts, "L3_"));
+    }
+    for (int i = 0; i < 8; ++i) {
+        synthL4.addVoice(new GranularVoice(&audioBufferL4, &apvts, "L4_"));
     }
 }
 
@@ -60,29 +61,29 @@ const juce::String Granular_SynthAudioProcessor::getName() const
 
 bool Granular_SynthAudioProcessor::acceptsMidi() const
 {
-   #if JucePlugin_WantsMidiInput
+#if JucePlugin_WantsMidiInput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 bool Granular_SynthAudioProcessor::producesMidi() const
 {
-   #if JucePlugin_ProducesMidiOutput
+#if JucePlugin_ProducesMidiOutput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 bool Granular_SynthAudioProcessor::isMidiEffect() const
 {
-   #if JucePlugin_IsMidiEffect
+#if JucePlugin_IsMidiEffect
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 double Granular_SynthAudioProcessor::getTailLengthSeconds() const
@@ -93,7 +94,7 @@ double Granular_SynthAudioProcessor::getTailLengthSeconds() const
 int Granular_SynthAudioProcessor::getNumPrograms()
 {
     return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
+    // so this should be at least 1, even if you're not really implementing programs.
 }
 
 int Granular_SynthAudioProcessor::getCurrentProgram()
@@ -101,16 +102,16 @@ int Granular_SynthAudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void Granular_SynthAudioProcessor::setCurrentProgram (int index)
+void Granular_SynthAudioProcessor::setCurrentProgram(int index)
 {
 }
 
-const juce::String Granular_SynthAudioProcessor::getProgramName (int index)
+const juce::String Granular_SynthAudioProcessor::getProgramName(int index)
 {
     return {};
 }
 
-void Granular_SynthAudioProcessor::changeProgramName (int index, const juce::String& newName)
+void Granular_SynthAudioProcessor::changeProgramName(int index, const juce::String& newName)
 {
 }
 
@@ -127,11 +128,13 @@ void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesP
     renderBufferL1.setSize(spec.numChannels, samplesPerBlock);
     renderBufferL2.setSize(spec.numChannels, samplesPerBlock);
     renderBufferL3.setSize(spec.numChannels, samplesPerBlock);
+    renderBufferL4.setSize(spec.numChannels, samplesPerBlock);
 
-    // 2. Preparamos las Reverbs gemelas
+    // 2. Preparamos las Reverbs
     reverbL1.prepare(spec);
     reverbL2.prepare(spec);
     reverbL3.prepare(spec);
+    reverbL4.prepare(spec);
 
     // 3. Preparamos el Limitador
     masterLimiter.prepare(spec);
@@ -141,37 +144,31 @@ void Granular_SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesP
     synthL1.setCurrentPlaybackSampleRate(sampleRate);
     synthL2.setCurrentPlaybackSampleRate(sampleRate);
     synthL3.setCurrentPlaybackSampleRate(sampleRate);
+    synthL4.setCurrentPlaybackSampleRate(sampleRate);
 }
 
 void Granular_SynthAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool Granular_SynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool Granular_SynthAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
+#if JucePlugin_IsMidiEffect
+    juce::ignoreUnused(layouts);
     return true;
-  #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    // Some plugin hosts, such as certain GarageBand versions, will only
-    // load plugins that support stereo bus layouts.
+#else
     if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
-    // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
+#if ! JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
-   #endif
+#endif
 
     return true;
-  #endif
+#endif
 }
 #endif
 
@@ -270,6 +267,30 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     lastHoldStateL3 = isHoldOnL3;
 
     // ==========================================================
+    // --- LÓGICA DE CAPA 4 (VERDE/LIMA) ---
+    // ==========================================================
+    bool isPlayOnL4 = apvts.getRawParameterValue("L4_PLAY")->load() > 0.5f;
+    bool isMidiOnL4 = apvts.getRawParameterValue("L4_MIDI")->load() > 0.5f;
+    bool isHoldOnL4 = apvts.getRawParameterValue("L4_HOLD")->load() > 0.5f;
+
+    juce::MidiBuffer processedMidiL4;
+    for (const auto metadata : midiMessages) {
+        auto message = metadata.getMessage();
+        if (isMidiOnL4) {
+            if (isHoldOnL4 && message.isNoteOff()) continue;
+            processedMidiL4.addEvent(message, metadata.samplePosition);
+        }
+    }
+
+    if (isPlayOnL4 && !lastPlayStateL4) processedMidiL4.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
+    else if (!isPlayOnL4 && lastPlayStateL4) processedMidiL4.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
+    lastPlayStateL4 = isPlayOnL4;
+
+    if (!isHoldOnL4 && lastHoldStateL4) synthL4.allNotesOff(0, true);
+    lastHoldStateL4 = isHoldOnL4;
+
+
+    // ==========================================================
     // --- LÓGICA DE RETRIGGER DEL LFO ---
     // ==========================================================
     bool retrigLfo = apvts.getRawParameterValue("LFO_RETRIG")->load() > 0.5f;
@@ -277,6 +298,7 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
         for (const auto metadata : processedMidiL1) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
         for (const auto metadata : processedMidiL2) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
         for (const auto metadata : processedMidiL3) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
+        for (const auto metadata : processedMidiL4) { if (metadata.getMessage().isNoteOn()) { lfo1Phase = 0.0f; lfo2Phase = 0.0f; } }
     }
 
     // ==========================================================
@@ -345,6 +367,9 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     for (int i = 0; i < synthL3.getNumVoices(); ++i) {
         if (auto* voice = dynamic_cast<GranularVoice*>(synthL3.getVoice(i))) { voice->currentLfo1Value = globalLfo1Value; voice->currentLfo2Value = globalLfo2Value; }
     }
+    for (int i = 0; i < synthL4.getNumVoices(); ++i) {
+        if (auto* voice = dynamic_cast<GranularVoice*>(synthL4.getVoice(i))) { voice->currentLfo1Value = globalLfo1Value; voice->currentLfo2Value = globalLfo2Value; }
+    }
 
     // ==========================================================
     // --- 2. PROCESAMIENTO INDEPENDIENTE DE AUDIO Y EFECTOS ---
@@ -353,11 +378,13 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
 
     renderBufferL1.clear();
     renderBufferL2.clear();
-    renderBufferL3.clear(); // Limpiamos pista naranja
+    renderBufferL3.clear();
+    renderBufferL4.clear();
 
     synthL1.renderNextBlock(renderBufferL1, processedMidiL1, 0, buffer.getNumSamples());
     synthL2.renderNextBlock(renderBufferL2, processedMidiL2, 0, buffer.getNumSamples());
-    synthL3.renderNextBlock(renderBufferL3, processedMidiL3, 0, buffer.getNumSamples()); // Audio L3
+    synthL3.renderNextBlock(renderBufferL3, processedMidiL3, 0, buffer.getNumSamples());
+    synthL4.renderNextBlock(renderBufferL4, processedMidiL4, 0, buffer.getNumSamples());
 
     auto applyEffectsToLayer = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix, juce::dsp::Reverb& reverb)
         {
@@ -411,43 +438,39 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
 
     applyEffectsToLayer(renderBufferL1, "L1_", reverbL1);
     applyEffectsToLayer(renderBufferL2, "L2_", reverbL2);
-    applyEffectsToLayer(renderBufferL3, "L3_", reverbL3); // Efectos L3
+    applyEffectsToLayer(renderBufferL3, "L3_", reverbL3);
+    applyEffectsToLayer(renderBufferL4, "L4_", reverbL4);
 
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
         buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
         buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
-        buffer.addFrom(ch, 0, renderBufferL3, ch, 0, buffer.getNumSamples()); // Master L3
+        buffer.addFrom(ch, 0, renderBufferL3, ch, 0, buffer.getNumSamples());
+        buffer.addFrom(ch, 0, renderBufferL4, ch, 0, buffer.getNumSamples());
     }
-    
+
     // ==========================================================
     // --- 3. MASTER VOLUME & BRICKWALL LIMITER ---
     // ==========================================================
     float masterVolDb = apvts.getRawParameterValue("MASTER_VOL")->load();
     float limiterThresh = apvts.getRawParameterValue("LIMITER_THRESH")->load();
 
-    // 1. Aplicamos el volumen general (convertimos de decibelios a un multiplicador lineal)
     float volumeMultiplier = juce::Decibels::decibelsToGain(masterVolDb);
     buffer.applyGain(volumeMultiplier);
 
-    // 2. Aplicamos el Limitador de JUCE
     masterLimiter.setThreshold(limiterThresh);
     juce::dsp::AudioBlock<float> limiterBlock(buffer);
     juce::dsp::ProcessContextReplacing<float> limiterContext(limiterBlock);
     masterLimiter.process(limiterContext);
 
     // ==========================================================
-    // --- 4. ACTUALIZAR LOS ESPÍAS VISUALES (VÚMETRO ESTÉREO) ---
+    // --- 4. ACTUALIZAR LOS ESPÍAS VISUALES ---
     // ==========================================================
-    // Leemos el pico máximo del canal Izquierdo (0) y Derecho (1) de este bloque
     float peakL = buffer.getMagnitude(0, 0, buffer.getNumSamples());
     float peakR = buffer.getMagnitude(1, 0, buffer.getNumSamples());
 
-    // Convertimos los picos a Decibelios (para que la barra baje suavemente en la UI)
-    // Usamos -60dB como piso de ruido absoluto
     float dbL = juce::Decibels::gainToDecibels(peakL, -60.0f);
     float dbR = juce::Decibels::gainToDecibels(peakR, -60.0f);
 
-    // Guardamos los valores para que el MasterModule.cpp los lea a 30 FPS
     visualMeterL.store(dbL);
     visualMeterR.store(dbR);
 }
@@ -455,30 +478,24 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
 //==============================================================================
 bool Granular_SynthAudioProcessor::hasEditor() const
 {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 juce::AudioProcessorEditor* Granular_SynthAudioProcessor::createEditor()
 {
-    return new Granular_SynthAudioProcessorEditor (*this);
+    return new Granular_SynthAudioProcessorEditor(*this);
 }
 
 //==============================================================================
-void Granular_SynthAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void Granular_SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
 }
 
-void Granular_SynthAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void Granular_SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
 }
 
 //==============================================================================
-// This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new Granular_SynthAudioProcessor();
@@ -489,7 +506,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
     // ==============================================================================
-    // 1. PARÁMETROS GLOBALES (LFOs, Master, Reverb Size, etc.)
+    // 1. PARÁMETROS GLOBALES
     // ==============================================================================
     juce::StringArray beatDivisions = { "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16", "1/32" };
     juce::StringArray waveShapes = { "Sine", "Triangle", "Saw", "Square", "S&H" };
@@ -517,7 +534,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>("ENV2_R", "Env2 R", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
     // ==============================================================================
-    // 2. FUNCIÓN GENERADORA DE CAPAS (Crea todo el ADN de una capa al instante)
+    // 2. FUNCIÓN GENERADORA DE CAPAS
     // ==============================================================================
     auto addLayerParameters = [&](juce::String prefix)
         {
@@ -554,7 +571,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_S", "Amp S", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_AMP_R", "Amp R", juce::NormalisableRange<float>(0.01f, 5.0f, 0.01f, 0.3f), 1.0f));
 
-            // Effects (Distortion & Reverb Mix)
+            // Effects
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DIST_DRIVE", "Drive", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DIST_MIX", "Dist Mix", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
@@ -570,38 +587,32 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_HIGH", "EQ High", eqRange, 0.0f));
         };
 
-    // 3. ¡CREAMOS LAS 2 CAPAS CON UNA SOLA LÍNEA DE CÓDIGO CADA UNA!
+    // 3. ¡CREAMOS LAS 4 CAPAS!
     addLayerParameters("L1");
     addLayerParameters("L2");
     addLayerParameters("L3");
+    addLayerParameters("L4");
 
     return { params.begin(), params.end() };
 }
 
 void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerIndex)
 {
-    // 1. Convertimos la ruta de texto en un "Archivo" real que JUCE entienda
     juce::File file(path);
-
-    // 2. Le pedimos a nuestro manager que intente crear un "lector" para este archivo
     std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(file));
 
-    // 3. Si el lector se ha creado con éxito
     if (reader != nullptr)
     {
-        // Creamos nuestro disco duro temporal
         juce::AudioBuffer<float> tempBuffer((int)reader->numChannels, (int)reader->lengthInSamples);
         reader->read(&tempBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
 
-        // Apagamos el motor 1 microsegundo
         suspendProcessing(true);
-        
-        // Disco duro segun layer
+
         if (layerIndex == 1) {
             audioBufferL1.makeCopyOf(tempBuffer);
             isAudioLoadedL1 = true;
             lastLoadedFilePathL1 = path;
-        } 
+        }
         else if (layerIndex == 2) {
             audioBufferL2.makeCopyOf(tempBuffer);
             isAudioLoadedL2 = true;
@@ -612,10 +623,14 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
             isAudioLoadedL3 = true;
             lastLoadedFilePathL3 = path;
         }
+        else if (layerIndex == 4) {
+            audioBufferL4.makeCopyOf(tempBuffer);
+            isAudioLoadedL4 = true;
+            lastLoadedFilePathL4 = path;
+        }
 
-        // Volvemos a encender
         suspendProcessing(false);
-        
+
         DBG("Archivo cargado en Capa " + juce::String(layerIndex) + ": " + file.getFileName());
     }
 }

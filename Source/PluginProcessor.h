@@ -51,27 +51,32 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // --- LOS 3 JEFES ---
+    // --- LOS 4 JEFES ---
     juce::Synthesiser& getSynthesiserL1() { return synthL1; }
     juce::Synthesiser& getSynthesiserL2() { return synthL2; }
     juce::Synthesiser& getSynthesiserL3() { return synthL3; }
+    juce::Synthesiser& getSynthesiserL4() { return synthL4; }
 
     // --- DISCOS DUROS PARA LAS CAPAS ---
     juce::AudioBuffer<float> audioBufferL1;
     juce::AudioBuffer<float> audioBufferL2;
     juce::AudioBuffer<float> audioBufferL3;
+    juce::AudioBuffer<float> audioBufferL4;
 
     juce::AudioBuffer<float>& getAudioBufferL1() { return audioBufferL1; }
     juce::AudioBuffer<float>& getAudioBufferL2() { return audioBufferL2; }
     juce::AudioBuffer<float>& getAudioBufferL3() { return audioBufferL3; }
+    juce::AudioBuffer<float>& getAudioBufferL4() { return audioBufferL4; }
 
     bool isAudioLoadedL1 = false;
     bool isAudioLoadedL2 = false;
     bool isAudioLoadedL3 = false;
+    bool isAudioLoadedL4 = false;
 
     juce::String lastLoadedFilePathL1 = "";
     juce::String lastLoadedFilePathL2 = "";
     juce::String lastLoadedFilePathL3 = "";
+    juce::String lastLoadedFilePathL4 = "";
 
     // --- CÁMARAS DE ZOOM INDEPENDIENTES ---
     std::atomic<float> windowStartRatioL1{ 0.0f };
@@ -82,6 +87,9 @@ public:
 
     std::atomic<float> windowStartRatioL3{ 0.0f };
     std::atomic<float> windowLengthRatioL3{ 1.0f };
+
+    std::atomic<float> windowStartRatioL4{ 0.0f };
+    std::atomic<float> windowLengthRatioL4{ 1.0f };
 
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;
@@ -105,14 +113,17 @@ private:
     juce::Synthesiser synthL1;
     juce::Synthesiser synthL2;
     juce::Synthesiser synthL3;
+    juce::Synthesiser synthL4;
 
     juce::dsp::Reverb reverbL1;
     juce::dsp::Reverb reverbL2;
     juce::dsp::Reverb reverbL3;
+    juce::dsp::Reverb reverbL4;
 
     juce::AudioBuffer<float> renderBufferL1;
     juce::AudioBuffer<float> renderBufferL2;
     juce::AudioBuffer<float> renderBufferL3;
+    juce::AudioBuffer<float> renderBufferL4;
 
     juce::dsp::Limiter<float> masterLimiter;
 
@@ -131,6 +142,9 @@ private:
 
     bool lastPlayStateL3 = false;
     bool lastHoldStateL3 = false;
+
+    bool lastPlayStateL4 = false;
+    bool lastHoldStateL4 = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessor)
 };

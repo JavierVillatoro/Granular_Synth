@@ -63,6 +63,7 @@ private:
     LayerControlsModule layer1Controls;
     LayerControlsModule layer2Controls;
     LayerControlsModule layer3Controls;
+    LayerControlsModule layer4Controls;
 
     Granular_SynthAudioProcessor& audioProcessor;
 
@@ -70,6 +71,7 @@ private:
     juce::AudioThumbnail thumbnail;
     juce::AudioThumbnail thumbnailL2;
     juce::AudioThumbnail thumbnailL3;
+    juce::AudioThumbnail thumbnailL4;
 
     EngineModule engineModule{ audioProcessor.apvts, "L1_" };
     ScanModule scanModule{ audioProcessor.apvts, "L1_" };
@@ -90,6 +92,9 @@ private:
 
     double zoomFactorL3 = 1.0;
     double viewStartRatioL3 = 0.0;
+
+    double zoomFactorL4 = 1.0;
+    double viewStartRatioL4 = 0.0;
 
     int lastDragX = 0;
     int activeLayer = 1;

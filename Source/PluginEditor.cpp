@@ -19,14 +19,17 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     layer1Controls(p.apvts, "L1_"),
     layer2Controls(p.apvts, "L2_"),
     layer3Controls(p.apvts, "L3_"),
+    layer4Controls(p.apvts, "L4_"),
     thumbnailCache(5),
     thumbnail(512, p.getFormatManager(), thumbnailCache),
     thumbnailL2(512, p.getFormatManager(), thumbnailCache),
-    thumbnailL3(512, p.getFormatManager(), thumbnailCache)
+    thumbnailL3(512, p.getFormatManager(), thumbnailCache),
+    thumbnailL4(512, p.getFormatManager(), thumbnailCache)
 {
     thumbnail.addChangeListener(this);
     thumbnailL2.addChangeListener(this);
     thumbnailL3.addChangeListener(this);
+    thumbnailL4.addChangeListener(this);
     setSize(1200, 750);
 
     addAndMakeVisible(scanModule);
@@ -43,6 +46,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(layer1Controls);
     addAndMakeVisible(layer2Controls);
     addAndMakeVisible(layer3Controls);
+    addAndMakeVisible(layer4Controls);
     addAndMakeVisible(mixerModule1);
 
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
@@ -57,6 +61,10 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("L3_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L3_SHAPE", this);
 
+    audioProcessor.apvts.addParameterListener("L4_POSITION", this);
+    audioProcessor.apvts.addParameterListener("L4_GRAIN_SIZE", this);
+    audioProcessor.apvts.addParameterListener("L4_SHAPE", this);
+
     startTimerHz(30);
 
     if (audioProcessor.isAudioLoadedL1 && audioProcessor.lastLoadedFilePathL1.isNotEmpty())
@@ -65,6 +73,8 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
         thumbnailL2.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL2)));
     if (audioProcessor.isAudioLoadedL3 && audioProcessor.lastLoadedFilePathL3.isNotEmpty())
         thumbnailL3.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL3)));
+    if (audioProcessor.isAudioLoadedL4 && audioProcessor.lastLoadedFilePathL4.isNotEmpty())
+        thumbnailL4.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL4)));
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
@@ -83,6 +93,11 @@ Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
     audioProcessor.apvts.removeParameterListener("L3_GRAIN_SIZE", this);
     audioProcessor.apvts.removeParameterListener("L3_SHAPE", this);
     thumbnailL3.removeChangeListener(this);
+
+    audioProcessor.apvts.removeParameterListener("L4_POSITION", this);
+    audioProcessor.apvts.removeParameterListener("L4_GRAIN_SIZE", this);
+    audioProcessor.apvts.removeParameterListener("L4_SHAPE", this);
+    thumbnailL4.removeChangeListener(this);
 }
 
 void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
@@ -125,13 +140,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float currentPosition = positionParam->load();
             float sizeRatio = grainSizeParam->load();
             float shapeValue = shapeParamVal->load();
-
             float winStart = audioProcessor.windowStartRatioL1.load();
             float winLen = audioProcessor.windowLengthRatioL1.load();
 
             float absolutePos = winStart + (currentPosition * winLen);
             double cursorTimeSeconds = absolutePos * totalAudioSeconds;
-
             float activeAudioSeconds = (float)totalAudioSeconds * winLen;
             float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
 
@@ -213,7 +226,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float currentPositionL2 = posParamL2->load();
             float sizeRatioL2 = sizeParamL2->load();
             float shapeValueL2 = shapeParamL2->load();
-
             float winStartL2 = audioProcessor.windowStartRatioL2.load();
             float winLenL2 = audioProcessor.windowLengthRatioL2.load();
 
@@ -300,7 +312,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             float currentPositionL3 = posParamL3->load();
             float sizeRatioL3 = sizeParamL3->load();
             float shapeValueL3 = shapeParamL3->load();
-
             float winStartL3 = audioProcessor.windowStartRatioL3.load();
             float winLenL3 = audioProcessor.windowLengthRatioL3.load();
 
@@ -361,17 +372,99 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         }
     }
 
-    g.setColour(juce::Colours::white.withAlpha(0.1f));
-    for (int i = 0; i < 1; ++i) // AHORA SOLO QUEDA 1 HUECO LIBRE
+    // ==========================================================
+    // --- CAPA 4 (VERDE LIMA) ---
+    // ==========================================================
+    auto layer4Area = wavesArea.removeFromTop(layerHeight);
+    g.setColour(juce::Colours::lime.withAlpha(0.6f));
+    g.drawRect(layer4Area, 2);
+
+    if (thumbnailL4.getNumChannels() > 0)
     {
-        g.drawRect(wavesArea.removeFromTop(layerHeight), 1);
+        double totalAudioSecondsL4 = thumbnailL4.getTotalLength();
+        double visibleSecondsL4 = totalAudioSecondsL4 / zoomFactorL4;
+        double startTimeL4 = viewStartRatioL4 * totalAudioSecondsL4;
+        double endTimeL4 = startTimeL4 + visibleSecondsL4;
+
+        g.setColour(juce::Colours::lime);
+        thumbnailL4.drawChannel(g, layer4Area.reduced(2), startTimeL4, endTimeL4, 0, 1.0f);
+
+        auto posParamL4 = audioProcessor.apvts.getRawParameterValue("L4_POSITION");
+        auto sizeParamL4 = audioProcessor.apvts.getRawParameterValue("L4_GRAIN_SIZE");
+        auto shapeParamL4 = audioProcessor.apvts.getRawParameterValue("L4_SHAPE");
+
+        if (posParamL4 != nullptr && sizeParamL4 != nullptr && shapeParamL4 != nullptr)
+        {
+            float currentPositionL4 = posParamL4->load();
+            float sizeRatioL4 = sizeParamL4->load();
+            float shapeValueL4 = shapeParamL4->load();
+            float winStartL4 = audioProcessor.windowStartRatioL4.load();
+            float winLenL4 = audioProcessor.windowLengthRatioL4.load();
+
+            float absolutePosL4 = winStartL4 + (currentPositionL4 * winLenL4);
+            double cursorTimeSecondsL4 = absolutePosL4 * totalAudioSecondsL4;
+            float activeAudioSecondsL4 = (float)totalAudioSecondsL4 * winLenL4;
+            float grainSizeSecondsL4 = juce::jmax(0.01f, sizeRatioL4 * activeAudioSecondsL4);
+
+            float cursorXL4 = layer4Area.getX() + ((cursorTimeSecondsL4 - startTimeL4) / visibleSecondsL4) * layer4Area.getWidth();
+            float grainWidthPixelsL4 = (grainSizeSecondsL4 / visibleSecondsL4) * layer4Area.getWidth();
+            grainWidthPixelsL4 = juce::jmax(3.0f, grainWidthPixelsL4);
+
+            juce::Rectangle<float> grainWindowL4(cursorXL4 - (grainWidthPixelsL4 / 2.0f), layer4Area.getY(), grainWidthPixelsL4, layer4Area.getHeight());
+            juce::Path grainPathL4;
+            grainPathL4.startNewSubPath(grainWindowL4.getX(), grainWindowL4.getBottom());
+
+            for (float x = 0; x <= grainWindowL4.getWidth(); x += 1.0f) {
+                float progress = x / grainWindowL4.getWidth();
+                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
+                float amplitude = (hann * (1.0f - shapeValueL4)) + (square * shapeValueL4);
+                float yPos = grainWindowL4.getBottom() - (amplitude * grainWindowL4.getHeight());
+                grainPathL4.lineTo(grainWindowL4.getX() + x, yPos);
+            }
+            grainPathL4.lineTo(grainWindowL4.getRight(), grainWindowL4.getBottom());
+            grainPathL4.closeSubPath();
+
+            g.setColour(juce::Colours::lime.withAlpha(0.3f));
+            g.fillPath(grainPathL4);
+            g.setColour(juce::Colours::lime.withAlpha(0.8f));
+            g.strokePath(grainPathL4, juce::PathStrokeType(1.5f));
+
+            g.setColour(juce::Colours::white.withAlpha(0.9f));
+            g.drawLine(cursorXL4, layer4Area.getY(), cursorXL4, layer4Area.getBottom(), 2.0f);
+        }
+
+        auto& synthL4 = audioProcessor.getSynthesiserL4();
+        for (int i = 0; i < synthL4.getNumVoices(); ++i) {
+            if (auto* voice = dynamic_cast<GranularVoice*>(synthL4.getVoice(i))) {
+                for (int g_idx = 0; g_idx < 128; ++g_idx) {
+                    float env = voice->visualGrainEnv[g_idx].load();
+                    if (env > 0.001f) {
+                        float pos = voice->visualGrainPos[g_idx].load();
+                        double grainTimeSeconds = pos * totalAudioSecondsL4;
+                        float xPixel = layer4Area.getX() + ((grainTimeSeconds - startTimeL4) / visibleSecondsL4) * layer4Area.getWidth();
+
+                        if (xPixel >= layer4Area.getX() && xPixel <= layer4Area.getRight()) {
+                            float maxLineHeight = layer4Area.getHeight() * 0.8f;
+                            float currentHeight = maxLineHeight * env;
+                            float yCenter = layer4Area.getCentreY();
+                            float yStart = yCenter - (currentHeight / 2.0f);
+                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
+                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
+                        }
+                    }
+                }
+            }
+        }
     }
+
 
     // --- RESALTAR LA CAPA ACTIVA ---
     g.setColour(juce::Colours::white.withAlpha(0.8f));
     if (activeLayer == 1) g.drawRect(layer1Area, 2);
     else if (activeLayer == 2) g.drawRect(layer2Area, 2);
-    else if (activeLayer == 3) g.drawRect(layer3Area, 2); // Naranja Activo
+    else if (activeLayer == 3) g.drawRect(layer3Area, 2);
+    else if (activeLayer == 4) g.drawRect(layer4Area, 2); // Verde Lima Activo
 
     // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES
     g.setColour(juce::Colour(0xff121212));
@@ -437,6 +530,9 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
     layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 150, 20);
+
+    auto layer4Area = wavesArea.removeFromTop(layerHeight);
+    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 150, 20);
 
     auto area = rightMixerArea;
     auto rightColumn = area.removeFromRight(area.getWidth() * 0.35f);
@@ -506,6 +602,11 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
         audioProcessor.loadFile(filePath, 3);
         thumbnailL3.setSource(new juce::FileInputSource(juce::File(filePath)));
     }
+    // --- LÓGICA DE CARGA PARA LA CAPA 4 ---
+    else if (y >= layerHeight * 3) {
+        audioProcessor.loadFile(filePath, 4);
+        thumbnailL4.setSource(new juce::FileInputSource(juce::File(filePath)));
+    }
 }
 
 void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) { repaint(); }
@@ -520,6 +621,7 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
     auto layer1Area = bounds.removeFromTop(layerHeight);
     auto layer2Area = bounds.removeFromTop(layerHeight);
     auto layer3Area = bounds.removeFromTop(layerHeight);
+    auto layer4Area = bounds.removeFromTop(layerHeight);
 
     if (layer1Area.contains(event.getPosition()) && thumbnail.getTotalLength() > 0.0) {
         double mouseX = event.getPosition().x - layer1Area.getX();
@@ -560,6 +662,20 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
         audioProcessor.windowLengthRatioL3.store(1.0f / (float)zoomFactorL3);
         repaint();
     }
+    // --- LÓGICA DE ZOOM PARA LA CAPA 4 ---
+    else if (layer4Area.contains(event.getPosition()) && thumbnailL4.getTotalLength() > 0.0) {
+        double mouseX = event.getPosition().x - layer4Area.getX();
+        double mouseRatioInView = mouseX / (double)layer4Area.getWidth();
+        double timeUnderMouse = viewStartRatioL4 + (mouseRatioInView / zoomFactorL4);
+        double zoomMultiplier = (wheel.deltaY > 0) ? 1.2 : 1.0 / 1.2;
+        double newZoomFactorL4 = juce::jlimit(1.0, 50.0, zoomFactorL4 * zoomMultiplier);
+        viewStartRatioL4 = timeUnderMouse - (mouseRatioInView / newZoomFactorL4);
+        viewStartRatioL4 = juce::jlimit(0.0, 1.0 - (1.0 / newZoomFactorL4), viewStartRatioL4);
+        zoomFactorL4 = newZoomFactorL4;
+        audioProcessor.windowStartRatioL4.store((float)viewStartRatioL4);
+        audioProcessor.windowLengthRatioL4.store(1.0f / (float)zoomFactorL4);
+        repaint();
+    }
 }
 
 void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
@@ -572,6 +688,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     auto layer1Area = bounds.removeFromTop(layerHeight);
     auto layer2Area = bounds.removeFromTop(layerHeight);
     auto layer3Area = bounds.removeFromTop(layerHeight);
+    auto layer4Area = bounds.removeFromTop(layerHeight);
 
     auto updateModules = [&](int layer) {
         activeLayer = layer;
@@ -607,6 +724,14 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (auto* p = audioProcessor.apvts.getParameter("L3_POSITION")) p->setValueNotifyingHost(ratioInView);
         repaint();
     }
+    // --- LÓGICA DE SELECCIÓN PARA LA CAPA 4 ---
+    else if (layer4Area.contains(event.getPosition())) {
+        if (activeLayer != 4) { updateModules(4); repaint(); return; }
+        float clickX = event.getPosition().x - layer4Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer4Area.getWidth());
+        if (auto* p = audioProcessor.apvts.getParameter("L4_POSITION")) p->setValueNotifyingHost(ratioInView);
+        repaint();
+    }
 }
 
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
@@ -619,6 +744,7 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
     auto layer1Area = bounds.removeFromTop(layerHeight);
     auto layer2Area = bounds.removeFromTop(layerHeight);
     auto layer3Area = bounds.removeFromTop(layerHeight);
+    auto layer4Area = bounds.removeFromTop(layerHeight);
 
     if (layer1Area.contains(event.getPosition()) && activeLayer == 1) {
         float clickX = event.getPosition().x - layer1Area.getX();
@@ -636,6 +762,13 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
         float clickX = event.getPosition().x - layer3Area.getX();
         float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer3Area.getWidth());
         if (auto* p = audioProcessor.apvts.getParameter("L3_POSITION")) p->setValueNotifyingHost(ratioInView);
+        repaint();
+    }
+    // --- LÓGICA DE ARRASTRE PARA LA CAPA 4 ---
+    else if (layer4Area.contains(event.getPosition()) && activeLayer == 4) {
+        float clickX = event.getPosition().x - layer4Area.getX();
+        float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer4Area.getWidth());
+        if (auto* p = audioProcessor.apvts.getParameter("L4_POSITION")) p->setValueNotifyingHost(ratioInView);
         repaint();
     }
 }
