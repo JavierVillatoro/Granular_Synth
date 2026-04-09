@@ -26,6 +26,7 @@ void EnvelopeModule::setLayer(int layerIndex)
     if (layerIndex == 1) layerPrefix = "L1_";
     else if (layerIndex == 2) layerPrefix = "L2_";
     else if (layerIndex == 3) layerPrefix = "L3_";
+    else if (layerIndex == 4) layerPrefix = "L4_";
 
     repaint(); // Forzamos un redibujado para que cambie el color al instante
 }
@@ -56,6 +57,7 @@ void EnvelopeModule::paint(juce::Graphics& g)
     if (currentLayer == 1) layerColor = juce::Colours::cyan;
     else if (currentLayer == 2) layerColor = juce::Colours::magenta;
     else if (currentLayer == 3) layerColor = juce::Colours::orange;
+    else if (currentLayer == 4) layerColor = juce::Colours::lime;
 
     juce::Colour globalColor = juce::Colour(0xffd0d0d0); // Gris Titanio para el ENV2 (que es global)
 
@@ -98,8 +100,11 @@ void EnvelopeModule::drawEnvelope(juce::Graphics& g, juce::Rectangle<int> bounds
     g.strokePath(envPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
 
     float dotSize = 8.0f;
-    // Si es naranja, que los puntitos de la gráfica sean whitesmoke para más visibilidad
-    juce::Colour envDotColor = (envColor == juce::Colours::orange) ? juce::Colours::whitesmoke : juce::Colours::white;
+
+    juce::Colour envDotColor = juce::Colours::white;
+    if (envColor == juce::Colours::orange) envDotColor = juce::Colours::whitesmoke;
+    else if (envColor == juce::Colours::lime) envDotColor = juce::Colours::lightgrey.withAlpha(0.9f);
+
     g.setColour(envDotColor);
 
     g.fillEllipse(attackX - dotSize / 2, topY - dotSize / 2, dotSize, dotSize);

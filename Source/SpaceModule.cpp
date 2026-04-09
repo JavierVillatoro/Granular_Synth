@@ -52,6 +52,11 @@ void SpaceModule::setLayer(int layerIndex)
         layerColor = juce::Colours::orange;
         dotColor = juce::Colours::whitesmoke;
     }
+    else if (layerIndex == 4) {
+        layerPrefix = "L4_";
+        layerColor = juce::Colours::lime;
+        dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
+    }
 
     // Solo cambiamos el color y el cable del MIX (el independiente)
     mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);

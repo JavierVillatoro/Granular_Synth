@@ -52,6 +52,11 @@ void FilterModule::setLayer(int layerIndex)
         layerColor = juce::Colours::orange;
         dotColor = juce::Colours::whitesmoke;
     }
+    else if (layerIndex == 4) {
+        layerPrefix = "L4_";
+        layerColor = juce::Colours::lime;
+        dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
+    }
 
     hpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     resHpfKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
@@ -162,6 +167,7 @@ void FilterModule::paint(juce::Graphics& g)
     if (currentLayer == 1) layerColor = juce::Colours::cyan;
     else if (currentLayer == 2) layerColor = juce::Colours::magenta;
     else if (currentLayer == 3) layerColor = juce::Colours::orange;
+    else if (currentLayer == 4) layerColor = juce::Colours::lime;
 
     g.setColour(layerColor.withAlpha(0.05f));
     g.fillRoundedRectangle(graphArea.toFloat(), 5.0f);
@@ -238,7 +244,12 @@ void FilterModule::paint(juce::Graphics& g)
     juce::Point<float> lpfDot(getDotX(lpfVal), getDotY(lResVal));
 
     float dotRadius = 5.0f;
-    g.setColour(juce::Colours::white);
+
+    juce::Colour filterDotColor = juce::Colours::white;
+    if (currentLayer == 3) filterDotColor = juce::Colours::whitesmoke;
+    else if (currentLayer == 4) filterDotColor = juce::Colours::lightgrey.withAlpha(0.9f);
+
+    g.setColour(filterDotColor);
     g.fillEllipse(hpfDot.getX() - dotRadius, hpfDot.getY() - dotRadius, dotRadius * 2, dotRadius * 2);
     g.fillEllipse(lpfDot.getX() - dotRadius, lpfDot.getY() - dotRadius, dotRadius * 2, dotRadius * 2);
 }
