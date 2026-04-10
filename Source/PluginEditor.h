@@ -23,6 +23,7 @@
 #include "BpmModule.h"
 #include "LayerControlsModule.h"
 #include "LayerMixerModule.h"
+#include "FxFormantModule.h"
 
 class Granular_SynthAudioProcessorEditor : public juce::AudioProcessorEditor,
     public juce::FileDragAndDropTarget,
@@ -83,6 +84,7 @@ private:
     LfoModule lfoModule{ audioProcessor.apvts };
     DistModule distModule{ audioProcessor.apvts, "L1_" };
     LayerMixerModule mixerModule1{ audioProcessor.apvts, "L1_" };
+    FxFormantModule vowelModule{ audioProcessor.apvts, "L1_" };
 
     double zoomFactor = 1.0;
     double viewStartRatio = 0.0;

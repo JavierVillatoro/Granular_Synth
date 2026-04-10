@@ -61,9 +61,23 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
         lpf[i].prepare(spec);
         lpf[i].setType(juce::dsp::StateVariableTPTFilterType::lowpass);
         lpf[i].reset();
+
         hpf[i].prepare(spec);
         hpf[i].setType(juce::dsp::StateVariableTPTFilterType::highpass);
         hpf[i].reset();
+
+        // --- PREPARAMOS LOS FILTROS DE FORMANTES COMO PASO-BANDA ---
+        formantF1[i].prepare(spec);
+        formantF1[i].setType(juce::dsp::StateVariableTPTFilterType::bandpass);
+        formantF1[i].reset();
+
+        formantF2[i].prepare(spec);
+        formantF2[i].setType(juce::dsp::StateVariableTPTFilterType::bandpass);
+        formantF2[i].reset();
+
+        formantF3[i].prepare(spec);
+        formantF3[i].setType(juce::dsp::StateVariableTPTFilterType::bandpass);
+        formantF3[i].reset();
     }
 
     ampAdsr.setSampleRate(getSampleRate());
@@ -95,7 +109,6 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             winStart = processor->windowStartRatioL3.load();
             winLen = processor->windowLengthRatioL3.load();
         }
-        // --- LA LÍNEA MÁGICA PARA LA CAPA 4 ---
         else if (myPrefix == "L4_") {
             currentBuffer = &processor->audioBufferL4;
             winStart = processor->windowStartRatioL4.load();
@@ -105,6 +118,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     if (currentBuffer == nullptr || currentBuffer->getNumSamples() == 0) return;
 
+    // --- LECTURA DE PARÁMETROS GENERALES ---
     float positionKnob = apvts->getRawParameterValue(myPrefix + "POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue(myPrefix + "GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue(myPrefix + "SCAN_SPEED")->load();
@@ -120,6 +134,45 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float filterHpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_HPF")->load();
     float filterResHpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_HPF")->load();
 
+    // --- SETUP DEL FILTRO VOWEL ---
+    float vowelX = apvts->getRawParameterValue(myPrefix + "VOWEL_X")->load();
+    float vowelY = apvts->getRawParameterValue(myPrefix + "VOWEL_Y")->load();
+    float vowelMix = apvts->getRawParameterValue(myPrefix + "VOWEL_MIX")->load();
+
+    if (vowelMix > 0.001f)
+    {
+        // 1. Mapear X (0-1) a 5 vocales (A, E, I, O, U)
+        float pos = vowelX * 4.0f;
+        int index = (int)pos;
+        float frac = pos - index;
+
+        // Diccionario de Formantes (F1, F2, F3) para cada vocal
+        const float f1_t[5] = { 730.0f, 530.0f, 270.0f, 400.0f, 320.0f };
+        const float f2_t[5] = { 1090.0f, 1840.0f, 2290.0f, 840.0f, 800.0f };
+        const float f3_t[5] = { 2440.0f, 2480.0f, 3010.0f, 2400.0f, 2250.0f };
+
+        // 2. Interpolar suavemente entre las vocales si estamos a medias
+        float f1 = (index >= 4) ? f1_t[4] : f1_t[index] + frac * (f1_t[index + 1] - f1_t[index]);
+        float f2 = (index >= 4) ? f2_t[4] : f2_t[index] + frac * (f2_t[index + 1] - f2_t[index]);
+        float f3 = (index >= 4) ? f3_t[4] : f3_t[index] + frac * (f3_t[index + 1] - f3_t[index]);
+
+        // 3. Aplicar "Shift" basado en el Eje Y (Garganta grande/pequeña)
+        float shiftMap = 0.5f + vowelY; // Rango de 0.5x a 1.5x
+        f1 = juce::jlimit(20.0f, 20000.0f, f1 * shiftMap);
+        f2 = juce::jlimit(20.0f, 20000.0f, f2 * shiftMap);
+        f3 = juce::jlimit(20.0f, 20000.0f, f3 * shiftMap);
+
+        // 4. Aplicar "Resonancia (Q)" basada en el Eje Y
+        float q = 1.0f + (vowelY * 15.0f); // Cuanto más arriba, más a láser/sintético suena
+
+        for (int i = 0; i < 2; ++i) {
+            formantF1[i].setCutoffFrequency(f1); formantF1[i].setResonance(q);
+            formantF2[i].setCutoffFrequency(f2); formantF2[i].setResonance(q);
+            formantF3[i].setCutoffFrequency(f3); formantF3[i].setResonance(q);
+        }
+    }
+
+    // --- SETUP DE ENVOLVENTES Y EQ ---
     ampAdsrParams.attack = apvts->getRawParameterValue(myPrefix + "AMP_A")->load();
     ampAdsrParams.decay = apvts->getRawParameterValue(myPrefix + "AMP_D")->load();
     ampAdsrParams.sustain = apvts->getRawParameterValue(myPrefix + "AMP_S")->load();
@@ -169,6 +222,9 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     float mixerVolGain = juce::Decibels::decibelsToGain(mixerVolDb);
 
+    // =======================================================================
+    // BUCLE DE AUDIO (MUESTRA A MUESTRA)
+    // =======================================================================
     for (int s = 0; s < numSamples; ++s)
     {
         autoScanOffset += (double)scanSpeed / (double)currentBuffer->getNumSamples();
@@ -290,8 +346,44 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         totalL = lpf[0].processSample(0, totalL);
         totalR = lpf[1].processSample(0, totalR);
 
-        totalL = std::tanh(totalL);
-        totalR = std::tanh(totalR);
+        // 1. Saturación base para darle armónicos al sonido ANTES de los filtros
+        float saturatedL = std::tanh(totalL);
+        float saturatedR = std::tanh(totalR);
+
+        // Dejamos el totalL y totalR originales LIMPIOS para la mezcla Dry
+        totalL = saturatedL;
+        totalR = saturatedR;
+
+        // --- APLICAR EL FILTRO VOWEL ---
+        if (vowelMix > 0.001f)
+        {
+            // 2. Pasamos la señal por los 3 picos paralelos
+            float wetL = formantF1[0].processSample(0, totalL) + formantF2[0].processSample(0, totalL) + formantF3[0].processSample(0, totalL);
+            float wetR = formantF1[1].processSample(0, totalR) + formantF2[1].processSample(0, totalR) + formantF3[1].processSample(0, totalR);
+
+            // 3. Control de Energía (El secreto de la transparencia)
+            // Dividimos entre 3 para compensar la suma de los 3 filtros
+            wetL *= 0.333f;
+            wetR *= 0.333f;
+
+            // Aplicamos un pequeño Makeup Gain mucho más controlado
+            float makeupGain = 1.2f;
+            wetL *= makeupGain;
+            wetR *= makeupGain;
+
+            // 4. Saturamos SOLO la voz para hacerla agresiva, sin manchar el Piano original
+            wetL = std::tanh(wetL);
+            wetR = std::tanh(wetR);
+
+            // 5. Mezcla de Potencia Constante (Constant Power Crossfade)
+            // Mantiene el volumen global idéntico al 0%, 50% y 100%
+            float dryGain = std::cos(vowelMix * juce::MathConstants<float>::halfPi);
+            float wetGain = std::sin(vowelMix * juce::MathConstants<float>::halfPi);
+
+            // Mezclamos la señal limpia (Dry) con la robótica (Wet) usando la curva perfecta
+            totalL = (totalL * dryGain) + (wetL * wetGain);
+            totalR = (totalR * dryGain) + (wetR * wetGain);
+        }
 
         totalL = eqLowFilter[0].processSample(totalL);
         totalR = eqLowFilter[1].processSample(totalR);

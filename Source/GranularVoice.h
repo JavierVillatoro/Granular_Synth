@@ -77,6 +77,11 @@ private:
     juce::dsp::StateVariableTPTFilter<float> lpf[2];
     juce::dsp::StateVariableTPTFilter<float> hpf[2];
 
+    // --- NUEVO: FILTROS DE FORMANTES (3 picos paralelos por canal) ---
+    juce::dsp::StateVariableTPTFilter<float> formantF1[2];
+    juce::dsp::StateVariableTPTFilter<float> formantF2[2];
+    juce::dsp::StateVariableTPTFilter<float> formantF3[2];
+
     juce::ADSR ampAdsr;
     juce::ADSR::Parameters ampAdsrParams;
 

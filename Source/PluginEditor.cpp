@@ -48,6 +48,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(layer3Controls);
     addAndMakeVisible(layer4Controls);
     addAndMakeVisible(mixerModule1);
+    addAndMakeVisible(vowelModule);
 
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
     audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
@@ -514,7 +515,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
     // Escribimos los títulos de los 4 Efectos
     g.setFont(11.0f);
-    g.drawText("VOWEL", vowelArea.withTrimmedTop(5), juce::Justification::centredTop);
+    //g.drawText("VOWEL", vowelArea.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("RESON", resArea.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("TAPE", tapeArea.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("STUTTER", stutterArea.withTrimmedTop(5), juce::Justification::centredTop);
@@ -585,6 +586,12 @@ void Granular_SynthAudioProcessorEditor::resized()
     fxArea = bottomHalf;
 
     mixerModule1.setBounds(mixerArea);
+
+    int fxW = fxArea.getWidth() / 2;
+    int fxH = fxArea.getHeight() / 2;
+    juce::Rectangle<int> vowelArea(fxArea.getX(), fxArea.getY(), fxW, fxH);
+
+    vowelModule.setBounds(vowelArea);
 
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
@@ -743,6 +750,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         distModule.setLayer(layer);
         envelopeModule.setLayer(layer);
         mixerModule1.setLayer(layer);
+        vowelModule.setLayer(layer);
         };
 
     if (layer1Area.contains(event.getPosition())) {
