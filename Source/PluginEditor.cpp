@@ -128,7 +128,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     int layerHeight = wavesArea.getHeight() / 4;
 
     // ==========================================================
-    // --- CAPA 1 (CYAN) --- Las formas de onda mantienen sus colores propios
+    // --- CAPA 1 (CYAN) --- 
     // ==========================================================
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     g.setColour(juce::Colours::cyan.withAlpha(0.6f));
@@ -471,9 +471,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         }
     }
 
-
     // --- RESALTAR LA CAPA ACTIVA ---
-    // Lo dejamos en blanco porque contrasta muy bien con cualquier capa, pero puedes cambiarlo a themeColor si prefieres
     g.setColour(juce::Colours::white.withAlpha(0.8f));
     if (activeLayer == 1) g.drawRect(layer1Area, 2);
     else if (activeLayer == 2) g.drawRect(layer2Area, 2);
@@ -486,7 +484,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xff121212));
     g.fillRect(rightMixerArea);
 
-    // APLICAMOS EL COLOR DEL TEMA A TODOS LOS BORDES
     g.setColour(themeColor.withAlpha(0.3f));
     g.drawRect(matrixArea, 1);
     g.drawRect(mixerArea, 1);
@@ -494,14 +491,12 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawRect(distArea, 1);
     g.drawRect(bpmArea, 1);
 
-    // --- DIBUJAMOS LA CUADRÍCULA FX 2x2 EN SU NUEVO ESPACIO ---
     g.setColour(themeColor.withAlpha(0.2f));
     g.drawRect(fxArea, 1);
 
     int fxW = fxArea.getWidth() / 2;
     int fxH = fxArea.getHeight() / 2;
 
-    // Aquí evitamos la duplicidad que causaba errores.
     juce::Rectangle<int> vowelAreaRect(fxArea.getX(), fxArea.getY(), fxW, fxH);
     juce::Rectangle<int> resAreaRect(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
     juce::Rectangle<int> tapeAreaRect(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
@@ -517,7 +512,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
-    // Escribimos los títulos de las 4 Voces (Usamos los Rectangles que acabamos de definir)
     g.setFont(11.0f);
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.drawText("VOICE 1", vowelAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
@@ -525,13 +519,16 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("VOICE 3", tapeAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("VOICE 4", stutterAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
 
+    // Ajustamos las listas de nombres debajo de los knobs
     std::vector<juce::StringArray> knobNames = {
         juce::StringArray {"Size", "Density", "Shape"}, juce::StringArray {"Pos", "Speed", "Dir"},
         juce::StringArray {"Pos", "Pitch", "Pan"}, juce::StringArray {"Trans", "Fine", "Scale"},
         juce::StringArray {"", "", ""}, juce::StringArray {"", "", "", ""},
-        juce::StringArray {"", "", ""}, juce::StringArray {"Size", "Fback", "Mix"}
+        juce::StringArray {"", "", ""}
     };
-    juce::StringArray moduleNames = { "ENGINE", "SCAN", "SPRAY", "PITCH", "", "", "", "SPACE" };
+
+    // Dejamos solo los de arriba, los de abajo ("LFO", "ENV", "FILTER") se quedan vacíos para limpiar
+    juce::StringArray moduleNames = { "ENGINE", "SCAN", "SPRAY", "PITCH", "", "", "" };
 
     int numColumns = 4, numRows = 2;
     int moduleWidth = bottomModulesArea.getWidth() / numColumns;
@@ -540,24 +537,44 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     int modIndex = 0;
     for (int row = 0; row < numRows; ++row) {
         for (int col = 0; col < numColumns; ++col) {
+            if (row == 1 && col == 3) continue; // Nos saltamos el último hueco
+
             juce::Rectangle<int> moduleRect(bottomModulesArea.getX() + (col * moduleWidth), bottomModulesArea.getY() + (row * moduleHeight), moduleWidth, moduleHeight);
 
-            // Borde dinámico para cada uno de los 8 módulos inferiores
             g.setColour(themeColor.withAlpha(0.2f));
             g.drawRect(moduleRect, 1);
 
-            g.setColour(juce::Colours::white.withAlpha(0.7f));
-            g.setFont(juce::Font(16.0f, juce::Font::bold));
-            g.drawText(moduleNames[modIndex], moduleRect.removeFromTop(30), juce::Justification::centred);
+            // ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA PARA DIBUJAR LOS TÍTULOS DE ARRIBA!
+            if (moduleNames[modIndex].isNotEmpty()) {
+                g.setColour(juce::Colours::white.withAlpha(0.7f));
+                g.setFont(juce::Font(16.0f, juce::Font::bold));
+                g.drawText(moduleNames[modIndex], moduleRect.removeFromTop(30), juce::Justification::centred);
+            }
+
             auto labelArea = moduleRect.removeFromBottom(25);
             int numKnobs = knobNames[modIndex].size();
-            int labelWidth = labelArea.getWidth() / numKnobs;
-            g.setFont(12.0f);
-            g.setColour(juce::Colours::white.withAlpha(0.4f));
-            for (int i = 0; i < numKnobs; ++i) g.drawText(knobNames[modIndex][i], labelArea.removeFromLeft(labelWidth), juce::Justification::centred);
+            if (numKnobs > 0) {
+                int labelWidth = labelArea.getWidth() / numKnobs;
+                g.setFont(12.0f);
+                g.setColour(juce::Colours::white.withAlpha(0.4f));
+                for (int i = 0; i < numKnobs; ++i) {
+                    g.drawText(knobNames[modIndex][i], labelArea.removeFromLeft(labelWidth), juce::Justification::centred);
+                }
+            }
             modIndex++;
         }
     }
+
+    // --- DIBUJAMOS EL 8º HUECO (CHOIR y SPACE) ---
+    juce::Rectangle<int> lastBlock(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
+    int halfW = lastBlock.getWidth() / 2;
+
+    juce::Rectangle<int> choirRect = lastBlock.removeFromLeft(halfW);
+    juce::Rectangle<int> spaceRect = lastBlock;
+
+    g.setColour(themeColor.withAlpha(0.2f));
+    g.drawRect(choirRect, 1);
+    g.drawRect(spaceRect, 1);
 }
 
 void Granular_SynthAudioProcessorEditor::resized()
@@ -568,6 +585,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto wavesArea = bounds;
     int layerHeight = wavesArea.getHeight() / 4;
 
+    // Capas
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     layer1Controls.setBounds(layer1Area.reduced(10).withHeight(20));
 
@@ -580,6 +598,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
     layer4Controls.setBounds(layer4Area.reduced(10).withHeight(20));
 
+    // Mixer / Master
     auto area = rightMixerArea;
     auto rightColumn = area.removeFromRight(area.getWidth() * 0.35f);
     auto leftColumn = area;
@@ -595,7 +614,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     int fxW = fxArea.getWidth() / 2;
     int fxH = fxArea.getHeight() / 2;
 
-    // Nombramos los rectángulos de forma única para que no choquen con paint()
+    // Pad XY Monjes (M1 a M4)
     juce::Rectangle<int> areaM1(fxArea.getX(), fxArea.getY(), fxW, fxH);
     juce::Rectangle<int> areaM2(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
     juce::Rectangle<int> areaM3(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
@@ -606,6 +625,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     monk3.setBounds(areaM3);
     monk4.setBounds(areaM4);
 
+    // Módulos verticales derechos (Master, Dist, BPM)
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distModule.setBounds(distArea);
@@ -613,6 +633,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     bpmArea = rightColumn;
     bpmModule.setBounds(bpmArea);
 
+    // Módulos inferiores (Fila 1 y 2)
     int moduleWidth = bottomModulesArea.getWidth() / 4;
     int moduleHeight = bottomModulesArea.getHeight() / 2;
 
@@ -624,14 +645,23 @@ void Granular_SynthAudioProcessorEditor::resized()
     sprayModule.setBounds(module3Rect);
     juce::Rectangle<int> module4Rect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY(), moduleWidth, moduleHeight);
     pitchModule.setBounds(module4Rect);
+
     juce::Rectangle<int> lfoRect(bottomModulesArea.getX(), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     lfoModule.setBounds(lfoRect);
     juce::Rectangle<int> envRect(bottomModulesArea.getX() + moduleWidth, bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     envelopeModule.setBounds(envRect);
     juce::Rectangle<int> filterRect(bottomModulesArea.getX() + (moduleWidth * 2), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     filterModule.setBounds(filterRect);
-    juce::Rectangle<int> spaceRect(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
-    spaceModule.setBounds(spaceRect);
+
+    
+    juce::Rectangle<int> lastBlock(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
+    int halfW = lastBlock.getWidth() / 2;
+
+    juce::Rectangle<int> choirRect = lastBlock.removeFromLeft(halfW);
+    juce::Rectangle<int> spaceRect = lastBlock; // Space se queda con la mitad derecha
+
+    // Ahora sí, le pasamos el rectángulo correcto al módulo
+    spaceModule.setBounds(spaceRect.reduced(2));
 }
 
 bool Granular_SynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files)

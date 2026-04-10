@@ -1,3 +1,9 @@
+/*
+  ==============================================================================
+    SpaceModule.cpp
+  ==============================================================================
+*/
+
 #include "SpaceModule.h"
 
 SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
@@ -13,6 +19,26 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
     setupKnob(fbackKnob);
     setupKnob(mixKnob);
 
+    // Inicializar Labels (Textos debajo de los knobs)
+    sizeLabel.setText("Size", juce::dontSendNotification);
+    sizeLabel.setJustificationType(juce::Justification::centred);
+    sizeLabel.setFont(juce::Font(12.0f, juce::Font::bold));
+    sizeLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+    addAndMakeVisible(sizeLabel);
+
+    fbackLabel.setText("Fback", juce::dontSendNotification);
+    fbackLabel.setJustificationType(juce::Justification::centred);
+    fbackLabel.setFont(juce::Font(12.0f, juce::Font::bold));
+    fbackLabel.setColour(juce::Label::textColourId, juce::Colours::white.withAlpha(0.5f));
+    addAndMakeVisible(fbackLabel);
+
+    // Texto de Mix en GRIS CLARO y fijo
+    mixLabel.setText("Mix", juce::dontSendNotification);
+    mixLabel.setJustificationType(juce::Justification::centred);
+    mixLabel.setFont(juce::Font(14.0f, juce::Font::bold));
+    mixLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    addAndMakeVisible(mixLabel);
+
     juce::Colour titaniumColor = juce::Colour(0xffd0d0d0);
     auto setKnobPlatino = [&](juce::Slider& k) {
         k.setColour(juce::Slider::rotarySliderOutlineColourId, titaniumColor.withAlpha(0.2f));
@@ -20,7 +46,6 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
         k.setColour(juce::Slider::thumbColourId, titaniumColor);
         };
 
-    // Size y Feedback son siempre grises (globales)
     setKnobPlatino(sizeKnob);
     setKnobPlatino(fbackKnob);
 
@@ -31,6 +56,8 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
 }
 
 SpaceModule::~SpaceModule() {}
+
+void SpaceModule::paint(juce::Graphics& g) {}
 
 void SpaceModule::setLayer(int layerIndex)
 {
@@ -58,7 +85,7 @@ void SpaceModule::setLayer(int layerIndex)
         dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
     }
 
-    // Solo cambiamos el color y el cable del MIX (el independiente)
+    // Solo cambiamos el color del anillo del Mix, NO de la letra
     mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     mixKnob.setColour(juce::Slider::thumbColourId, dotColor);
 
@@ -68,9 +95,29 @@ void SpaceModule::setLayer(int layerIndex)
 
 void SpaceModule::resized()
 {
-    auto area = getLocalBounds().reduced(10);
-    int widthUnit = area.getWidth() / 3;
-    sizeKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
-    fbackKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
-    mixKnob.setBounds(area.removeFromLeft(widthUnit).reduced(5));
+    auto area = getLocalBounds().reduced(2);
+
+    // Dividimos exactamente al 50% para que Size/Fback sean tan grandes como Mix
+    auto topArea = area.removeFromTop(area.getHeight() * 0.5f);
+    auto bottomArea = area;
+
+    // --- FILA SUPERIOR: Size y Feedback ---
+    int halfTopWidth = topArea.getWidth() / 2;
+
+    // Ajustamos al máximo: quitamos márgenes internos para que el knob crezca
+    auto sizeCell = topArea.removeFromLeft(halfTopWidth);
+    auto sizeLabelArea = sizeCell.removeFromBottom(15);
+    sizeKnob.setBounds(sizeCell);
+    sizeLabel.setBounds(sizeLabelArea);
+
+    auto fbackCell = topArea;
+    auto fbackLabelArea = fbackCell.removeFromBottom(15);
+    fbackKnob.setBounds(fbackCell);
+    fbackLabel.setBounds(fbackLabelArea);
+
+    // --- FILA INFERIOR: MIX GIGANTE ---
+    auto mixLabelArea = bottomArea.removeFromBottom(15);
+    int mixSize = juce::jmin(bottomArea.getWidth(), bottomArea.getHeight()) - 2;
+    mixKnob.setBounds(bottomArea.withSizeKeepingCentre(mixSize, mixSize));
+    mixLabel.setBounds(mixLabelArea);
 }
