@@ -124,13 +124,13 @@ void LayerMixerModule::paint(juce::Graphics& g)
 
 void LayerMixerModule::resized()
 {
-    auto area = getLocalBounds();
-    auto leftSection = area.removeFromLeft(area.getWidth() * 0.4f).reduced(5);
+    // Ahora usamos todo el espacio, porque el editor ya nos ha recortado el ancho
+    auto area = getLocalBounds().reduced(5);
 
-    auto faderArea = leftSection.removeFromRight(leftSection.getWidth() * 0.35f);
+    auto faderArea = area.removeFromRight(area.getWidth() * 0.35f);
     volumeFader.setBounds(faderArea.reduced(2, 12));
 
-    auto eqArea = leftSection;
+    auto eqArea = area;
     int knobHeight = eqArea.getHeight() / 4;
 
     eqHigh.setBounds(eqArea.removeFromTop(knobHeight).reduced(3));

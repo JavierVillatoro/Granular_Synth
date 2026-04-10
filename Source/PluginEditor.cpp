@@ -102,20 +102,29 @@ Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 
 void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff121212));
+    // ==========================================================
+    // --- 1. MAGIA DE COLOR: TEMA DINÁMICO SEGÚN LA CAPA ---
+    // ==========================================================
+    juce::Colour themeColor = juce::Colours::cyan; // Capa 1 por defecto
+    if (activeLayer == 2) themeColor = juce::Colours::magenta;
+    else if (activeLayer == 3) themeColor = juce::Colours::orange;
+    else if (activeLayer == 4) themeColor = juce::Colours::lime;
+
+    g.fillAll(juce::Colour(0xff121212)); // Fondo oscuro global
 
     auto bounds = getLocalBounds();
     auto bottomModulesArea = bounds.removeFromBottom(300);
     auto rightMixerArea = bounds.removeFromRight(350);
     auto wavesArea = bounds;
 
-    g.setColour(juce::Colours::cyan.withAlpha(0.3f));
+    // Borde general de las ondas usando el color dinámico
+    g.setColour(themeColor.withAlpha(0.3f));
     g.drawRect(wavesArea, 1);
 
     int layerHeight = wavesArea.getHeight() / 4;
 
     // ==========================================================
-    // --- CAPA 1 (CYAN) ---
+    // --- CAPA 1 (CYAN) --- Las formas de onda mantienen sus colores propios
     // ==========================================================
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     g.setColour(juce::Colours::cyan.withAlpha(0.6f));
@@ -460,27 +469,55 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
 
     // --- RESALTAR LA CAPA ACTIVA ---
+    // Lo dejamos en blanco porque contrasta muy bien con cualquier capa, pero puedes cambiarlo a themeColor si prefieres
     g.setColour(juce::Colours::white.withAlpha(0.8f));
     if (activeLayer == 1) g.drawRect(layer1Area, 2);
     else if (activeLayer == 2) g.drawRect(layer2Area, 2);
     else if (activeLayer == 3) g.drawRect(layer3Area, 2);
     else if (activeLayer == 4) g.drawRect(layer4Area, 2);
 
-    // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES
+    // ==========================================================
+    // --- 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES / FX ---
+    // ==========================================================
     g.setColour(juce::Colour(0xff121212));
     g.fillRect(rightMixerArea);
 
-    g.setColour(juce::Colours::cyan.withAlpha(0.3f));
+    // APLICAMOS EL COLOR DEL TEMA A TODOS LOS BORDES
+    g.setColour(themeColor.withAlpha(0.3f));
     g.drawRect(matrixArea, 1);
     g.drawRect(mixerArea, 1);
     g.drawRect(masterArea, 1);
     g.drawRect(distArea, 1);
     g.drawRect(bpmArea, 1);
 
+    // --- DIBUJAMOS LA CUADRÍCULA FX 2x2 EN SU NUEVO ESPACIO ---
+    g.setColour(themeColor.withAlpha(0.2f));
+    g.drawRect(fxArea, 1);
+
+    int fxW = fxArea.getWidth() / 2;
+    int fxH = fxArea.getHeight() / 2;
+
+    juce::Rectangle<int> vowelArea(fxArea.getX(), fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> resArea(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> tapeArea(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
+    juce::Rectangle<int> stutterArea(fxArea.getX() + fxW, fxArea.getY() + fxH, fxW, fxH);
+
+    g.drawRect(vowelArea, 1);
+    g.drawRect(resArea, 1);
+    g.drawRect(tapeArea, 1);
+    g.drawRect(stutterArea, 1);
+
     g.setColour(juce::Colours::white.withAlpha(0.7f));
     g.setFont(14.0f);
     g.drawText("MATRIX", matrixArea, juce::Justification::centred);
-    g.drawText("MIXER", mixerArea, juce::Justification::centred);
+    g.drawText("MIX", mixerArea, juce::Justification::centred);
+
+    // Escribimos los títulos de los 4 Efectos
+    g.setFont(11.0f);
+    g.drawText("VOWEL", vowelArea.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("RESON", resArea.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("TAPE", tapeArea.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("STUTTER", stutterArea.withTrimmedTop(5), juce::Justification::centredTop);
 
     std::vector<juce::StringArray> knobNames = {
         juce::StringArray {"Size", "Density", "Shape"}, juce::StringArray {"Pos", "Speed", "Dir"},
@@ -498,8 +535,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     for (int row = 0; row < numRows; ++row) {
         for (int col = 0; col < numColumns; ++col) {
             juce::Rectangle<int> moduleRect(bottomModulesArea.getX() + (col * moduleWidth), bottomModulesArea.getY() + (row * moduleHeight), moduleWidth, moduleHeight);
-            g.setColour(juce::Colours::cyan.withAlpha(0.2f));
+
+            // Borde dinámico para cada uno de los 8 módulos inferiores
+            g.setColour(themeColor.withAlpha(0.2f));
             g.drawRect(moduleRect, 1);
+
             g.setColour(juce::Colours::white.withAlpha(0.7f));
             g.setFont(juce::Font(16.0f, juce::Font::bold));
             g.drawText(moduleNames[modIndex], moduleRect.removeFromTop(30), juce::Justification::centred);
@@ -522,7 +562,6 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto wavesArea = bounds;
     int layerHeight = wavesArea.getHeight() / 4;
 
-    // Ampliamos la caja a todo el ancho, con 10px de margen
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     layer1Controls.setBounds(layer1Area.reduced(10).withHeight(20));
 
@@ -540,7 +579,11 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto leftColumn = area;
 
     matrixArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f);
-    mixerArea = leftColumn;
+
+    auto bottomHalf = leftColumn;
+    mixerArea = bottomHalf.removeFromLeft(bottomHalf.getWidth() * 0.45f);
+    fxArea = bottomHalf;
+
     mixerModule1.setBounds(mixerArea);
 
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);

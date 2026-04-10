@@ -104,6 +104,7 @@ private:
     juce::Rectangle<int> masterArea;
     juce::Rectangle<int> distArea;
     juce::Rectangle<int> bpmArea;
+    juce::Rectangle<int> fxArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessorEditor)
 };
