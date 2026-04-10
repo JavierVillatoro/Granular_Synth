@@ -83,14 +83,14 @@ void XYPad::mouseDrag(const juce::MouseEvent& e)
 
 
 // ==============================================================================
-// MÓDULO VOWEL PRINCIPAL
+// MÓDULO VOWEL PRINCIPAL (Ahora adaptado a Multivoz)
 // ==============================================================================
-FxFormantModule::FxFormantModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
-    : apvtsRef(apvts), layerPrefix(prefix), xyPad(apvts, prefix + "VOWEL_X", prefix + "VOWEL_Y")
+FxFormantModule::FxFormantModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix, int vId)
+    : apvtsRef(apvts), layerPrefix(prefix), voiceId(vId),
+    xyPad(apvts, prefix + "M" + juce::String(vId) + "_X", prefix + "M" + juce::String(vId) + "_Y")
 {
     addAndMakeVisible(xyPad);
 
-    // Barra que se rellena horizontalmente
     mixSlider.setSliderStyle(juce::Slider::LinearBar);
     mixSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
     addAndMakeVisible(mixSlider);
@@ -110,18 +110,21 @@ void FxFormantModule::setLayer(int layerIndex)
     else if (layerIndex == 3) { layerPrefix = "L3_"; currentBaseColor = juce::Colours::orange; }
     else if (layerIndex == 4) { layerPrefix = "L4_"; currentBaseColor = juce::Colours::lime; }
 
-    xyPad.updateParameters(layerPrefix + "VOWEL_X", layerPrefix + "VOWEL_Y");
+    // Generamos el sufijo específico de este monje (Ej: L1_M1)
+    juce::String vPrefix = layerPrefix + "M" + juce::String(voiceId);
+
+    xyPad.updateParameters(vPrefix + "_X", vPrefix + "_Y");
     xyPad.setColors(currentBaseColor);
 
-    // 3. La barra de Mix se llena con el color del layer seleccionado
     mixSlider.setColour(juce::Slider::trackColourId, currentBaseColor.withAlpha(0.6f));
     mixSlider.setColour(juce::Slider::backgroundColourId, juce::Colours::black.withAlpha(0.3f));
 
     mixAttach.reset();
-    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "VOWEL_MIX", mixSlider);
+    mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, vPrefix + "_MIX", mixSlider);
 
     repaint();
 }
+
 
 void FxFormantModule::timerCallback()
 {

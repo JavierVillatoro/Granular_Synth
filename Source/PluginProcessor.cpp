@@ -614,10 +614,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPACE_MIX", "Reverb Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
 
-            // FX: Vowel Formant
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_VOWEL_X", "Vowel X", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.0f));
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_VOWEL_Y", "Vowel Y", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
-            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_VOWEL_MIX", "Vowel Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+            // FX: 4 choral voices
+            for (int v = 1; v <= 4; ++v) {
+                juce::String vPref = prefix + "_M" + juce::String(v);
+                params.push_back(std::make_unique<juce::AudioParameterFloat>(vPref + "_X", "Voice " + juce::String(v) + " X", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+                params.push_back(std::make_unique<juce::AudioParameterFloat>(vPref + "_Y", "Voice " + juce::String(v) + " Y", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
+                params.push_back(std::make_unique<juce::AudioParameterFloat>(vPref + "_MIX", "Voice " + juce::String(v) + " Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+            }
 
             // Mixer & EQ
             juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
@@ -629,7 +632,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_HIGH", "EQ High", eqRange, 0.0f));
         };
 
-    // 3. ¡CREAMOS LAS 4 CAPAS!
+    // 4 layers
     addLayerParameters("L1");
     addLayerParameters("L2");
     addLayerParameters("L3");

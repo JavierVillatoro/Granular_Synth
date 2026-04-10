@@ -48,7 +48,10 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(layer3Controls);
     addAndMakeVisible(layer4Controls);
     addAndMakeVisible(mixerModule1);
-    addAndMakeVisible(vowelModule);
+    addAndMakeVisible(monk1);
+    addAndMakeVisible(monk2);
+    addAndMakeVisible(monk3);
+    addAndMakeVisible(monk4);
 
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
     audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
@@ -498,27 +501,29 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     int fxW = fxArea.getWidth() / 2;
     int fxH = fxArea.getHeight() / 2;
 
-    juce::Rectangle<int> vowelArea(fxArea.getX(), fxArea.getY(), fxW, fxH);
-    juce::Rectangle<int> resArea(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
-    juce::Rectangle<int> tapeArea(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
-    juce::Rectangle<int> stutterArea(fxArea.getX() + fxW, fxArea.getY() + fxH, fxW, fxH);
+    // Aquí evitamos la duplicidad que causaba errores.
+    juce::Rectangle<int> vowelAreaRect(fxArea.getX(), fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> resAreaRect(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> tapeAreaRect(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
+    juce::Rectangle<int> stutterAreaRect(fxArea.getX() + fxW, fxArea.getY() + fxH, fxW, fxH);
 
-    g.drawRect(vowelArea, 1);
-    g.drawRect(resArea, 1);
-    g.drawRect(tapeArea, 1);
-    g.drawRect(stutterArea, 1);
+    g.drawRect(vowelAreaRect, 1);
+    g.drawRect(resAreaRect, 1);
+    g.drawRect(tapeAreaRect, 1);
+    g.drawRect(stutterAreaRect, 1);
 
     g.setColour(juce::Colours::white.withAlpha(0.7f));
     g.setFont(14.0f);
     g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
-    // Escribimos los títulos de los 4 Efectos
+    // Escribimos los títulos de las 4 Voces (Usamos los Rectangles que acabamos de definir)
     g.setFont(11.0f);
-    //g.drawText("VOWEL", vowelArea.withTrimmedTop(5), juce::Justification::centredTop);
-    g.drawText("RESON", resArea.withTrimmedTop(5), juce::Justification::centredTop);
-    g.drawText("TAPE", tapeArea.withTrimmedTop(5), juce::Justification::centredTop);
-    g.drawText("STUTTER", stutterArea.withTrimmedTop(5), juce::Justification::centredTop);
+    g.setColour(juce::Colours::white.withAlpha(0.6f));
+    g.drawText("VOICE 1", vowelAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("VOICE 2", resAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("VOICE 3", tapeAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
+    g.drawText("VOICE 4", stutterAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
 
     std::vector<juce::StringArray> knobNames = {
         juce::StringArray {"Size", "Density", "Shape"}, juce::StringArray {"Pos", "Speed", "Dir"},
@@ -589,9 +594,17 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     int fxW = fxArea.getWidth() / 2;
     int fxH = fxArea.getHeight() / 2;
-    juce::Rectangle<int> vowelArea(fxArea.getX(), fxArea.getY(), fxW, fxH);
 
-    vowelModule.setBounds(vowelArea);
+    // Nombramos los rectángulos de forma única para que no choquen con paint()
+    juce::Rectangle<int> areaM1(fxArea.getX(), fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> areaM2(fxArea.getX() + fxW, fxArea.getY(), fxW, fxH);
+    juce::Rectangle<int> areaM3(fxArea.getX(), fxArea.getY() + fxH, fxW, fxH);
+    juce::Rectangle<int> areaM4(fxArea.getX() + fxW, fxArea.getY() + fxH, fxW, fxH);
+
+    monk1.setBounds(areaM1);
+    monk2.setBounds(areaM2);
+    monk3.setBounds(areaM3);
+    monk4.setBounds(areaM4);
 
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
@@ -750,7 +763,10 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         distModule.setLayer(layer);
         envelopeModule.setLayer(layer);
         mixerModule1.setLayer(layer);
-        vowelModule.setLayer(layer);
+        monk1.setLayer(layer);
+        monk2.setLayer(layer);
+        monk3.setLayer(layer);
+        monk4.setLayer(layer);
         };
 
     if (layer1Area.contains(event.getPosition())) {

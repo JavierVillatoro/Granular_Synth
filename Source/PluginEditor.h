@@ -84,7 +84,10 @@ private:
     LfoModule lfoModule{ audioProcessor.apvts };
     DistModule distModule{ audioProcessor.apvts, "L1_" };
     LayerMixerModule mixerModule1{ audioProcessor.apvts, "L1_" };
-    FxFormantModule vowelModule{ audioProcessor.apvts, "L1_" };
+    FxFormantModule monk1{ audioProcessor.apvts, "L1_", 1 };
+    FxFormantModule monk2{ audioProcessor.apvts, "L1_", 2 };
+    FxFormantModule monk3{ audioProcessor.apvts, "L1_", 3 };
+    FxFormantModule monk4{ audioProcessor.apvts, "L1_", 4 };
 
     double zoomFactor = 1.0;
     double viewStartRatio = 0.0;

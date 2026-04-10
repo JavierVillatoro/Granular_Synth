@@ -36,7 +36,8 @@ private:
 class FxFormantModule : public juce::Component, public juce::Timer
 {
 public:
-    FxFormantModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix);
+    // Aquí está el int vId que le faltaba al compilador
+    FxFormantModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix, int vId);
     ~FxFormantModule() override;
 
     void setLayer(int layerIndex);
@@ -48,6 +49,10 @@ private:
     juce::AudioProcessorValueTreeState& apvtsRef;
     juce::String layerPrefix;
     int currentLayer = 1;
+
+    // Aquí está la variable que decía que "no estaba definida"
+    int voiceId;
+
     juce::Colour currentBaseColor = juce::Colours::cyan;
 
     XYPad xyPad;

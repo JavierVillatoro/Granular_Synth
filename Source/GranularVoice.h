@@ -1,10 +1,8 @@
 /*
   ==============================================================================
-
     GranularVoice.h
     Created: 15 Mar 2026 7:08:37pm
     Author:  franc
-
   ==============================================================================
 */
 
@@ -30,7 +28,6 @@ public:
 class GranularVoice : public juce::SynthesiserVoice
 {
 public:
-    // EL NUEVO CONSTRUCTOR UNIVERSAL
     GranularVoice(juce::AudioBuffer<float>* buffer, juce::AudioProcessorValueTreeState* apvtsToUse, juce::String prefix);
 
     float currentLfo1Value = 0.0f;
@@ -69,18 +66,16 @@ private:
     float currentVelocity = 0.0f;
     float pitchRatio = 1.0f;
 
-    // --- LAS LLAVES PRIVADAS DE ESTA VOZ ---
     juce::AudioBuffer<float>* myBuffer;
     juce::AudioProcessorValueTreeState* apvts;
-    juce::String myPrefix; // Guardará "L1_" o "L2_" o "L3_"
+    juce::String myPrefix;
 
     juce::dsp::StateVariableTPTFilter<float> lpf[2];
     juce::dsp::StateVariableTPTFilter<float> hpf[2];
 
-    // --- NUEVO: FILTROS DE FORMANTES (3 picos paralelos por canal) ---
-    juce::dsp::StateVariableTPTFilter<float> formantF1[2];
-    juce::dsp::StateVariableTPTFilter<float> formantF2[2];
-    juce::dsp::StateVariableTPTFilter<float> formantF3[2];
+    // --- NUEVO: 4 MONJES x 3 PICOS FORMANTES x 2 CANALES ---
+    // formantF[monje][pico][canal]
+    juce::dsp::StateVariableTPTFilter<float> formantFilters[4][3][2];
 
     juce::ADSR ampAdsr;
     juce::ADSR::Parameters ampAdsrParams;
