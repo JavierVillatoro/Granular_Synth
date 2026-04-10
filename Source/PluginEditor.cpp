@@ -464,7 +464,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     if (activeLayer == 1) g.drawRect(layer1Area, 2);
     else if (activeLayer == 2) g.drawRect(layer2Area, 2);
     else if (activeLayer == 3) g.drawRect(layer3Area, 2);
-    else if (activeLayer == 4) g.drawRect(layer4Area, 2); // Verde Lima Activo
+    else if (activeLayer == 4) g.drawRect(layer4Area, 2);
 
     // 4. DIBUJAMOS LA ZONA DEL MIXER / ENVELOPES
     g.setColour(juce::Colour(0xff121212));
@@ -522,17 +522,18 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto wavesArea = bounds;
     int layerHeight = wavesArea.getHeight() / 4;
 
+    // Ampliamos la caja a todo el ancho, con 10px de margen
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 150, 20);
+    layer1Controls.setBounds(layer1Area.reduced(10).withHeight(20));
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 150, 20);
+    layer2Controls.setBounds(layer2Area.reduced(10).withHeight(20));
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 150, 20);
+    layer3Controls.setBounds(layer3Area.reduced(10).withHeight(20));
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 150, 20);
+    layer4Controls.setBounds(layer4Area.reduced(10).withHeight(20));
 
     auto area = rightMixerArea;
     auto rightColumn = area.removeFromRight(area.getWidth() * 0.35f);
@@ -602,7 +603,6 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
         audioProcessor.loadFile(filePath, 3);
         thumbnailL3.setSource(new juce::FileInputSource(juce::File(filePath)));
     }
-    // --- LÓGICA DE CARGA PARA LA CAPA 4 ---
     else if (y >= layerHeight * 3) {
         audioProcessor.loadFile(filePath, 4);
         thumbnailL4.setSource(new juce::FileInputSource(juce::File(filePath)));
@@ -662,7 +662,6 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
         audioProcessor.windowLengthRatioL3.store(1.0f / (float)zoomFactorL3);
         repaint();
     }
-    // --- LÓGICA DE ZOOM PARA LA CAPA 4 ---
     else if (layer4Area.contains(event.getPosition()) && thumbnailL4.getTotalLength() > 0.0) {
         double mouseX = event.getPosition().x - layer4Area.getX();
         double mouseRatioInView = mouseX / (double)layer4Area.getWidth();
@@ -724,7 +723,6 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         if (auto* p = audioProcessor.apvts.getParameter("L3_POSITION")) p->setValueNotifyingHost(ratioInView);
         repaint();
     }
-    // --- LÓGICA DE SELECCIÓN PARA LA CAPA 4 ---
     else if (layer4Area.contains(event.getPosition())) {
         if (activeLayer != 4) { updateModules(4); repaint(); return; }
         float clickX = event.getPosition().x - layer4Area.getX();
@@ -764,7 +762,6 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
         if (auto* p = audioProcessor.apvts.getParameter("L3_POSITION")) p->setValueNotifyingHost(ratioInView);
         repaint();
     }
-    // --- LÓGICA DE ARRASTRE PARA LA CAPA 4 ---
     else if (layer4Area.contains(event.getPosition()) && activeLayer == 4) {
         float clickX = event.getPosition().x - layer4Area.getX();
         float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer4Area.getWidth());

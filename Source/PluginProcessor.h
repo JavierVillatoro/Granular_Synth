@@ -146,5 +146,10 @@ private:
     bool lastPlayStateL4 = false;
     bool lastHoldStateL4 = false;
 
+    float lastMuteGainL1 = 1.0f;
+    float lastMuteGainL2 = 1.0f;
+    float lastMuteGainL3 = 1.0f;
+    float lastMuteGainL4 = 1.0f;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessor)
 };

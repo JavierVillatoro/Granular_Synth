@@ -441,6 +441,42 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     applyEffectsToLayer(renderBufferL3, "L3_", reverbL3);
     applyEffectsToLayer(renderBufferL4, "L4_", reverbL4);
 
+    // --- LEEMOS LOS MUTES ---
+    //bool isMutedL1 = apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f;
+    //bool isMutedL2 = apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f;
+    //bool isMutedL3 = apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f;
+    //bool isMutedL4 = apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f;
+
+    // --- LEEMOS LOS MUTES Y APLICAMOS FADES (Anti-Click) ---
+    // Si Mute está activado el objetivo es 0.0f (Silencio), si no, es 1.0f (Volumen a tope)
+    float targetMuteL1 = apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
+    float targetMuteL2 = apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
+    float targetMuteL3 = apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
+    float targetMuteL4 = apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
+
+    // applyGainRamp hace un "fade" súper rápido de 5 milisegundos. ¡Adiós clicks!
+    renderBufferL1.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL1, targetMuteL1);
+    renderBufferL2.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL2, targetMuteL2);
+    renderBufferL3.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL3, targetMuteL3);
+    renderBufferL4.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL4, targetMuteL4);
+
+    // Guardamos el volumen en el que nos hemos quedado para el siguiente bloque
+    lastMuteGainL1 = targetMuteL1;
+    lastMuteGainL2 = targetMuteL2;
+    lastMuteGainL3 = targetMuteL3;
+    lastMuteGainL4 = targetMuteL4;
+
+    // --- SUMADOR AL MASTER (Con Mutes Aplicados) ---
+    //for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
+        //if (!isMutedL1) buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
+        //if (!isMutedL2) buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
+        //if (!isMutedL3) buffer.addFrom(ch, 0, renderBufferL3, ch, 0, buffer.getNumSamples());
+        //if (!isMutedL4) buffer.addFrom(ch, 0, renderBufferL4, ch, 0, buffer.getNumSamples());
+    //}
+
+    // --- SUMADOR AL MASTER ---
+    // Ahora sumamos todas las capas SIEMPRE. Si una capa está muteada, 
+    // su renderBuffer estará multiplicado por 0, así que no sonará nada.
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
         buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
         buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
@@ -538,10 +574,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // ==============================================================================
     auto addLayerParameters = [&](juce::String prefix)
         {
-            // Controles Base
+            // Controles Base (MUTE AÑADIDO)
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_PLAY", "Play", false));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MIDI", "MIDI", true));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_HOLD", "Hold", false));
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MUTE", "Mute", false));
 
             // Granular Engine
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
