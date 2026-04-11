@@ -97,23 +97,22 @@ void SpaceModule::resized()
 {
     auto area = getLocalBounds().reduced(2);
 
-    // Dividimos exactamente al 50% para que Size/Fback sean tan grandes como Mix
-    auto topArea = area.removeFromTop(area.getHeight() * 0.5f);
+    // Mantenemos el 38% para NO robarle absolutamente nada de espacio al Mix
+    auto topArea = area.removeFromTop(area.getHeight() * 0.38f);
     auto bottomArea = area;
 
     // --- FILA SUPERIOR: Size y Feedback ---
     int halfTopWidth = topArea.getWidth() / 2;
 
-    // Ajustamos al máximo: quitamos márgenes internos para que el knob crezca
+    // TRUCO: Le damos el 100% de la celda al knob para que sea máximo.
+    // Como el mando está abierto por abajo, ponemos el texto pisando ese hueco.
     auto sizeCell = topArea.removeFromLeft(halfTopWidth);
-    auto sizeLabelArea = sizeCell.removeFromBottom(15);
     sizeKnob.setBounds(sizeCell);
-    sizeLabel.setBounds(sizeLabelArea);
+    sizeLabel.setBounds(sizeCell.withHeight(12).withY(sizeCell.getBottom() - 12));
 
     auto fbackCell = topArea;
-    auto fbackLabelArea = fbackCell.removeFromBottom(15);
     fbackKnob.setBounds(fbackCell);
-    fbackLabel.setBounds(fbackLabelArea);
+    fbackLabel.setBounds(fbackCell.withHeight(12).withY(fbackCell.getBottom() - 12));
 
     // --- FILA INFERIOR: MIX GIGANTE ---
     auto mixLabelArea = bottomArea.removeFromBottom(15);
