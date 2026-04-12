@@ -668,30 +668,34 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
         juce::AudioBuffer<float> tempBuffer((int)reader->numChannels, (int)reader->lengthInSamples);
         reader->read(&tempBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
 
-        suspendProcessing(true);
-
         if (layerIndex == 1) {
+            isUpdatingBufferL1.store(true); // SEMÁFORO EN ROJO (Para el audio)
             audioBufferL1.makeCopyOf(tempBuffer);
             isAudioLoadedL1 = true;
             lastLoadedFilePathL1 = path;
+            isUpdatingBufferL1.store(false); // SEMÁFORO EN VERDE
         }
         else if (layerIndex == 2) {
+            isUpdatingBufferL2.store(true);
             audioBufferL2.makeCopyOf(tempBuffer);
             isAudioLoadedL2 = true;
             lastLoadedFilePathL2 = path;
+            isUpdatingBufferL2.store(false);
         }
         else if (layerIndex == 3) {
+            isUpdatingBufferL3.store(true);
             audioBufferL3.makeCopyOf(tempBuffer);
             isAudioLoadedL3 = true;
             lastLoadedFilePathL3 = path;
+            isUpdatingBufferL3.store(false);
         }
         else if (layerIndex == 4) {
+            isUpdatingBufferL4.store(true);
             audioBufferL4.makeCopyOf(tempBuffer);
             isAudioLoadedL4 = true;
             lastLoadedFilePathL4 = path;
+            isUpdatingBufferL4.store(false);
         }
-
-        suspendProcessing(false);
 
         DBG("Archivo cargado en Capa " + juce::String(layerIndex) + ": " + file.getFileName());
     }

@@ -73,6 +73,12 @@ public:
     bool isAudioLoadedL3 = false;
     bool isAudioLoadedL4 = false;
 
+    // Anti clicks (Lock)
+    std::atomic<bool> isUpdatingBufferL1{ false };
+    std::atomic<bool> isUpdatingBufferL2{ false };
+    std::atomic<bool> isUpdatingBufferL3{ false };
+    std::atomic<bool> isUpdatingBufferL4{ false };
+
     juce::String lastLoadedFilePathL1 = "";
     juce::String lastLoadedFilePathL2 = "";
     juce::String lastLoadedFilePathL3 = "";

@@ -110,15 +110,19 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor))
     {
         if (myPrefix == "L1_") {
+            if (processor->isUpdatingBufferL1.load()) return; // OBEDECER AL SEMÁFORO
             currentBuffer = &processor->audioBufferL1; winStart = processor->windowStartRatioL1.load(); winLen = processor->windowLengthRatioL1.load();
         }
         else if (myPrefix == "L2_") {
+            if (processor->isUpdatingBufferL2.load()) return;
             currentBuffer = &processor->audioBufferL2; winStart = processor->windowStartRatioL2.load(); winLen = processor->windowLengthRatioL2.load();
         }
         else if (myPrefix == "L3_") {
+            if (processor->isUpdatingBufferL3.load()) return;
             currentBuffer = &processor->audioBufferL3; winStart = processor->windowStartRatioL3.load(); winLen = processor->windowLengthRatioL3.load();
         }
         else if (myPrefix == "L4_") {
+            if (processor->isUpdatingBufferL4.load()) return;
             currentBuffer = &processor->audioBufferL4; winStart = processor->windowStartRatioL4.load(); winLen = processor->windowLengthRatioL4.load();
         }
     }
