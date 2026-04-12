@@ -441,16 +441,16 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // Capas
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 135, 40);
+    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 200, 45); 
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 135, 40);
+    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 200, 45); 
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 135, 40);
+    layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 200, 45); 
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 135, 40);
+    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 200, 45); 
 
     // Mixer / Master
     auto area = rightMixerArea;
@@ -662,10 +662,10 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         return false;
         };
 
-    if (checkButtons(layer1Area, "L1_")) return;
-    if (checkButtons(layer2Area, "L2_")) return;
-    if (checkButtons(layer3Area, "L3_")) return;
-    if (checkButtons(layer4Area, "L4_")) return;
+    if (checkButtons(layer1Area, "L1_")) { ignoreDragForPosition = true; return; }
+    if (checkButtons(layer2Area, "L2_")) { ignoreDragForPosition = true; return; }
+    if (checkButtons(layer3Area, "L3_")) { ignoreDragForPosition = true; return; }
+    if (checkButtons(layer4Area, "L4_")) { ignoreDragForPosition = true; return; }
 
 
     // --- 2. LÓGICA DE SELECCIÓN DE PISTA (Si no hiciste clic en un botón) ---
@@ -693,6 +693,8 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
 
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
 {
+    if (ignoreDragForPosition) return;
+
     auto bounds = getLocalBounds();
     bounds.removeFromBottom(300);
     bounds.removeFromRight(350);

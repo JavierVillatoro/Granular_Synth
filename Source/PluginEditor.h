@@ -106,6 +106,8 @@ private:
 
     int lastDragX = 0;
     int activeLayer = 1;
+    
+    bool ignoreDragForPosition = false;
 
     juce::Rectangle<int> matrixArea;
     juce::Rectangle<int> mixerArea;
