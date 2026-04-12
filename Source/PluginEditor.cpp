@@ -70,6 +70,12 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("L4_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L4_SHAPE", this);
 
+    
+    for (int i = 1; i <= 4; ++i) {
+        audioProcessor.apvts.addParameterListener("L" + juce::String(i) + "_MUTE", this);
+        audioProcessor.apvts.addParameterListener("L" + juce::String(i) + "_SOLO", this);
+    }
+
     startTimerHz(30);
 
     if (audioProcessor.isAudioLoadedL1 && audioProcessor.lastLoadedFilePathL1.isNotEmpty())
@@ -103,6 +109,11 @@ Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
     audioProcessor.apvts.removeParameterListener("L4_GRAIN_SIZE", this);
     audioProcessor.apvts.removeParameterListener("L4_SHAPE", this);
     thumbnailL4.removeChangeListener(this);
+
+    for (int i = 1; i <= 4; ++i) {
+        audioProcessor.apvts.removeParameterListener("L" + juce::String(i) + "_MUTE", this);
+        audioProcessor.apvts.removeParameterListener("L" + juce::String(i) + "_SOLO", this);
+    }
 }
 
 void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
@@ -128,349 +139,132 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 
     int layerHeight = wavesArea.getHeight() / 4;
 
+    // --- LEER ESTADOS PARA EL DIMMING VISUAL ---
+    bool m1 = audioProcessor.apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f;
+    bool m2 = audioProcessor.apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f;
+    bool m3 = audioProcessor.apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f;
+    bool m4 = audioProcessor.apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f;
+
+    bool s1 = audioProcessor.apvts.getRawParameterValue("L1_SOLO")->load() > 0.5f;
+    bool s2 = audioProcessor.apvts.getRawParameterValue("L2_SOLO")->load() > 0.5f;
+    bool s3 = audioProcessor.apvts.getRawParameterValue("L3_SOLO")->load() > 0.5f;
+    bool s4 = audioProcessor.apvts.getRawParameterValue("L4_SOLO")->load() > 0.5f;
+
+    bool anySolo = s1 || s2 || s3 || s4;
+
+    // Si la capa está muteada, o hay otro solo activo, la opacidad cae a 0.2 (Fantasma)
+    float a1 = (!m1 && (!anySolo || s1)) ? 1.0f : 0.2f;
+    float a2 = (!m2 && (!anySolo || s2)) ? 1.0f : 0.2f;
+    float a3 = (!m3 && (!anySolo || s3)) ? 1.0f : 0.2f;
+    float a4 = (!m4 && (!anySolo || s4)) ? 1.0f : 0.2f;
+
+    // Función Helper para pintar los botones de cada capa en la esquina inferior derecha
+    auto drawLayerButtons = [&](juce::Rectangle<int> area, juce::Colour color, int num, bool isSolo, bool isMute, float layerAlpha) {
+        auto btnArea = area.removeFromBottom(25).removeFromRight(55).withTrimmedRight(5);
+        juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
+        btnArea.removeFromRight(5);
+        juce::Rectangle<int> btnSolo = btnArea.removeFromRight(20);
+
+        // MUTE/NUM BUTTON (Invertido: brilla si la capa está ON/no muteada)
+        g.setColour(!isMute ? color.withAlpha(juce::jmax(0.5f, layerAlpha)) : juce::Colours::grey.withAlpha(0.2f));
+        g.fillRect(btnNum);
+        g.setColour(juce::Colours::white.withAlpha(!isMute ? 1.0f : 0.3f));
+        g.drawText(juce::String(num), btnNum, juce::Justification::centred);
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.drawRect(btnNum, 1);
+
+        // SOLO BUTTON
+        g.setColour(isSolo ? juce::Colours::yellow.withAlpha(0.8f) : juce::Colours::grey.withAlpha(0.2f));
+        g.fillRect(btnSolo);
+        g.setColour(juce::Colours::white.withAlpha(isSolo ? 1.0f : 0.3f));
+        g.drawText("S", btnSolo, juce::Justification::centred);
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.drawRect(btnSolo, 1);
+        };
+
     // ==========================================================
-    // --- CAPA 1 (CYAN) --- 
+    // --- LÓGICA DE DIBUJO DE CAPAS (Con Dimming Dinámico) ---
     // ==========================================================
+    // ==========================================================
+    // --- LÓGICA DE DIBUJO DE CAPAS (Con Dimming Dinámico y Shape) ---
+    // ==========================================================
+    auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute) {
+        g.setColour(color.withAlpha(0.6f * alpha));
+        g.drawRect(area, 2);
+
+        if (thumb.getNumChannels() > 0) {
+            double totSecs = thumb.getTotalLength();
+            double visSecs = totSecs / zF;
+            double startT = vsR * totSecs;
+
+            g.setColour(color.withAlpha(alpha));
+            thumb.drawChannel(g, area.reduced(2), startT, startT + visSecs, 0, 1.0f);
+
+            auto posParam = audioProcessor.apvts.getRawParameterValue(prefix + "POSITION");
+            auto sizeParam = audioProcessor.apvts.getRawParameterValue(prefix + "GRAIN_SIZE");
+            auto shapeParam = audioProcessor.apvts.getRawParameterValue(prefix + "SHAPE");
+
+            if (posParam && sizeParam && shapeParam) {
+                float winStart = posParam->load();
+                if (prefix == "L1_") winStart = audioProcessor.windowStartRatioL1.load();
+                else if (prefix == "L2_") winStart = audioProcessor.windowStartRatioL2.load();
+                else if (prefix == "L3_") winStart = audioProcessor.windowStartRatioL3.load();
+                else if (prefix == "L4_") winStart = audioProcessor.windowStartRatioL4.load();
+
+                float winLen = 1.0f / zF;
+                float currentPosition = posParam->load();
+                float absolutePos = winStart + (currentPosition * winLen);
+
+                double cursorTimeSeconds = absolutePos * totSecs;
+                float cursorX = area.getX() + (((cursorTimeSeconds)-startT) / visSecs) * area.getWidth();
+
+                // --- RECUPERADO: DIBUJO DE LA FORMA DEL GRANO (SHAPE / SIZE) ---
+                float sizeRatio = sizeParam->load();
+                float shapeValue = shapeParam->load();
+                float activeAudioSeconds = (float)totSecs * winLen;
+                float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
+                float grainWidthPixels = (grainSizeSeconds / visSecs) * area.getWidth();
+                grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
+
+                juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f), area.getY(), grainWidthPixels, area.getHeight());
+                juce::Path grainPath;
+                grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
+
+                for (float x = 0; x <= grainWindow.getWidth(); x += 1.0f) {
+                    float progress = x / grainWindow.getWidth();
+                    float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                    float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
+                    float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
+                    float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
+                    grainPath.lineTo(grainWindow.getX() + x, yPos);
+                }
+                grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
+                grainPath.closeSubPath();
+
+                g.setColour(color.withAlpha(0.3f * alpha));
+                g.fillPath(grainPath);
+                g.setColour(color.withAlpha(0.8f * alpha));
+                g.strokePath(grainPath, juce::PathStrokeType(1.5f));
+                // ---------------------------------------------------------------
+
+                g.setColour(juce::Colours::white.withAlpha(0.9f * alpha));
+                g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
+            }
+        }
+        drawLayerButtons(area, color, num, isSolo, isMute, alpha);
+        };
+
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    g.setColour(juce::Colours::cyan.withAlpha(0.6f));
-    g.drawRect(layer1Area, 2);
+    drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1);
 
-    if (thumbnail.getNumChannels() > 0)
-    {
-        double totalAudioSeconds = thumbnail.getTotalLength();
-        double visibleSeconds = totalAudioSeconds / zoomFactor;
-        double startTime = viewStartRatio * totalAudioSeconds;
-        double endTime = startTime + visibleSeconds;
-
-        g.setColour(juce::Colours::cyan);
-        thumbnail.drawChannel(g, layer1Area.reduced(2), startTime, endTime, 0, 1.0f);
-
-        auto positionParam = audioProcessor.apvts.getRawParameterValue("L1_POSITION");
-        auto grainSizeParam = audioProcessor.apvts.getRawParameterValue("L1_GRAIN_SIZE");
-        auto shapeParamVal = audioProcessor.apvts.getRawParameterValue("L1_SHAPE");
-
-        if (positionParam != nullptr && grainSizeParam != nullptr && shapeParamVal != nullptr)
-        {
-            float currentPosition = positionParam->load();
-            float sizeRatio = grainSizeParam->load();
-            float shapeValue = shapeParamVal->load();
-            float winStart = audioProcessor.windowStartRatioL1.load();
-            float winLen = audioProcessor.windowLengthRatioL1.load();
-
-            float absolutePos = winStart + (currentPosition * winLen);
-            double cursorTimeSeconds = absolutePos * totalAudioSeconds;
-            float activeAudioSeconds = (float)totalAudioSeconds * winLen;
-            float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
-
-            float cursorX = layer1Area.getX() + ((cursorTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
-            float grainWidthPixels = (grainSizeSeconds / visibleSeconds) * layer1Area.getWidth();
-            grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
-
-            juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f), layer1Area.getY(), grainWidthPixels, layer1Area.getHeight());
-            juce::Path grainPath;
-            grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
-
-            for (float x = 0; x <= grainWindow.getWidth(); x += 1.0f) {
-                float progress = x / grainWindow.getWidth();
-                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
-                float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
-                float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
-                grainPath.lineTo(grainWindow.getX() + x, yPos);
-            }
-            grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
-            grainPath.closeSubPath();
-
-            g.setColour(juce::Colours::cyan.withAlpha(0.3f));
-            g.fillPath(grainPath);
-            g.setColour(juce::Colours::cyan.withAlpha(0.8f));
-            g.strokePath(grainPath, juce::PathStrokeType(1.5f));
-
-            g.setColour(juce::Colours::white.withAlpha(0.9f));
-            g.drawLine(cursorX, layer1Area.getY(), cursorX, layer1Area.getBottom(), 2.0f);
-        }
-
-        auto& synthL1 = audioProcessor.getSynthesiserL1();
-        for (int i = 0; i < synthL1.getNumVoices(); ++i) {
-            if (auto* voice = dynamic_cast<GranularVoice*>(synthL1.getVoice(i))) {
-                for (int g_idx = 0; g_idx < 128; ++g_idx) {
-                    float env = voice->visualGrainEnv[g_idx].load();
-                    if (env > 0.001f) {
-                        float pos = voice->visualGrainPos[g_idx].load();
-                        double grainTimeSeconds = pos * totalAudioSeconds;
-                        float xPixel = layer1Area.getX() + ((grainTimeSeconds - startTime) / visibleSeconds) * layer1Area.getWidth();
-
-                        if (xPixel >= layer1Area.getX() && xPixel <= layer1Area.getRight()) {
-                            float maxLineHeight = layer1Area.getHeight() * 0.8f;
-                            float currentHeight = maxLineHeight * env;
-                            float yCenter = layer1Area.getCentreY();
-                            float yStart = yCenter - (currentHeight / 2.0f);
-                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
-                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ==========================================================
-    // --- CAPA 2 (MAGENTA) ---
-    // ==========================================================
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    g.setColour(juce::Colours::magenta.withAlpha(0.6f));
-    g.drawRect(layer2Area, 2);
+    drawLayer(layer2Area, juce::Colours::magenta, a2, thumbnailL2, "L2_", zoomFactorL2, viewStartRatioL2, 2, s2, m2);
 
-    if (thumbnailL2.getNumChannels() > 0)
-    {
-        double totalAudioSecondsL2 = thumbnailL2.getTotalLength();
-        double visibleSecondsL2 = totalAudioSecondsL2 / zoomFactorL2;
-        double startTimeL2 = viewStartRatioL2 * totalAudioSecondsL2;
-        double endTimeL2 = startTimeL2 + visibleSecondsL2;
-
-        g.setColour(juce::Colours::magenta);
-        thumbnailL2.drawChannel(g, layer2Area.reduced(2), startTimeL2, endTimeL2, 0, 1.0f);
-
-        auto posParamL2 = audioProcessor.apvts.getRawParameterValue("L2_POSITION");
-        auto sizeParamL2 = audioProcessor.apvts.getRawParameterValue("L2_GRAIN_SIZE");
-        auto shapeParamL2 = audioProcessor.apvts.getRawParameterValue("L2_SHAPE");
-
-        if (posParamL2 != nullptr && sizeParamL2 != nullptr && shapeParamL2 != nullptr)
-        {
-            float currentPositionL2 = posParamL2->load();
-            float sizeRatioL2 = sizeParamL2->load();
-            float shapeValueL2 = shapeParamL2->load();
-            float winStartL2 = audioProcessor.windowStartRatioL2.load();
-            float winLenL2 = audioProcessor.windowLengthRatioL2.load();
-
-            float absolutePosL2 = winStartL2 + (currentPositionL2 * winLenL2);
-            double cursorTimeSecondsL2 = absolutePosL2 * totalAudioSecondsL2;
-            float activeAudioSecondsL2 = (float)totalAudioSecondsL2 * winLenL2;
-            float grainSizeSecondsL2 = juce::jmax(0.01f, sizeRatioL2 * activeAudioSecondsL2);
-
-            float cursorXL2 = layer2Area.getX() + ((cursorTimeSecondsL2 - startTimeL2) / visibleSecondsL2) * layer2Area.getWidth();
-            float grainWidthPixelsL2 = (grainSizeSecondsL2 / visibleSecondsL2) * layer2Area.getWidth();
-            grainWidthPixelsL2 = juce::jmax(3.0f, grainWidthPixelsL2);
-
-            juce::Rectangle<float> grainWindowL2(cursorXL2 - (grainWidthPixelsL2 / 2.0f), layer2Area.getY(), grainWidthPixelsL2, layer2Area.getHeight());
-            juce::Path grainPathL2;
-            grainPathL2.startNewSubPath(grainWindowL2.getX(), grainWindowL2.getBottom());
-
-            for (float x = 0; x <= grainWindowL2.getWidth(); x += 1.0f) {
-                float progress = x / grainWindowL2.getWidth();
-                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
-                float amplitude = (hann * (1.0f - shapeValueL2)) + (square * shapeValueL2);
-                float yPos = grainWindowL2.getBottom() - (amplitude * grainWindowL2.getHeight());
-                grainPathL2.lineTo(grainWindowL2.getX() + x, yPos);
-            }
-            grainPathL2.lineTo(grainWindowL2.getRight(), grainWindowL2.getBottom());
-            grainPathL2.closeSubPath();
-
-            g.setColour(juce::Colours::magenta.withAlpha(0.3f));
-            g.fillPath(grainPathL2);
-            g.setColour(juce::Colours::magenta.withAlpha(0.8f));
-            g.strokePath(grainPathL2, juce::PathStrokeType(1.5f));
-
-            g.setColour(juce::Colours::white.withAlpha(0.9f));
-            g.drawLine(cursorXL2, layer2Area.getY(), cursorXL2, layer2Area.getBottom(), 2.0f);
-        }
-
-        auto& synthL2 = audioProcessor.getSynthesiserL2();
-        for (int i = 0; i < synthL2.getNumVoices(); ++i) {
-            if (auto* voice = dynamic_cast<GranularVoice*>(synthL2.getVoice(i))) {
-                for (int g_idx = 0; g_idx < 128; ++g_idx) {
-                    float env = voice->visualGrainEnv[g_idx].load();
-                    if (env > 0.001f) {
-                        float pos = voice->visualGrainPos[g_idx].load();
-                        double grainTimeSeconds = pos * totalAudioSecondsL2;
-                        float xPixel = layer2Area.getX() + ((grainTimeSeconds - startTimeL2) / visibleSecondsL2) * layer2Area.getWidth();
-
-                        if (xPixel >= layer2Area.getX() && xPixel <= layer2Area.getRight()) {
-                            float maxLineHeight = layer2Area.getHeight() * 0.8f;
-                            float currentHeight = maxLineHeight * env;
-                            float yCenter = layer2Area.getCentreY();
-                            float yStart = yCenter - (currentHeight / 2.0f);
-                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
-                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ==========================================================
-    // --- CAPA 3 (NARANJA) ---
-    // ==========================================================
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    g.setColour(juce::Colours::orange.withAlpha(0.6f));
-    g.drawRect(layer3Area, 2);
+    drawLayer(layer3Area, juce::Colours::orange, a3, thumbnailL3, "L3_", zoomFactorL3, viewStartRatioL3, 3, s3, m3);
 
-    if (thumbnailL3.getNumChannels() > 0)
-    {
-        double totalAudioSecondsL3 = thumbnailL3.getTotalLength();
-        double visibleSecondsL3 = totalAudioSecondsL3 / zoomFactorL3;
-        double startTimeL3 = viewStartRatioL3 * totalAudioSecondsL3;
-        double endTimeL3 = startTimeL3 + visibleSecondsL3;
-
-        g.setColour(juce::Colours::orange);
-        thumbnailL3.drawChannel(g, layer3Area.reduced(2), startTimeL3, endTimeL3, 0, 1.0f);
-
-        auto posParamL3 = audioProcessor.apvts.getRawParameterValue("L3_POSITION");
-        auto sizeParamL3 = audioProcessor.apvts.getRawParameterValue("L3_GRAIN_SIZE");
-        auto shapeParamL3 = audioProcessor.apvts.getRawParameterValue("L3_SHAPE");
-
-        if (posParamL3 != nullptr && sizeParamL3 != nullptr && shapeParamL3 != nullptr)
-        {
-            float currentPositionL3 = posParamL3->load();
-            float sizeRatioL3 = sizeParamL3->load();
-            float shapeValueL3 = shapeParamL3->load();
-            float winStartL3 = audioProcessor.windowStartRatioL3.load();
-            float winLenL3 = audioProcessor.windowLengthRatioL3.load();
-
-            float absolutePosL3 = winStartL3 + (currentPositionL3 * winLenL3);
-            double cursorTimeSecondsL3 = absolutePosL3 * totalAudioSecondsL3;
-            float activeAudioSecondsL3 = (float)totalAudioSecondsL3 * winLenL3;
-            float grainSizeSecondsL3 = juce::jmax(0.01f, sizeRatioL3 * activeAudioSecondsL3);
-
-            float cursorXL3 = layer3Area.getX() + ((cursorTimeSecondsL3 - startTimeL3) / visibleSecondsL3) * layer3Area.getWidth();
-            float grainWidthPixelsL3 = (grainSizeSecondsL3 / visibleSecondsL3) * layer3Area.getWidth();
-            grainWidthPixelsL3 = juce::jmax(3.0f, grainWidthPixelsL3);
-
-            juce::Rectangle<float> grainWindowL3(cursorXL3 - (grainWidthPixelsL3 / 2.0f), layer3Area.getY(), grainWidthPixelsL3, layer3Area.getHeight());
-            juce::Path grainPathL3;
-            grainPathL3.startNewSubPath(grainWindowL3.getX(), grainWindowL3.getBottom());
-
-            for (float x = 0; x <= grainWindowL3.getWidth(); x += 1.0f) {
-                float progress = x / grainWindowL3.getWidth();
-                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
-                float amplitude = (hann * (1.0f - shapeValueL3)) + (square * shapeValueL3);
-                float yPos = grainWindowL3.getBottom() - (amplitude * grainWindowL3.getHeight());
-                grainPathL3.lineTo(grainWindowL3.getX() + x, yPos);
-            }
-            grainPathL3.lineTo(grainWindowL3.getRight(), grainWindowL3.getBottom());
-            grainPathL3.closeSubPath();
-
-            g.setColour(juce::Colours::orange.withAlpha(0.3f));
-            g.fillPath(grainPathL3);
-            g.setColour(juce::Colours::orange.withAlpha(0.8f));
-            g.strokePath(grainPathL3, juce::PathStrokeType(1.5f));
-
-            g.setColour(juce::Colours::white.withAlpha(0.9f));
-            g.drawLine(cursorXL3, layer3Area.getY(), cursorXL3, layer3Area.getBottom(), 2.0f);
-        }
-
-        auto& synthL3 = audioProcessor.getSynthesiserL3();
-        for (int i = 0; i < synthL3.getNumVoices(); ++i) {
-            if (auto* voice = dynamic_cast<GranularVoice*>(synthL3.getVoice(i))) {
-                for (int g_idx = 0; g_idx < 128; ++g_idx) {
-                    float env = voice->visualGrainEnv[g_idx].load();
-                    if (env > 0.001f) {
-                        float pos = voice->visualGrainPos[g_idx].load();
-                        double grainTimeSeconds = pos * totalAudioSecondsL3;
-                        float xPixel = layer3Area.getX() + ((grainTimeSeconds - startTimeL3) / visibleSecondsL3) * layer3Area.getWidth();
-
-                        if (xPixel >= layer3Area.getX() && xPixel <= layer3Area.getRight()) {
-                            float maxLineHeight = layer3Area.getHeight() * 0.8f;
-                            float currentHeight = maxLineHeight * env;
-                            float yCenter = layer3Area.getCentreY();
-                            float yStart = yCenter - (currentHeight / 2.0f);
-                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
-                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ==========================================================
-    // --- CAPA 4 (VERDE LIMA) ---
-    // ==========================================================
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    g.setColour(juce::Colours::lime.withAlpha(0.6f));
-    g.drawRect(layer4Area, 2);
-
-    if (thumbnailL4.getNumChannels() > 0)
-    {
-        double totalAudioSecondsL4 = thumbnailL4.getTotalLength();
-        double visibleSecondsL4 = totalAudioSecondsL4 / zoomFactorL4;
-        double startTimeL4 = viewStartRatioL4 * totalAudioSecondsL4;
-        double endTimeL4 = startTimeL4 + visibleSecondsL4;
-
-        g.setColour(juce::Colours::lime);
-        thumbnailL4.drawChannel(g, layer4Area.reduced(2), startTimeL4, endTimeL4, 0, 1.0f);
-
-        auto posParamL4 = audioProcessor.apvts.getRawParameterValue("L4_POSITION");
-        auto sizeParamL4 = audioProcessor.apvts.getRawParameterValue("L4_GRAIN_SIZE");
-        auto shapeParamL4 = audioProcessor.apvts.getRawParameterValue("L4_SHAPE");
-
-        if (posParamL4 != nullptr && sizeParamL4 != nullptr && shapeParamL4 != nullptr)
-        {
-            float currentPositionL4 = posParamL4->load();
-            float sizeRatioL4 = sizeParamL4->load();
-            float shapeValueL4 = shapeParamL4->load();
-            float winStartL4 = audioProcessor.windowStartRatioL4.load();
-            float winLenL4 = audioProcessor.windowLengthRatioL4.load();
-
-            float absolutePosL4 = winStartL4 + (currentPositionL4 * winLenL4);
-            double cursorTimeSecondsL4 = absolutePosL4 * totalAudioSecondsL4;
-            float activeAudioSecondsL4 = (float)totalAudioSecondsL4 * winLenL4;
-            float grainSizeSecondsL4 = juce::jmax(0.01f, sizeRatioL4 * activeAudioSecondsL4);
-
-            float cursorXL4 = layer4Area.getX() + ((cursorTimeSecondsL4 - startTimeL4) / visibleSecondsL4) * layer4Area.getWidth();
-            float grainWidthPixelsL4 = (grainSizeSecondsL4 / visibleSecondsL4) * layer4Area.getWidth();
-            grainWidthPixelsL4 = juce::jmax(3.0f, grainWidthPixelsL4);
-
-            juce::Rectangle<float> grainWindowL4(cursorXL4 - (grainWidthPixelsL4 / 2.0f), layer4Area.getY(), grainWidthPixelsL4, layer4Area.getHeight());
-            juce::Path grainPathL4;
-            grainPathL4.startNewSubPath(grainWindowL4.getX(), grainWindowL4.getBottom());
-
-            for (float x = 0; x <= grainWindowL4.getWidth(); x += 1.0f) {
-                float progress = x / grainWindowL4.getWidth();
-                float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
-                float amplitude = (hann * (1.0f - shapeValueL4)) + (square * shapeValueL4);
-                float yPos = grainWindowL4.getBottom() - (amplitude * grainWindowL4.getHeight());
-                grainPathL4.lineTo(grainWindowL4.getX() + x, yPos);
-            }
-            grainPathL4.lineTo(grainWindowL4.getRight(), grainWindowL4.getBottom());
-            grainPathL4.closeSubPath();
-
-            g.setColour(juce::Colours::lime.withAlpha(0.3f));
-            g.fillPath(grainPathL4);
-            g.setColour(juce::Colours::lime.withAlpha(0.8f));
-            g.strokePath(grainPathL4, juce::PathStrokeType(1.5f));
-
-            g.setColour(juce::Colours::white.withAlpha(0.9f));
-            g.drawLine(cursorXL4, layer4Area.getY(), cursorXL4, layer4Area.getBottom(), 2.0f);
-        }
-
-        auto& synthL4 = audioProcessor.getSynthesiserL4();
-        for (int i = 0; i < synthL4.getNumVoices(); ++i) {
-            if (auto* voice = dynamic_cast<GranularVoice*>(synthL4.getVoice(i))) {
-                for (int g_idx = 0; g_idx < 128; ++g_idx) {
-                    float env = voice->visualGrainEnv[g_idx].load();
-                    if (env > 0.001f) {
-                        float pos = voice->visualGrainPos[g_idx].load();
-                        double grainTimeSeconds = pos * totalAudioSecondsL4;
-                        float xPixel = layer4Area.getX() + ((grainTimeSeconds - startTimeL4) / visibleSecondsL4) * layer4Area.getWidth();
-
-                        if (xPixel >= layer4Area.getX() && xPixel <= layer4Area.getRight()) {
-                            float maxLineHeight = layer4Area.getHeight() * 0.8f;
-                            float currentHeight = maxLineHeight * env;
-                            float yCenter = layer4Area.getCentreY();
-                            float yStart = yCenter - (currentHeight / 2.0f);
-                            g.setColour(juce::Colours::white.withAlpha(env * 0.8f));
-                            g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
-                        }
-                    }
-                }
-            }
-        }
-    }
+    drawLayer(layer4Area, juce::Colours::lime, a4, thumbnailL4, "L4_", zoomFactorL4, viewStartRatioL4, 4, s4, m4);
 
     // --- RESALTAR LA CAPA ACTIVA ---
     g.setColour(juce::Colours::white.withAlpha(0.8f));
@@ -528,7 +322,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         juce::StringArray {"", "", ""}
     };
 
-    // Dejamos solo los de arriba, los de abajo ("LFO", "ENV", "FILTER") se quedan vacíos para limpiar
     juce::StringArray moduleNames = { "ENGINE", "SCAN", "SPRAY", "PITCH", "", "", "" };
 
     int numColumns = 4, numRows = 2;
@@ -545,7 +338,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.setColour(themeColor.withAlpha(0.2f));
             g.drawRect(moduleRect, 1);
 
-            // ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA PARA DIBUJAR LOS TÍTULOS DE ARRIBA!
             if (moduleNames[modIndex].isNotEmpty()) {
                 g.setColour(juce::Colours::white.withAlpha(0.7f));
                 g.setFont(juce::Font(16.0f, juce::Font::bold));
@@ -774,12 +566,9 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
 
 void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
 {
-    // Guardamos la posición inicial del ratón para calcular la velocidad de arrastre
     lastDragX = event.getPosition().x;
-
     auto bounds = getLocalBounds();
-    bounds.removeFromBottom(300);
-    bounds.removeFromRight(350);
+    bounds.removeFromBottom(300); bounds.removeFromRight(350);
 
     int layerHeight = bounds.getHeight() / 4;
     auto layer1Area = bounds.removeFromTop(layerHeight);
@@ -787,40 +576,57 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     auto layer3Area = bounds.removeFromTop(layerHeight);
     auto layer4Area = bounds.removeFromTop(layerHeight);
 
-    auto updateModules = [&](int layer) {
-        activeLayer = layer;
-        engineModule.setLayer(layer);
-        scanModule.setLayer(layer);
-        sprayModule.setLayer(layer);
-        pitchModule.setLayer(layer);
-        filterModule.setLayer(layer);
-        spaceModule.setLayer(layer);
-        choirModule.setLayer(layer);
-        distModule.setLayer(layer);
-        envelopeModule.setLayer(layer);
-        mixerModule1.setLayer(layer);
-        monk1.setLayer(layer);
-        monk2.setLayer(layer);
-        monk3.setLayer(layer);
-        monk4.setLayer(layer);
+    // Función auxiliar para obtener las coordenadas exactas de los botones
+    auto getButtonsArea = [&](juce::Rectangle<int> area) {
+        auto btnArea = area.removeFromBottom(25).removeFromRight(55).withTrimmedRight(5);
+        juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
+        btnArea.removeFromRight(5);
+        juce::Rectangle<int> btnSolo = btnArea.removeFromRight(20);
+        return std::make_pair(btnSolo, btnNum);
         };
 
-    // Quitamos la lógica de Panning de aquí, ya no la necesitamos en el Click
+    // --- 1. COMPROBAR CLICS EN BOTONES (Antes que la selección de pista) ---
+    auto checkButtons = [&](juce::Rectangle<int> area, juce::String prefix) {
+        auto btns = getButtonsArea(area);
+        if (btns.first.contains(event.getPosition())) {
+            auto* p = audioProcessor.apvts.getParameter(prefix + "SOLO");
+            p->setValueNotifyingHost(p->getValue() > 0.5f ? 0.0f : 1.0f);
+            return true;
+        }
+        if (btns.second.contains(event.getPosition())) {
+            auto* p = audioProcessor.apvts.getParameter(prefix + "MUTE");
+            p->setValueNotifyingHost(p->getValue() > 0.5f ? 0.0f : 1.0f);
+            return true;
+        }
+        return false;
+        };
+
+    if (checkButtons(layer1Area, "L1_")) return;
+    if (checkButtons(layer2Area, "L2_")) return;
+    if (checkButtons(layer3Area, "L3_")) return;
+    if (checkButtons(layer4Area, "L4_")) return;
+
+
+    // --- 2. LÓGICA DE SELECCIÓN DE PISTA (Si no hiciste clic en un botón) ---
+    auto updateModules = [&](int layer) {
+        activeLayer = layer; engineModule.setLayer(layer); scanModule.setLayer(layer);
+        sprayModule.setLayer(layer); pitchModule.setLayer(layer); filterModule.setLayer(layer);
+        spaceModule.setLayer(layer); choirModule.setLayer(layer); distModule.setLayer(layer);
+        envelopeModule.setLayer(layer); mixerModule1.setLayer(layer);
+        monk1.setLayer(layer); monk2.setLayer(layer); monk3.setLayer(layer); monk4.setLayer(layer);
+        };
+
     if (layer1Area.contains(event.getPosition())) {
-        if (activeLayer != 1) updateModules(1);
-        repaint();
+        if (activeLayer != 1) updateModules(1); repaint();
     }
     else if (layer2Area.contains(event.getPosition())) {
-        if (activeLayer != 2) updateModules(2);
-        repaint();
+        if (activeLayer != 2) updateModules(2); repaint();
     }
     else if (layer3Area.contains(event.getPosition())) {
-        if (activeLayer != 3) updateModules(3);
-        repaint();
+        if (activeLayer != 3) updateModules(3); repaint();
     }
     else if (layer4Area.contains(event.getPosition())) {
-        if (activeLayer != 4) updateModules(4);
-        repaint();
+        if (activeLayer != 4) updateModules(4); repaint();
     }
 }
 

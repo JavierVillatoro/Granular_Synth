@@ -441,42 +441,40 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     applyEffectsToLayer(renderBufferL3, "L3_", reverbL3);
     applyEffectsToLayer(renderBufferL4, "L4_", reverbL4);
 
-    // --- LEEMOS LOS MUTES ---
-    //bool isMutedL1 = apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f;
-    //bool isMutedL2 = apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f;
-    //bool isMutedL3 = apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f;
-    //bool isMutedL4 = apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f;
+    // ==========================================================
+    // --- LEEMOS LOS MUTES Y SOLOS (Lógica Universal) ---
+    // ==========================================================
+    bool m1 = apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f;
+    bool m2 = apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f;
+    bool m3 = apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f;
+    bool m4 = apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f;
 
-    // --- LEEMOS LOS MUTES Y APLICAMOS FADES (Anti-Click) ---
-    // Si Mute está activado el objetivo es 0.0f (Silencio), si no, es 1.0f (Volumen a tope)
-    float targetMuteL1 = apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
-    float targetMuteL2 = apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
-    float targetMuteL3 = apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
-    float targetMuteL4 = apvts.getRawParameterValue("L4_MUTE")->load() > 0.5f ? 0.0f : 1.0f;
+    bool s1 = apvts.getRawParameterValue("L1_SOLO")->load() > 0.5f;
+    bool s2 = apvts.getRawParameterValue("L2_SOLO")->load() > 0.5f;
+    bool s3 = apvts.getRawParameterValue("L3_SOLO")->load() > 0.5f;
+    bool s4 = apvts.getRawParameterValue("L4_SOLO")->load() > 0.5f;
 
-    // applyGainRamp hace un "fade" súper rápido de 5 milisegundos. ¡Adiós clicks!
+    // Si ALGUNA capa está en Solo, entramos en modo Solo-Exclusivo
+    bool anySoloActive = s1 || s2 || s3 || s4;
+
+    // El objetivo (1.0f ON, 0.0f OFF). Una capa suena si NO está muteada Y (no hay solos OR ella tiene el solo)
+    float targetMuteL1 = (!m1 && (!anySoloActive || s1)) ? 1.0f : 0.0f;
+    float targetMuteL2 = (!m2 && (!anySoloActive || s2)) ? 1.0f : 0.0f;
+    float targetMuteL3 = (!m3 && (!anySoloActive || s3)) ? 1.0f : 0.0f;
+    float targetMuteL4 = (!m4 && (!anySoloActive || s4)) ? 1.0f : 0.0f;
+
+    // Fades súper rápidos de 5ms. ¡Adiós clicks!
     renderBufferL1.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL1, targetMuteL1);
     renderBufferL2.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL2, targetMuteL2);
     renderBufferL3.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL3, targetMuteL3);
     renderBufferL4.applyGainRamp(0, buffer.getNumSamples(), lastMuteGainL4, targetMuteL4);
 
-    // Guardamos el volumen en el que nos hemos quedado para el siguiente bloque
     lastMuteGainL1 = targetMuteL1;
     lastMuteGainL2 = targetMuteL2;
     lastMuteGainL3 = targetMuteL3;
     lastMuteGainL4 = targetMuteL4;
 
-    // --- SUMADOR AL MASTER (Con Mutes Aplicados) ---
-    //for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
-        //if (!isMutedL1) buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
-        //if (!isMutedL2) buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
-        //if (!isMutedL3) buffer.addFrom(ch, 0, renderBufferL3, ch, 0, buffer.getNumSamples());
-        //if (!isMutedL4) buffer.addFrom(ch, 0, renderBufferL4, ch, 0, buffer.getNumSamples());
-    //}
-
-    // --- SUMADOR AL MASTER ---
-    // Ahora sumamos todas las capas SIEMPRE. Si una capa está muteada, 
-    // su renderBuffer estará multiplicado por 0, así que no sonará nada.
+    // Sumamos todas las capas SIEMPRE (Si no tienen que sonar, ya estarán a volumen 0)
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
         buffer.addFrom(ch, 0, renderBufferL1, ch, 0, buffer.getNumSamples());
         buffer.addFrom(ch, 0, renderBufferL2, ch, 0, buffer.getNumSamples());
@@ -574,11 +572,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     // ==============================================================================
     auto addLayerParameters = [&](juce::String prefix)
         {
-            // Controles Base (MUTE AÑADIDO)
+            // Controles Base (NUEVO: SOLO AÑADIDO)
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_PLAY", "Play", false));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MIDI", "MIDI", true));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_HOLD", "Hold", false));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MUTE", "Mute", false));
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_SOLO", "Solo", false));
 
             // Granular Engine
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
@@ -622,22 +621,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
                 params.push_back(std::make_unique<juce::AudioParameterFloat>(vPref + "_MIX", "Voice " + juce::String(v) + " Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
             }
 
-            // ==============================================================================
-            // NUEVO: PARÁMETROS DEL MÓDULO CHOIR (Halo + Ensemble)
-            // ==============================================================================
-
-            // HALO (Shimmer / Pitch)
+            // HALO & ENSEMBLE
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_PITCH", "Halo Pitch", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_SHIMMER", "Halo Shimmer", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_COLOR", "Halo Color", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_MIX", "Halo Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
 
-            // ENSEMBLE (Chorus masivo)
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_RATE", "Ensemble Rate", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_DEPTH", "Ensemble Depth", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_WIDTH", "Ensemble Width", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_MIX", "Ensemble Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
-
 
             // Mixer & EQ
             juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
@@ -649,11 +642,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_HIGH", "EQ High", eqRange, 0.0f));
         };
 
-    // 4 layers
-    addLayerParameters("L1");
-    addLayerParameters("L2");
-    addLayerParameters("L3");
-    addLayerParameters("L4");
+    addLayerParameters("L1"); addLayerParameters("L2"); addLayerParameters("L3"); addLayerParameters("L4");
 
     return { params.begin(), params.end() };
 }
