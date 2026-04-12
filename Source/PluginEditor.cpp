@@ -30,7 +30,11 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     thumbnailL2.addChangeListener(this);
     thumbnailL3.addChangeListener(this);
     thumbnailL4.addChangeListener(this);
-    setSize(1200, 750);
+    
+
+    setResizable(true, true);
+    setResizeLimits(900, 600, 2400, 1500); // Min Ancho/Alto, Max Ancho/Alto
+    setSize(1200, 750); 
 
     addAndMakeVisible(scanModule);
     addAndMakeVisible(engineModule);
@@ -188,7 +192,9 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     // ==========================================================
     // --- LÓGICA DE DIBUJO DE CAPAS (Con Dimming Dinámico y Shape) ---
     // ==========================================================
-    auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute) {
+    //auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute) {
+    //auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, juce::AudioBuffer<float>* rawBuffer) {
+    auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, juce::AudioBuffer<float>* rawBuffer, juce::Synthesiser& synth) {
         g.setColour(color.withAlpha(0.6f * alpha));
         g.drawRect(area, 2);
 
@@ -197,8 +203,38 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             double visSecs = totSecs / zF;
             double startT = vsR * totSecs;
 
-            g.setColour(color.withAlpha(alpha));
-            thumb.drawChannel(g, area.reduced(2), startT, startT + visSecs, 0, 1.0f);
+            // --- NUEVO: SISTEMA DE RENDERIZADO HÍBRIDO ---
+            if (zF >= 8.0 && rawBuffer != nullptr && rawBuffer->getNumSamples() > 0) {
+                // MODO VECTORIAL (Alto Zoom): Leemos el sample exacto
+                g.setColour(color.withAlpha(alpha));
+                juce::Path wavePath;
+                int sampleRate = audioProcessor.getSampleRate();
+                int startSample = (int)(startT * sampleRate);
+                int numSamplesToDraw = (int)(visSecs * sampleRate);
+                int endSample = juce::jmin(startSample + numSamplesToDraw, rawBuffer->getNumSamples());
+
+                if (endSample > startSample) {
+                    float yCenter = area.getCentreY();
+                    float heightHalf = area.getHeight() / 2.0f;
+                    wavePath.startNewSubPath(area.getX(), yCenter);
+
+                    // Nos saltamos muestras según el ancho de la pantalla para no ahogar la CPU
+                    int skip = juce::jmax(1, numSamplesToDraw / area.getWidth());
+                    auto* readPtr = rawBuffer->getReadPointer(0); // Leemos el canal L
+
+                    for (int i = startSample; i < endSample; i += skip) {
+                        float x = area.getX() + ((float)(i - startSample) / numSamplesToDraw) * area.getWidth();
+                        float y = yCenter - (readPtr[i] * heightHalf);
+                        wavePath.lineTo(x, y);
+                    }
+                    g.strokePath(wavePath, juce::PathStrokeType(1.2f));
+                }
+            }
+            else {
+                // MODO CACHÉ (Zoom Normal): Rápido y eficiente
+                g.setColour(color.withAlpha(alpha));
+                thumb.drawChannel(g, area.reduced(2), startT, startT + visSecs, 0, 1.0f);
+            }
 
             auto posParam = audioProcessor.apvts.getRawParameterValue(prefix + "POSITION");
             auto sizeParam = audioProcessor.apvts.getRawParameterValue(prefix + "GRAIN_SIZE");
@@ -248,6 +284,31 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 // ---------------------------------------------------------------
 
                 g.setColour(juce::Colours::white.withAlpha(0.9f * alpha));
+                // --- RECUPERADO: DIBUJAR LOS GRANOS ACTIVOS (BARRITAS BLANCAS) ---
+                for (int i = 0; i < synth.getNumVoices(); ++i) {
+                    if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
+                        for (int g_idx = 0; g_idx < 128; ++g_idx) {
+                            float env = voice->visualGrainEnv[g_idx].load();
+                            if (env > 0.001f) {
+                                float pos = voice->visualGrainPos[g_idx].load();
+                                double grainTimeSeconds = pos * totSecs;
+                                float xPixel = area.getX() + ((grainTimeSeconds - startT) / visSecs) * area.getWidth();
+
+                                if (xPixel >= area.getX() && xPixel <= area.getRight()) {
+                                    float maxLineHeight = area.getHeight() * 0.8f;
+                                    float currentHeight = maxLineHeight * env;
+                                    float yCenter = area.getCentreY();
+                                    float yStart = yCenter - (currentHeight / 2.0f);
+
+                                    // Pintamos con el alpha de la capa para que se atenúe si está muteada
+                                    g.setColour(juce::Colours::white.withAlpha(env * 0.8f * alpha));
+                                    g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
+                                }
+                            }
+                        }
+                    }
+                }
+                // -----------------------------------------------------------------
                 g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
             }
         }
@@ -255,16 +316,16 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         };
 
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1);
+    drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1, &audioProcessor.audioBufferL1, audioProcessor.getSynthesiserL1());
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer2Area, juce::Colours::magenta, a2, thumbnailL2, "L2_", zoomFactorL2, viewStartRatioL2, 2, s2, m2);
+    drawLayer(layer2Area, juce::Colours::magenta, a2, thumbnailL2, "L2_", zoomFactorL2, viewStartRatioL2, 2, s2, m2, &audioProcessor.audioBufferL2, audioProcessor.getSynthesiserL2());
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer3Area, juce::Colours::orange, a3, thumbnailL3, "L3_", zoomFactorL3, viewStartRatioL3, 3, s3, m3);
+    drawLayer(layer3Area, juce::Colours::orange, a3, thumbnailL3, "L3_", zoomFactorL3, viewStartRatioL3, 3, s3, m3, &audioProcessor.audioBufferL3, audioProcessor.getSynthesiserL3());
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer4Area, juce::Colours::lime, a4, thumbnailL4, "L4_", zoomFactorL4, viewStartRatioL4, 4, s4, m4);
+    drawLayer(layer4Area, juce::Colours::lime, a4, thumbnailL4, "L4_", zoomFactorL4, viewStartRatioL4, 4, s4, m4, &audioProcessor.audioBufferL4, audioProcessor.getSynthesiserL4());
 
     // --- RESALTAR LA CAPA ACTIVA ---
     g.setColour(juce::Colours::white.withAlpha(0.8f));
@@ -380,16 +441,16 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // Capas
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    layer1Controls.setBounds(layer1Area.reduced(10).withHeight(20));
+    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 135, 40);
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    layer2Controls.setBounds(layer2Area.reduced(10).withHeight(20));
+    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 135, 40);
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    layer3Controls.setBounds(layer3Area.reduced(10).withHeight(20));
+    layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 135, 40);
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    layer4Controls.setBounds(layer4Area.reduced(10).withHeight(20));
+    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 135, 40);
 
     // Mixer / Master
     auto area = rightMixerArea;

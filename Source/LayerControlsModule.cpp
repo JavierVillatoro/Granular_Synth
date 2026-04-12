@@ -36,7 +36,18 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     setupButton(playButton, "PLAY", paramPrefix + "PLAY", playAttach);
     setupButton(midiButton, "MIDI", paramPrefix + "MIDI", midiAttach);
     setupButton(holdButton, "HOLD", paramPrefix + "HOLD", holdAttach);
-    setupButton(muteButton, "MUTE", paramPrefix + "MUTE", muteAttach);
+    //setupButton(muteButton, "MUTE", paramPrefix + "MUTE", muteAttach);
+
+    // --- NUEVO: SLIDER DE PANEO ---
+    panSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    panSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    panSlider.setColour(juce::Slider::thumbColourId, mainColor);
+    panSlider.setColour(juce::Slider::trackColourId, juce::Colours::white.withAlpha(0.1f));
+    // ¡Aquí está la magia del doble clic para centrar!
+    panSlider.setDoubleClickReturnValue(true, 0.0);
+
+    addAndMakeVisible(panSlider);
+    panAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, paramPrefix + "PAN", panSlider);
 }
 
 LayerControlsModule::~LayerControlsModule() {}
@@ -46,13 +57,17 @@ void LayerControlsModule::paint(juce::Graphics& g) {}
 void LayerControlsModule::resized()
 {
     auto area = getLocalBounds();
-    int btnWidth = 50;
 
-    // Alineados a la izquierda
-    playButton.setBounds(area.removeFromLeft(btnWidth));
-    midiButton.setBounds(area.removeFromLeft(btnWidth));
-    holdButton.setBounds(area.removeFromLeft(btnWidth));
+    // Separamos la mitad superior para los botones (20 píxeles de alto)
+    auto topRow = area.removeFromTop(20);
 
-    // Alineado a la derecha
-    muteButton.setBounds(area.removeFromRight(btnWidth));
+    // Calculamos el ancho para que los 3 botones midan exactamente lo mismo
+    int btnWidth = topRow.getWidth() / 3;
+
+    playButton.setBounds(topRow.removeFromLeft(btnWidth));
+    midiButton.setBounds(topRow.removeFromLeft(btnWidth));
+    holdButton.setBounds(topRow.removeFromLeft(btnWidth));
+
+    // El slider de paneo se queda con la fila de abajo al completo
+    panSlider.setBounds(area);
 }

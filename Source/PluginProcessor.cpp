@@ -386,6 +386,24 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     synthL3.renderNextBlock(renderBufferL3, processedMidiL3, 0, buffer.getNumSamples());
     synthL4.renderNextBlock(renderBufferL4, processedMidiL4, 0, buffer.getNumSamples());
 
+    auto applyLayerPan = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix) {
+        float panVal = apvts.getRawParameterValue(prefix + "PAN")->load() / 100.0f; // Pasa de -100/100 a -1.0/1.0
+
+        // Matemática de paneo de potencia constante (Circular)
+        float panMapped = (panVal + 1.0f) * 0.5f; // Mapea a 0.0 - 1.0
+        float gainL = std::cos(panMapped * juce::MathConstants<float>::halfPi);
+        float gainR = std::sin(panMapped * juce::MathConstants<float>::halfPi);
+
+        // Aplicamos la ganancia destructivamente a cada canal
+        layerBuffer.applyGain(0, 0, layerBuffer.getNumSamples(), gainL);
+        layerBuffer.applyGain(1, 0, layerBuffer.getNumSamples(), gainR);
+        };
+
+    applyLayerPan(renderBufferL1, "L1_");
+    applyLayerPan(renderBufferL2, "L2_");
+    applyLayerPan(renderBufferL3, "L3_");
+    applyLayerPan(renderBufferL4, "L4_");
+
     auto applyEffectsToLayer = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix, juce::dsp::Reverb& reverb)
         {
             float driveParam = apvts.getRawParameterValue(prefix + "DIST_DRIVE")->load();
@@ -636,6 +654,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
             eqRange.setSkewForCentre(0.0f);
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_MIX_VOL", "Vol", juce::NormalisableRange<float>(-60.0f, 6.0f, 0.1f, 2.0f), 0.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_PAN", "Pan", juce::NormalisableRange<float>(-100.0f, 100.0f, 1.0f), 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_LOW", "EQ Low", eqRange, 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_LOW", "EQ Mid-L", eqRange, 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_HIGH", "EQ Mid-H", eqRange, 0.0f));
