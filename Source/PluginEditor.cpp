@@ -39,6 +39,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(filterModule);
     addAndMakeVisible(envelopeModule);
     addAndMakeVisible(spaceModule);
+    addAndMakeVisible(choirModule);
     addAndMakeVisible(lfoModule);
     addAndMakeVisible(masterModule);
     addAndMakeVisible(distModule);
@@ -662,6 +663,7 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // Ahora sí, le pasamos el rectángulo correcto al módulo
     spaceModule.setBounds(spaceRect.reduced(2));
+    choirModule.setBounds(choirRect.reduced(2));
 }
 
 bool Granular_SynthAudioProcessorEditor::isInterestedInFileDrag(const juce::StringArray& files)
@@ -790,6 +792,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         pitchModule.setLayer(layer);
         filterModule.setLayer(layer);
         spaceModule.setLayer(layer);
+        choirModule.setLayer(layer);
         distModule.setLayer(layer);
         envelopeModule.setLayer(layer);
         mixerModule1.setLayer(layer);

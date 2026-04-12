@@ -24,6 +24,7 @@
 #include "LayerControlsModule.h"
 #include "LayerMixerModule.h"
 #include "FxFormantModule.h"
+#include "ChoirModule.h"
 
 class Granular_SynthAudioProcessorEditor : public juce::AudioProcessorEditor,
     public juce::FileDragAndDropTarget,
@@ -81,6 +82,7 @@ private:
     FilterModule filterModule{ audioProcessor.apvts, "L1_" };
     EnvelopeModule envelopeModule{ audioProcessor.apvts, "L1_" };
     SpaceModule spaceModule{ audioProcessor.apvts, "L1_" };
+    ChoirModule choirModule{ audioProcessor.apvts, "L1_" };
     LfoModule lfoModule{ audioProcessor.apvts };
     DistModule distModule{ audioProcessor.apvts, "L1_" };
     LayerMixerModule mixerModule1{ audioProcessor.apvts, "L1_" };

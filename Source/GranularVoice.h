@@ -84,4 +84,23 @@ private:
     juce::dsp::IIR::Filter<float> eqMidLowFilter[2];
     juce::dsp::IIR::Filter<float> eqMidHighFilter[2];
     juce::dsp::IIR::Filter<float> eqHighFilter[2];
+
+    // =======================================================================
+    // ARQUITECTURA  (Ruteo Paralelo)
+    // =======================================================================
+
+    // 1. LA TIERRA: Filtro Pasa-Bajos para aislar el subgrave puro
+    juce::dsp::StateVariableTPTFilter<float> subCrossoverFilter[2];
+
+    // 2. LA HUMANIDAD: Algoritmo de Chorus Multilínea de JUCE
+    juce::dsp::Chorus<float> ensembleFX;
+
+    // 3. EL CIELO: Delay Line y Filtro Pasa-Altos para el Halo (Shimmer)
+    // Reservamos memoria para 2 segundos de delay máximo a 48kHz o 96kHz (100000 muestras)
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> haloDelay{ 100000 };
+    juce::dsp::StateVariableTPTFilter<float> haloHighpass[2];
+
+    //LFO del Halo
+    //float haloLfoPhase = 0.0f;
+    float haloPhasor = 0.0f;
 };

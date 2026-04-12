@@ -4,6 +4,8 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth,pluginProducesMidiOut,pluginWantsMidiIn">
   <MAINGROUP id="rIKO8T" name="Granular_Synth">
     <GROUP id="{849B0228-6809-FA67-5837-53AAF84891E6}" name="Source">
+      <FILE id="Z2H9N2" name="ChoirModule.cpp" compile="1" resource="0" file="Source/ChoirModule.cpp"/>
+      <FILE id="MtLHfR" name="ChoirModule.h" compile="0" resource="0" file="Source/ChoirModule.h"/>
       <FILE id="r8tur2" name="FxFormantModule.cpp" compile="1" resource="0"
             file="Source/FxFormantModule.cpp"/>
       <FILE id="PNJe1L" name="FxFormantModule.h" compile="0" resource="0"

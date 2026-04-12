@@ -622,6 +622,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
                 params.push_back(std::make_unique<juce::AudioParameterFloat>(vPref + "_MIX", "Voice " + juce::String(v) + " Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
             }
 
+            // ==============================================================================
+            // NUEVO: PARÁMETROS DEL MÓDULO CHOIR (Halo + Ensemble)
+            // ==============================================================================
+
+            // HALO (Shimmer / Pitch)
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_PITCH", "Halo Pitch", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 1.0f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_SHIMMER", "Halo Shimmer", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_COLOR", "Halo Color", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_HALO_MIX", "Halo Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
+            // ENSEMBLE (Chorus masivo)
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_RATE", "Ensemble Rate", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_DEPTH", "Ensemble Depth", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_WIDTH", "Ensemble Width", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_ENS_MIX", "Ensemble Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.0f));
+
+
             // Mixer & EQ
             juce::NormalisableRange<float> eqRange(-60.0f, 15.0f, 0.1f);
             eqRange.setSkewForCentre(0.0f);
