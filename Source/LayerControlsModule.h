@@ -27,6 +27,9 @@ private:
     juce::TextButton holdButton;
     juce::TextButton muteButton;
 
+    juce::TextButton recButton;
+    juce::ComboBox recModeBox;
+
     juce::Slider panSlider;
     
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttach;
@@ -34,6 +37,9 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> midiAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> holdAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> muteAttach;
+
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> recAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> recModeAttach;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayerControlsModule)
 };

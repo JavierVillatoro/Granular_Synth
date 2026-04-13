@@ -659,6 +659,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_LOW", "EQ Mid-L", eqRange, 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_MID_HIGH", "EQ Mid-H", eqRange, 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_EQ_HIGH", "EQ High", eqRange, 0.0f));
+
+            // --- NUEVOS PARÁMETROS DE GRABACIÓN ---
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_REC", "Record", false));
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_REC_MODE", "Rec Mode", juce::StringArray{ "DAW Input", "WiFi Live", "WiFi File" }, 0));
         };
 
     addLayerParameters("L1"); addLayerParameters("L2"); addLayerParameters("L3"); addLayerParameters("L4");

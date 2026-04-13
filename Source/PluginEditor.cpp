@@ -627,17 +627,20 @@ void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& 
 
 void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event)
 {
+    ignoreDragForPosition = false; // Quitamos el seguro por defecto
     lastDragX = event.getPosition().x;
-    auto bounds = getLocalBounds();
-    bounds.removeFromBottom(300); bounds.removeFromRight(350);
 
+    auto bounds = getLocalBounds();
+    bounds.removeFromBottom(300);
+    bounds.removeFromRight(350);
     int layerHeight = bounds.getHeight() / 4;
+
     auto layer1Area = bounds.removeFromTop(layerHeight);
     auto layer2Area = bounds.removeFromTop(layerHeight);
     auto layer3Area = bounds.removeFromTop(layerHeight);
     auto layer4Area = bounds.removeFromTop(layerHeight);
 
-    // Función auxiliar para obtener las coordenadas exactas de los botones
+    // 1. Comprobar Botones Pequeños Inferiores (MUTE/SOLO en la onda)
     auto getButtonsArea = [&](juce::Rectangle<int> area) {
         auto btnArea = area.removeFromBottom(25).removeFromRight(55).withTrimmedRight(5);
         juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
@@ -646,7 +649,6 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         return std::make_pair(btnSolo, btnNum);
         };
 
-    // --- 1. COMPROBAR CLICS EN BOTONES (Antes que la selección de pista) ---
     auto checkButtons = [&](juce::Rectangle<int> area, juce::String prefix) {
         auto btns = getButtonsArea(area);
         if (btns.first.contains(event.getPosition())) {
@@ -667,108 +669,89 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     if (checkButtons(layer3Area, "L3_")) { ignoreDragForPosition = true; return; }
     if (checkButtons(layer4Area, "L4_")) { ignoreDragForPosition = true; return; }
 
-
-    // --- 2. LÓGICA DE SELECCIÓN DE PISTA (Si no hiciste clic en un botón) ---
+    // 2. Lógica Universal de Selección y Posicionamiento
     auto updateModules = [&](int layer) {
-        activeLayer = layer; engineModule.setLayer(layer); scanModule.setLayer(layer);
-        sprayModule.setLayer(layer); pitchModule.setLayer(layer); filterModule.setLayer(layer);
-        spaceModule.setLayer(layer); choirModule.setLayer(layer); distModule.setLayer(layer);
-        envelopeModule.setLayer(layer); mixerModule1.setLayer(layer);
-        monk1.setLayer(layer); monk2.setLayer(layer); monk3.setLayer(layer); monk4.setLayer(layer);
+        activeLayer = layer;
+        engineModule.setLayer(layer); scanModule.setLayer(layer); sprayModule.setLayer(layer);
+        pitchModule.setLayer(layer); filterModule.setLayer(layer); spaceModule.setLayer(layer);
+        choirModule.setLayer(layer); distModule.setLayer(layer); envelopeModule.setLayer(layer);
+        mixerModule1.setLayer(layer); monk1.setLayer(layer); monk2.setLayer(layer);
+        monk3.setLayer(layer); monk4.setLayer(layer);
         };
 
-    if (layer1Area.contains(event.getPosition())) {
-        if (activeLayer != 1) updateModules(1); repaint();
-    }
-    else if (layer2Area.contains(event.getPosition())) {
-        if (activeLayer != 2) updateModules(2); repaint();
-    }
-    else if (layer3Area.contains(event.getPosition())) {
-        if (activeLayer != 3) updateModules(3); repaint();
-    }
-    else if (layer4Area.contains(event.getPosition())) {
-        if (activeLayer != 4) updateModules(4); repaint();
-    }
+    bool isPanMode = event.mods.isAltDown() || event.mods.isRightButtonDown();
+
+    auto handleLayerClick = [&](juce::Rectangle<int>& area, int layerIndex, juce::String prefix) {
+        bool wasAlreadyActive = (activeLayer == layerIndex);
+
+        // Si no estaba activa, el primer clic solo la selecciona.
+        if (!wasAlreadyActive) {
+            updateModules(layerIndex);
+        }
+
+        // Si ya estaba activa y no es click derecho, movemos el cabezal
+        if (wasAlreadyActive && !isPanMode) {
+            float clickX = event.getPosition().x - area.getX();
+            // ratioInScreen es directamente el POSITION que espera tu motor granular
+            float ratioInScreen = juce::jlimit(0.0f, 1.0f, clickX / (float)area.getWidth());
+
+            if (auto* p = audioProcessor.apvts.getParameter(prefix + "POSITION"))
+                p->setValueNotifyingHost(ratioInScreen);
+        }
+        repaint();
+        };
+
+    if (layer1Area.contains(event.getPosition())) handleLayerClick(layer1Area, 1, "L1_");
+    else if (layer2Area.contains(event.getPosition())) handleLayerClick(layer2Area, 2, "L2_");
+    else if (layer3Area.contains(event.getPosition())) handleLayerClick(layer3Area, 3, "L3_");
+    else if (layer4Area.contains(event.getPosition())) handleLayerClick(layer4Area, 4, "L4_");
 }
 
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
 {
-    if (ignoreDragForPosition) return;
+    if (ignoreDragForPosition) return; // Si tocamos un botón antes, ignoramos el arrastre
 
     auto bounds = getLocalBounds();
     bounds.removeFromBottom(300);
     bounds.removeFromRight(350);
-
     int layerHeight = bounds.getHeight() / 4;
+
     auto layer1Area = bounds.removeFromTop(layerHeight);
     auto layer2Area = bounds.removeFromTop(layerHeight);
     auto layer3Area = bounds.removeFromTop(layerHeight);
     auto layer4Area = bounds.removeFromTop(layerHeight);
 
-    // Calculamos cuánto se ha movido el ratón desde el último fotograma
     int deltaX = event.getPosition().x - lastDragX;
     lastDragX = event.getPosition().x;
 
     bool isPanMode = event.mods.isAltDown() || event.mods.isRightButtonDown();
 
-    if (activeLayer == 1) {
+    auto handleLayerDrag = [&](juce::Rectangle<int>& area, juce::String prefix, double& vSR, double zF, std::atomic<float>& winStartRatioToStore) {
         if (isPanMode) {
-            // Lógica de Panning: Movemos la cámara proporcionalmente al zoom
-            double panShift = ((double)deltaX / (double)layer1Area.getWidth()) / zoomFactor;
-            viewStartRatio -= panShift; // Restamos para que la onda acompañe al ratón
-            viewStartRatio = juce::jlimit(0.0, 1.0 - (1.0 / zoomFactor), viewStartRatio);
-            audioProcessor.windowStartRatioL1.store((float)viewStartRatio);
+            // MODO NAVEGACIÓN (Arrastrar Cámara con Clic Derecho)
+            double panShift = ((double)deltaX / (double)area.getWidth()) / zF;
+            vSR -= panShift;
+            double maxStart = juce::jmax(0.0, 1.0 - (1.0 / zF));
+            vSR = juce::jlimit(0.0, maxStart, vSR);
+            winStartRatioToStore.store((float)vSR);
         }
         else {
-            // Lógica de Scrubbing normal
-            float clickX = event.getPosition().x - layer1Area.getX();
-            float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer1Area.getWidth());
-            if (auto* p = audioProcessor.apvts.getParameter("L1_POSITION")) p->setValueNotifyingHost(ratioInView);
+            // MODO SCRUBBING (Mover el Cabezal de Posición con Clic Izquierdo)
+            float clickX = event.getPosition().x - area.getX();
+            float ratioInScreen = juce::jlimit(0.0f, 1.0f, clickX / (float)area.getWidth());
+
+            if (auto* p = audioProcessor.apvts.getParameter(prefix + "POSITION"))
+                p->setValueNotifyingHost(ratioInScreen);
         }
         repaint();
-    }
-    else if (activeLayer == 2) {
-        if (isPanMode) {
-            double panShift = ((double)deltaX / (double)layer2Area.getWidth()) / zoomFactorL2;
-            viewStartRatioL2 -= panShift;
-            viewStartRatioL2 = juce::jlimit(0.0, 1.0 - (1.0 / zoomFactorL2), viewStartRatioL2);
-            audioProcessor.windowStartRatioL2.store((float)viewStartRatioL2);
-        }
-        else {
-            float clickX = event.getPosition().x - layer2Area.getX();
-            float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer2Area.getWidth());
-            if (auto* p = audioProcessor.apvts.getParameter("L2_POSITION")) p->setValueNotifyingHost(ratioInView);
-        }
-        repaint();
-    }
-    else if (activeLayer == 3) {
-        if (isPanMode) {
-            double panShift = ((double)deltaX / (double)layer3Area.getWidth()) / zoomFactorL3;
-            viewStartRatioL3 -= panShift;
-            viewStartRatioL3 = juce::jlimit(0.0, 1.0 - (1.0 / zoomFactorL3), viewStartRatioL3);
-            audioProcessor.windowStartRatioL3.store((float)viewStartRatioL3);
-        }
-        else {
-            float clickX = event.getPosition().x - layer3Area.getX();
-            float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer3Area.getWidth());
-            if (auto* p = audioProcessor.apvts.getParameter("L3_POSITION")) p->setValueNotifyingHost(ratioInView);
-        }
-        repaint();
-    }
-    else if (activeLayer == 4) {
-        if (isPanMode) {
-            double panShift = ((double)deltaX / (double)layer4Area.getWidth()) / zoomFactorL4;
-            viewStartRatioL4 -= panShift;
-            viewStartRatioL4 = juce::jlimit(0.0, 1.0 - (1.0 / zoomFactorL4), viewStartRatioL4);
-            audioProcessor.windowStartRatioL4.store((float)viewStartRatioL4);
-        }
-        else {
-            float clickX = event.getPosition().x - layer4Area.getX();
-            float ratioInView = juce::jlimit(0.0f, 1.0f, clickX / (float)layer4Area.getWidth());
-            if (auto* p = audioProcessor.apvts.getParameter("L4_POSITION")) p->setValueNotifyingHost(ratioInView);
-        }
-        repaint();
-    }
+        };
+
+    // Ya no comprobamos if(layerArea.contains) para evitar que el arrastre se corte
+    // si mueves la mano hacia arriba o abajo. Solo nos guiamos por la capa activa.
+    if (activeLayer == 1) handleLayerDrag(layer1Area, "L1_", viewStartRatio, zoomFactor, audioProcessor.windowStartRatioL1);
+    else if (activeLayer == 2) handleLayerDrag(layer2Area, "L2_", viewStartRatioL2, zoomFactorL2, audioProcessor.windowStartRatioL2);
+    else if (activeLayer == 3) handleLayerDrag(layer3Area, "L3_", viewStartRatioL3, zoomFactorL3, audioProcessor.windowStartRatioL3);
+    else if (activeLayer == 4) handleLayerDrag(layer4Area, "L4_", viewStartRatioL4, zoomFactorL4, audioProcessor.windowStartRatioL4);
 }
 
 void Granular_SynthAudioProcessorEditor::timerCallback() { repaint(); }
