@@ -242,8 +242,29 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
                     float finalPos = juce::jlimit(0.0f, 1.0f, winStart + (juce::jlimit(0.0f, 1.0f, currentTargetPos + ((juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos)) * winLen));
                     grain.startSample = (int)(finalPos * (currentBuffer->getNumSamples() - 1));
 
+                    //float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
+                    //if ((int)pitchScale == 1) rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
+
+                    //grain.activePitchRatio = finalBasePitchRatio * std::pow(2.0f, rawPitchRand / 12.0f);
+
                     float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
-                    if ((int)pitchScale == 1) rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
+
+                    // --- CORRECCIÓN DEL BUG DE ESCALA ---
+                    int scaleMode = juce::roundToInt(pitchScale); // Redondeo seguro, adiós a los decimales trampa
+
+                    if (scaleMode == 1) {
+                        // Modo 1: Octavas (Solo salta de 12 en 12)
+                        rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
+                    }
+                    else if (scaleMode == 2) {
+                        // Modo 2: Quintas (Solo salta de 7 en 7 semitonos)
+                        rawPitchRand = std::round(rawPitchRand / 7.0f) * 7.0f;
+                    }
+                    else if (scaleMode == 3) {
+                        // Modo 3: Semitonos (Cromático exacto)
+                        rawPitchRand = std::round(rawPitchRand);
+                    }
+                    // Si scaleMode es 0 (Libre), se queda como float continuo sin cuantizar.
 
                     grain.activePitchRatio = finalBasePitchRatio * std::pow(2.0f, rawPitchRand / 12.0f);
                     float randomPan = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPan;
