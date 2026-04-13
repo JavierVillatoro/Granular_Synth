@@ -41,5 +41,9 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> recAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> recModeAttach;
 
+    //std::unique_ptr<juce::LookAndFeel> customPanStyle;
+    std::unique_ptr<juce::LookAndFeel> recStyle;
+    std::unique_ptr<juce::LookAndFeel> comboStyle;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayerControlsModule)
 };

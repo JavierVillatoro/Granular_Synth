@@ -8,6 +8,85 @@
 
 #include "LayerControlsModule.h"
 
+// =============================================================================
+// --- ESTILO DEL BOTÓN REC (Forma ovalada + Texto dinámico) ---
+// =============================================================================
+class RecStyle : public juce::LookAndFeel_V4 {
+public:
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
+        bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override {
+        auto bounds = button.getLocalBounds().toFloat();
+        float cornerSize = bounds.getHeight() / 2.0f; // Radio perfecto para óvalo
+
+        if (button.getToggleState()) {
+            // SI ESTÁ GRABANDO (ON)
+            g.setColour(juce::Colours::red.withAlpha(0.9f));
+            g.fillRoundedRectangle(bounds, cornerSize);
+
+            // Borde blanco radiante
+            g.setColour(juce::Colours::white);
+            g.drawRoundedRectangle(bounds.reduced(1.0f), cornerSize, 2.0f);
+        }
+        else {
+            // SI ESTÁ APAGADO (OFF)
+            g.setColour(juce::Colours::transparentBlack);
+            g.fillRoundedRectangle(bounds, cornerSize);
+
+            g.setColour(juce::Colours::white.withAlpha(0.2f));
+            g.drawRoundedRectangle(bounds.reduced(0.5f), cornerSize, 1.0f);
+        }
+    }
+
+    void drawButtonText(juce::Graphics& g, juce::TextButton& button, bool, bool) override {
+        g.setFont(juce::Font(11.0f, juce::Font::bold));
+        // Texto blanco si graba, rojo apagado si no
+        g.setColour(button.getToggleState() ? juce::Colours::white : juce::Colours::red.withAlpha(0.6f));
+        g.drawText(button.getButtonText(), button.getLocalBounds(), juce::Justification::centred, false);
+    }
+};
+
+// =============================================================================
+// --- ESTILO DEL MENÚ DESPLEGABLE (Camaleónico) ---
+// =============================================================================
+class ComboStyle : public juce::LookAndFeel_V4 {
+public:
+    void drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
+        int buttonX, int buttonY, int buttonW, int buttonH,
+        juce::ComboBox& box) override
+    {
+        // Fondo y Borde sutil
+        g.setColour(juce::Colours::black.withAlpha(0.3f));
+        g.fillRoundedRectangle(0, 0, width, height, 4.0f);
+        g.setColour(juce::Colours::white.withAlpha(0.1f));
+        g.drawRoundedRectangle(0.5f, 0.5f, width - 1.0f, height - 1.0f, 4.0f, 1.0f);
+
+        // --- Lógica del texto corto ---
+        juce::String fullText = box.getText();
+        juce::String shortText = "DAW"; // Por defecto
+
+        if (fullText.contains("UDP")) shortText = "UDP";
+        else if (fullText.contains("TCP")) shortText = "TCP";
+
+        // Dibujamos nuestro texto personalizado
+        g.setColour(juce::Colours::white.withAlpha(0.8f));
+        g.setFont(juce::Font(12.0f, juce::Font::bold).withExtraKerningFactor(0.05f));
+        g.drawText(shortText, 0, 0, width - buttonW, height, juce::Justification::centred, false);
+
+        // Dibujar la flechita
+        juce::Path path;
+        float arrowX = width - 14.0f;
+        float arrowY = height / 2.0f - 2.0f;
+        path.addTriangle(arrowX, arrowY, arrowX + 8.0f, arrowY, arrowX + 4.0f, arrowY + 5.0f);
+        g.setColour(juce::Colours::white.withAlpha(0.6f));
+        g.fillPath(path);
+    }
+};
+
+
+// =============================================================================
+// --- CLASE PRINCIPAL ---
+// =============================================================================
+
 LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apvts, juce::String prefix)
     : apvtsRef(apvts), paramPrefix(prefix)
 {
@@ -35,23 +114,30 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     setupButton(holdButton, "HOLD", paramPrefix + "HOLD", holdAttach, mainColor);
     setupButton(muteButton, "MUTE", paramPrefix + "MUTE", muteAttach, mainColor);
 
-    // 2. Botón REC (Se ilumina en Rojo)
+    // 2. Botón REC (Le ponemos su nuevo traje)
     setupButton(recButton, "REC", paramPrefix + "REC", recAttach, juce::Colours::red);
+    recStyle = std::make_unique<RecStyle>();
+    recButton.setLookAndFeel(recStyle.get());
 
-    // 3. Menú Desplegable de Grabación
+    // 3. Menú Desplegable
     recModeBox.addItem("DAW Input / Mic", 1);
     recModeBox.addItem("WiFi Live (UDP)", 2);
     recModeBox.addItem("WiFi File (TCP)", 3);
-    recModeBox.setJustificationType(juce::Justification::centred);
+
+    // Hacemos el texto nativo invisible para que no se superponga con nuestro shortText
+    recModeBox.setColour(juce::ComboBox::textColourId, juce::Colours::transparentBlack);
     recModeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
-    recModeBox.setColour(juce::ComboBox::textColourId, juce::Colours::white.withAlpha(0.7f));
     recModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+
+    comboStyle = std::make_unique<ComboStyle>();
+    recModeBox.setLookAndFeel(comboStyle.get());
     addAndMakeVisible(recModeBox);
     recModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "REC_MODE", recModeBox);
 
-    // 4. Slider de Paneo
+    // 4. Slider de Paneo (¡DEVUELVO LOS COLORES A LOS DOTS!)
     panSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     panSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    // AQUÍ ESTÁ LA LÍNEA QUE FALTABA:
     panSlider.setColour(juce::Slider::thumbColourId, mainColor);
     panSlider.setColour(juce::Slider::trackColourId, juce::Colours::white.withAlpha(0.3f));
     panSlider.setDoubleClickReturnValue(true, 0.0);
@@ -59,28 +145,38 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     panAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, paramPrefix + "PAN", panSlider);
 }
 
-LayerControlsModule::~LayerControlsModule() {}
+LayerControlsModule::~LayerControlsModule() {
+    recButton.setLookAndFeel(nullptr);
+    recModeBox.setLookAndFeel(nullptr);
+}
+
 void LayerControlsModule::paint(juce::Graphics& g) {}
 
 void LayerControlsModule::resized()
 {
     auto area = getLocalBounds();
-    auto topRow = area.removeFromTop(area.getHeight() / 2);
-    int btnWidth = 45;
 
-    // Fila 1: Transporte (Izquierda)
-    playButton.setBounds(topRow.removeFromLeft(btnWidth));
-    midiButton.setBounds(topRow.removeFromLeft(btnWidth));
-    holdButton.setBounds(topRow.removeFromLeft(btnWidth));
-    muteButton.setBounds(topRow.removeFromLeft(btnWidth));
+    int stdBtnW = 40;
+    int gap = 2;
+    int topMargin = 8;
+    int sideMargin = 10;
 
-    // Fila 1: Botón REC (Derecha)
-    recButton.setBounds(topRow.removeFromRight(50).reduced(2, 2));
+    // --- ZONA IZQUIERDA ---
+    playButton.setBounds(sideMargin, topMargin, stdBtnW, 20);
+    midiButton.setBounds(sideMargin + stdBtnW + gap, topMargin, stdBtnW, 20);
+    holdButton.setBounds(sideMargin + (stdBtnW * 2) + (gap * 2), topMargin, stdBtnW, 20);
 
-    // Fila 2: Paneo (Ocupa el ancho exacto de Play, Midi y Hold)
-    auto bottomRow = area;
-    panSlider.setBounds(bottomRow.removeFromLeft(btnWidth * 3).reduced(5, 2));
+    int transportWidth = (stdBtnW * 3) + (gap * 2);
+    panSlider.setBounds(sideMargin, area.getHeight() - 25, transportWidth, 20);
 
-    // Fila 2: Desplegable REC_MODE (Debajo del Mute y el REC)
-    recModeBox.setBounds(bottomRow.removeFromRight(120).reduced(2, 2));
+    // --- ZONA DERECHA ---
+    int rightEdge = area.getWidth() - sideMargin;
+
+    muteButton.setBounds(rightEdge - stdBtnW, topMargin, stdBtnW, 20);
+
+    // El Rec con forma de píldora (mide 40 de ancho, pero el diseño ovalado le da el toque)
+    recButton.setBounds(rightEdge - (stdBtnW * 2) - gap, topMargin, stdBtnW, 20);
+
+    int comboW = 75; // Más corto, ya que ahora solo pone DAW, UDP o TCP
+    recModeBox.setBounds(rightEdge - (stdBtnW * 2) - gap - comboW - gap, topMargin, comboW, 20);
 }

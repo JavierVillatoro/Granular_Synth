@@ -125,25 +125,24 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     // ==========================================================
     // --- 1. MAGIA DE COLOR: TEMA DINÁMICO SEGÚN LA CAPA ---
     // ==========================================================
-    juce::Colour themeColor = juce::Colours::cyan; // Capa 1 por defecto
+    juce::Colour themeColor = juce::Colours::cyan;
     if (activeLayer == 2) themeColor = juce::Colours::magenta;
     else if (activeLayer == 3) themeColor = juce::Colours::orange;
     else if (activeLayer == 4) themeColor = juce::Colours::lime;
 
-    g.fillAll(juce::Colour(0xff121212)); // Fondo oscuro global
+    g.fillAll(juce::Colour(0xff121212));
 
     auto bounds = getLocalBounds();
     auto bottomModulesArea = bounds.removeFromBottom(300);
     auto rightMixerArea = bounds.removeFromRight(350);
     auto wavesArea = bounds;
 
-    // Borde general de las ondas usando el color dinámico
     g.setColour(themeColor.withAlpha(0.3f));
     g.drawRect(wavesArea, 1);
 
     int layerHeight = wavesArea.getHeight() / 4;
 
-    // --- LEER ESTADOS PARA EL DIMMING VISUAL ---
+    // --- LEER ESTADOS PARA EL DIMMING VISUAL Y REC ---
     bool m1 = audioProcessor.apvts.getRawParameterValue("L1_MUTE")->load() > 0.5f;
     bool m2 = audioProcessor.apvts.getRawParameterValue("L2_MUTE")->load() > 0.5f;
     bool m3 = audioProcessor.apvts.getRawParameterValue("L3_MUTE")->load() > 0.5f;
@@ -154,17 +153,29 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     bool s3 = audioProcessor.apvts.getRawParameterValue("L3_SOLO")->load() > 0.5f;
     bool s4 = audioProcessor.apvts.getRawParameterValue("L4_SOLO")->load() > 0.5f;
 
+    // Leemos quién está grabando
+    bool r1 = audioProcessor.apvts.getRawParameterValue("L1_REC")->load() > 0.5f;
+    bool r2 = audioProcessor.apvts.getRawParameterValue("L2_REC")->load() > 0.5f;
+    bool r3 = audioProcessor.apvts.getRawParameterValue("L3_REC")->load() > 0.5f;
+    bool r4 = audioProcessor.apvts.getRawParameterValue("L4_REC")->load() > 0.5f;
+
     bool anySolo = s1 || s2 || s3 || s4;
 
-    // Si la capa está muteada, o hay otro solo activo, la opacidad cae a 0.2 (Fantasma)
     float a1 = (!m1 && (!anySolo || s1)) ? 1.0f : 0.2f;
     float a2 = (!m2 && (!anySolo || s2)) ? 1.0f : 0.2f;
     float a3 = (!m3 && (!anySolo || s3)) ? 1.0f : 0.2f;
     float a4 = (!m4 && (!anySolo || s4)) ? 1.0f : 0.2f;
 
-    // Función Helper para pintar los botones de cada capa en la esquina inferior derecha
     auto drawLayerButtons = [&](juce::Rectangle<int> area, juce::Colour color, int num, bool isSolo, bool isMute, float layerAlpha) {
-        auto btnArea = area.removeFromBottom(25).removeFromRight(55).withTrimmedRight(5);
+
+        // --- NUEVO: CANDADO DE FUENTE ---
+        // Forzamos la fuente plana y tamaño normal para que el "Grabando..." gigante no contamine esto
+        g.setFont(juce::Font(14.0f, juce::Font::plain));
+
+        // --- NUEVO: AJUSTE DE ALTURA ---
+        // Le restamos 25 de abajo, pero lo trasladamos (0, -3) para separarlo del borde inferior 3 píxeles
+        auto btnArea = area.removeFromBottom(25).translated(0, -3).removeFromRight(55).withTrimmedRight(5);
+
         juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
         btnArea.removeFromRight(5);
         juce::Rectangle<int> btnSolo = btnArea.removeFromRight(20);
@@ -187,26 +198,22 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         };
 
     // ==========================================================
-    // --- LÓGICA DE DIBUJO DE CAPAS (Con Dimming Dinámico) ---
+    // --- LÓGICA DE DIBUJO DE CAPAS (HYBRID RENDER + REC MODE) ---
     // ==========================================================
-    // ==========================================================
-    // --- LÓGICA DE DIBUJO DE CAPAS (Con Dimming Dinámico y Shape) ---
-    // ==========================================================
-    //auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute) {
-    //auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, juce::AudioBuffer<float>* rawBuffer) {
-    auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, juce::AudioBuffer<float>* rawBuffer, juce::Synthesiser& synth) {
+    auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, bool isRec, juce::AudioBuffer<float>* rawBuffer, juce::Synthesiser& synth) {
         g.setColour(color.withAlpha(0.6f * alpha));
         g.drawRect(area, 2);
+
+        // Si está en modo REC, atenuamos la onda al máximo para que quede en segundo plano (efecto fantasma)
+        float drawAlpha = isRec ? 0.08f : alpha;
 
         if (thumb.getNumChannels() > 0) {
             double totSecs = thumb.getTotalLength();
             double visSecs = totSecs / zF;
             double startT = vsR * totSecs;
 
-            // --- NUEVO: SISTEMA DE RENDERIZADO HÍBRIDO ---
             if (zF >= 8.0 && rawBuffer != nullptr && rawBuffer->getNumSamples() > 0) {
-                // MODO VECTORIAL (Alto Zoom): Leemos el sample exacto
-                g.setColour(color.withAlpha(alpha));
+                g.setColour(color.withAlpha(drawAlpha));
                 juce::Path wavePath;
                 int sampleRate = audioProcessor.getSampleRate();
                 int startSample = (int)(startT * sampleRate);
@@ -218,9 +225,8 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                     float heightHalf = area.getHeight() / 2.0f;
                     wavePath.startNewSubPath(area.getX(), yCenter);
 
-                    // Nos saltamos muestras según el ancho de la pantalla para no ahogar la CPU
                     int skip = juce::jmax(1, numSamplesToDraw / area.getWidth());
-                    auto* readPtr = rawBuffer->getReadPointer(0); // Leemos el canal L
+                    auto* readPtr = rawBuffer->getReadPointer(0);
 
                     for (int i = startSample; i < endSample; i += skip) {
                         float x = area.getX() + ((float)(i - startSample) / numSamplesToDraw) * area.getWidth();
@@ -231,8 +237,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 }
             }
             else {
-                // MODO CACHÉ (Zoom Normal): Rápido y eficiente
-                g.setColour(color.withAlpha(alpha));
+                g.setColour(color.withAlpha(drawAlpha));
                 thumb.drawChannel(g, area.reduced(2), startT, startT + visSecs, 0, 1.0f);
             }
 
@@ -254,7 +259,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 double cursorTimeSeconds = absolutePos * totSecs;
                 float cursorX = area.getX() + (((cursorTimeSeconds)-startT) / visSecs) * area.getWidth();
 
-                // --- RECUPERADO: DIBUJO DE LA FORMA DEL GRANO (SHAPE / SIZE) ---
                 float sizeRatio = sizeParam->load();
                 float shapeValue = shapeParam->load();
                 float activeAudioSeconds = (float)totSecs * winLen;
@@ -277,14 +281,14 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
                 grainPath.closeSubPath();
 
-                g.setColour(color.withAlpha(0.3f * alpha));
+                g.setColour(color.withAlpha(0.3f * drawAlpha));
                 g.fillPath(grainPath);
-                g.setColour(color.withAlpha(0.8f * alpha));
+                g.setColour(color.withAlpha(0.8f * drawAlpha));
                 g.strokePath(grainPath, juce::PathStrokeType(1.5f));
-                // ---------------------------------------------------------------
 
-                g.setColour(juce::Colours::white.withAlpha(0.9f * alpha));
-                // --- RECUPERADO: DIBUJAR LOS GRANOS ACTIVOS (BARRITAS BLANCAS) ---
+                g.setColour(juce::Colours::white.withAlpha(0.9f * drawAlpha));
+
+                // PINTAR GRANOS
                 for (int i = 0; i < synth.getNumVoices(); ++i) {
                     if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
                         for (int g_idx = 0; g_idx < 128; ++g_idx) {
@@ -300,33 +304,68 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                                     float yCenter = area.getCentreY();
                                     float yStart = yCenter - (currentHeight / 2.0f);
 
-                                    // Pintamos con el alpha de la capa para que se atenúe si está muteada
-                                    g.setColour(juce::Colours::white.withAlpha(env * 0.8f * alpha));
+                                    g.setColour(juce::Colours::white.withAlpha(env * 0.8f * drawAlpha));
                                     g.drawLine(xPixel, yStart, xPixel, yStart + currentHeight, 1.5f + (env * 1.5f));
                                 }
                             }
                         }
                     }
                 }
-                // -----------------------------------------------------------------
-                g.setColour(juce::Colours::white);
+                g.setColour(juce::Colours::white.withAlpha(isRec ? 0.2f : 1.0f));
                 g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
             }
         }
+
+        // ==========================================================
+        // --- OVERLAY ELEGANTE DE GRABACIÓN (LA RESPIRACIÓN) ---
+        // ==========================================================
+        if (isRec) {
+            // Onda senoidal basada en el tiempo (pulso de 0.2 a 0.8)
+            float timeSecs = juce::Time::getMillisecondCounterHiRes() * 0.004f;
+            float pulse = 0.5f + 0.3f * std::sin(timeSecs);
+
+            // Capa negra semitransparente para oscurecer la onda
+            g.setColour(juce::Colours::black.withAlpha(0.65f));
+            g.fillRect(area.reduced(2));
+
+            // Borde rojo que respira
+            g.setColour(juce::Colours::red.withAlpha(pulse));
+            g.drawRect(area, 2);
+
+            // Determinar el mensaje según el modo seleccionado
+            int recMode = (int)audioProcessor.apvts.getRawParameterValue(prefix + "REC_MODE")->load();
+            juce::String statusText = "";
+            if (recMode == 0) statusText = juce::String::charToString(0x25CF) + " DAW AUDIO ROUTING...";
+            else if (recMode == 1) statusText = juce::String::charToString(0x25CF) + " WIFI LIVE: LISTENING UDP...";
+            else if (recMode == 2) statusText = juce::String::charToString(0x25CF) + " WIFI FILE: WAITING TCP DUMP...";
+
+            // Fuente elegante, un poco espaciada
+            g.setFont(juce::Font(18.0f, juce::Font::bold).withExtraKerningFactor(0.1f));
+
+            // Sombra del texto (glow)
+            g.setColour(juce::Colours::red.withAlpha(pulse * 0.5f));
+            g.drawText(statusText, area.translated(1, 1), juce::Justification::centred);
+
+            // Texto principal
+            g.setColour(juce::Colours::white.withAlpha(0.8f + (pulse * 0.2f)));
+            g.drawText(statusText, area, juce::Justification::centred);
+        }
+
         drawLayerButtons(area, color, num, isSolo, isMute, alpha);
         };
 
+    // Llamadas a drawLayer pasándole el nuevo parámetro `r1`, `r2`, etc.
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1, &audioProcessor.audioBufferL1, audioProcessor.getSynthesiserL1());
+    drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1, r1, &audioProcessor.audioBufferL1, audioProcessor.getSynthesiserL1());
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer2Area, juce::Colours::magenta, a2, thumbnailL2, "L2_", zoomFactorL2, viewStartRatioL2, 2, s2, m2, &audioProcessor.audioBufferL2, audioProcessor.getSynthesiserL2());
+    drawLayer(layer2Area, juce::Colours::magenta, a2, thumbnailL2, "L2_", zoomFactorL2, viewStartRatioL2, 2, s2, m2, r2, &audioProcessor.audioBufferL2, audioProcessor.getSynthesiserL2());
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer3Area, juce::Colours::orange, a3, thumbnailL3, "L3_", zoomFactorL3, viewStartRatioL3, 3, s3, m3, &audioProcessor.audioBufferL3, audioProcessor.getSynthesiserL3());
+    drawLayer(layer3Area, juce::Colours::orange, a3, thumbnailL3, "L3_", zoomFactorL3, viewStartRatioL3, 3, s3, m3, r3, &audioProcessor.audioBufferL3, audioProcessor.getSynthesiserL3());
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    drawLayer(layer4Area, juce::Colours::lime, a4, thumbnailL4, "L4_", zoomFactorL4, viewStartRatioL4, 4, s4, m4, &audioProcessor.audioBufferL4, audioProcessor.getSynthesiserL4());
+    drawLayer(layer4Area, juce::Colours::lime, a4, thumbnailL4, "L4_", zoomFactorL4, viewStartRatioL4, 4, s4, m4, r4, &audioProcessor.audioBufferL4, audioProcessor.getSynthesiserL4());
 
     // --- RESALTAR LA CAPA ACTIVA ---
     g.setColour(juce::Colours::white.withAlpha(0.8f));
@@ -365,18 +404,19 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawRect(stutterAreaRect, 1);
 
     g.setColour(juce::Colours::white.withAlpha(0.7f));
-    g.setFont(14.0f);
+    // CORRECCIÓN: Forzamos fuente plana
+    g.setFont(juce::Font(14.0f, juce::Font::plain));
     g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
-    g.setFont(11.0f);
+    // CORRECCIÓN: Forzamos fuente plana
+    g.setFont(juce::Font(11.0f, juce::Font::plain));
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.drawText("VOICE 1", vowelAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("VOICE 2", resAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("VOICE 3", tapeAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
     g.drawText("VOICE 4", stutterAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
 
-    // Ajustamos las listas de nombres debajo de los knobs
     std::vector<juce::StringArray> knobNames = {
         juce::StringArray {"Size", "Density", "Shape"}, juce::StringArray {"Pos", "Speed", "Dir"},
         juce::StringArray {"Pos", "Pitch", "Pan"}, juce::StringArray {"Trans", "Fine", "Scale"},
@@ -393,7 +433,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     int modIndex = 0;
     for (int row = 0; row < numRows; ++row) {
         for (int col = 0; col < numColumns; ++col) {
-            if (row == 1 && col == 3) continue; // Nos saltamos el último hueco
+            if (row == 1 && col == 3) continue;
 
             juce::Rectangle<int> moduleRect(bottomModulesArea.getX() + (col * moduleWidth), bottomModulesArea.getY() + (row * moduleHeight), moduleWidth, moduleHeight);
 
@@ -410,7 +450,8 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             int numKnobs = knobNames[modIndex].size();
             if (numKnobs > 0) {
                 int labelWidth = labelArea.getWidth() / numKnobs;
-                g.setFont(12.0f);
+                // CORRECCIÓN: Forzamos fuente plana
+                g.setFont(juce::Font(12.0f, juce::Font::plain));
                 g.setColour(juce::Colours::white.withAlpha(0.4f));
                 for (int i = 0; i < numKnobs; ++i) {
                     g.drawText(knobNames[modIndex][i], labelArea.removeFromLeft(labelWidth), juce::Justification::centred);
@@ -420,7 +461,6 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         }
     }
 
-    // --- DIBUJAMOS EL 8º HUECO (CHOIR y SPACE) ---
     juce::Rectangle<int> lastBlock(bottomModulesArea.getX() + (moduleWidth * 3), bottomModulesArea.getY() + moduleHeight, moduleWidth, moduleHeight);
     int halfW = lastBlock.getWidth() / 2;
 
@@ -442,16 +482,16 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // Capas
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
-    layer1Controls.setBounds(layer1Area.getX() + 10, layer1Area.getY() + 10, 200, 45); 
+    layer1Controls.setBounds(layer1Area);
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
-    layer2Controls.setBounds(layer2Area.getX() + 10, layer2Area.getY() + 10, 200, 45); 
+    layer2Controls.setBounds(layer2Area);
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
-    layer3Controls.setBounds(layer3Area.getX() + 10, layer3Area.getY() + 10, 200, 45); 
+    layer3Controls.setBounds(layer3Area);
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
-    layer4Controls.setBounds(layer4Area.getX() + 10, layer4Area.getY() + 10, 200, 45); 
+    layer4Controls.setBounds(layer4Area);
 
     // Mixer / Master
     auto area = rightMixerArea;

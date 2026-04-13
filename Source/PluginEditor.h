@@ -51,7 +51,8 @@ public:
     void parameterChanged(const juce::String& parameterID, float newValue) override
     {
         if (parameterID.contains("POSITION") || parameterID.contains("GRAIN_SIZE") ||
-            parameterID.contains("SHAPE") || parameterID.contains("MUTE") || parameterID.contains("SOLO"))
+            parameterID.contains("SHAPE") || parameterID.contains("MUTE") ||
+            parameterID.contains("SOLO") || parameterID.contains("REC")) // <-- ¡AÑADIDO "REC"!
         {
             juce::MessageManager::callAsync([this] { repaint(); });
         }
