@@ -36,5 +36,8 @@ private:
     juce::Slider volumeFader;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachVol;
 
+    // --- NUEVO: Traje del Fader ---
+    std::unique_ptr<juce::LookAndFeel> faderStyle;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LayerMixerModule)
 };

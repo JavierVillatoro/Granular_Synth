@@ -2,14 +2,73 @@
   ==============================================================================
 
     LayerMixerModule.cpp
-    Created: 28 Mar 2026 5:44:39pm
-    Author:  franc
 
   ==============================================================================
 */
 
 #include <JuceHeader.h>
 #include "LayerMixerModule.h"
+
+// =============================================================================
+// --- ESTILO DEL FADER (El Sándwich Visual Corregido) ---
+// =============================================================================
+class MixerFaderStyle : public juce::LookAndFeel_V4 {
+public:
+    void drawLinearSliderBackground(juce::Graphics& g, int x, int y, int width, int height,
+        float sliderPos, float minSliderPos, float maxSliderPos,
+        const juce::Slider::SliderStyle style, juce::Slider& slider) override
+    {
+        auto layerColor = slider.findColour(juce::Slider::thumbColourId);
+        auto trackColor = slider.findColour(juce::Slider::trackColourId);
+
+        // 1. Carril oscuro
+        float trackWidth = 4.0f; // Más fino y elegante
+        float trackX = x + (width - trackWidth) * 0.5f;
+
+        g.setColour(juce::Colours::black.withAlpha(0.8f));
+        g.fillRoundedRectangle(trackX, (float)y, trackWidth, (float)height, 2.0f);
+
+        // 2. Relleno inferior del color de la capa
+        g.setColour(trackColor);
+        g.fillRoundedRectangle(trackX, sliderPos, trackWidth, (y + height) - sliderPos, 2.0f);
+
+        // 3. LA LÍNEA DE 0dB (Asegurada dentro de los márgenes)
+        float zeroY = slider.getPositionOfValue(0.0);
+        g.setColour(layerColor.withAlpha(0.9f));
+
+        // La dibujamos de lado a lado del fader, dejando 2px de margen para que JUCE no la recorte
+        g.drawLine((float)x + 2.0f, zeroY, (float)x + width - 2.0f, zeroY, 2.0f);
+    }
+
+    void drawLinearSliderThumb(juce::Graphics& g, int x, int y, int width, int height,
+        float sliderPos, float minSliderPos, float maxSliderPos,
+        const juce::Slider::SliderStyle style, juce::Slider& slider) override
+    {
+        auto layerColor = slider.findColour(juce::Slider::thumbColourId);
+
+        // Capuchón ancho (estilo mesa)
+        float thumbW = width * 0.6f;
+        float thumbH = 12.0f;
+        float thumbX = x + (width - thumbW) * 0.5f;
+        juce::Rectangle<float> thumb(thumbX, sliderPos - thumbH * 0.5f, thumbW, thumbH);
+
+        // Sombra
+        g.setColour(juce::Colours::black.withAlpha(0.5f));
+        g.fillRoundedRectangle(thumb.translated(0.0f, 2.0f), 2.0f);
+
+        // Botón
+        g.setColour(layerColor);
+        g.fillRoundedRectangle(thumb, 2.0f);
+
+        // Marca blanca en el centro
+        g.setColour(juce::Colours::white.withAlpha(0.8f));
+        g.fillRect(thumbX + 4.0f, sliderPos - 1.0f, thumbW - 8.0f, 2.0f);
+    }
+};
+
+// =============================================================================
+// --- CLASE PRINCIPAL ---
+// =============================================================================
 
 LayerMixerModule::LayerMixerModule(juce::AudioProcessorValueTreeState& apvts, juce::String layerPrefix)
     : apvtsRef(apvts), prefix(layerPrefix)
@@ -28,14 +87,22 @@ LayerMixerModule::LayerMixerModule(juce::AudioProcessorValueTreeState& apvts, ju
     volumeFader.setSliderStyle(juce::Slider::LinearVertical);
     volumeFader.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 0, 0);
     volumeFader.setTextValueSuffix(" dB");
-    volumeFader.setColour(juce::Slider::backgroundColourId, juce::Colours::black.withAlpha(0.5f));
+
+    // Le ponemos su traje a medida
+    faderStyle = std::make_unique<MixerFaderStyle>();
+    volumeFader.setLookAndFeel(faderStyle.get());
+
     volumeFader.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+    volumeFader.setColour(juce::Slider::textBoxTextColourId, juce::Colours::transparentBlack);
+
     addAndMakeVisible(volumeFader);
 
-    setLayer(1); // Arranca en Capa 1
+    setLayer(1);
 }
 
-LayerMixerModule::~LayerMixerModule() {}
+LayerMixerModule::~LayerMixerModule() {
+    volumeFader.setLookAndFeel(nullptr);
+}
 
 void LayerMixerModule::setLayer(int layerIndex)
 {
@@ -104,10 +171,7 @@ void LayerMixerModule::paint(juce::Graphics& g)
     g.setColour(layerColor.withAlpha(0.3f));
     g.drawRect(getLocalBounds(), 1);
 
-    float zeroY = volumeFader.getY() + volumeFader.getPositionOfValue(0.0);
-
-    g.setColour(layerColor.withAlpha(0.9f));
-    g.drawLine((float)volumeFader.getX() - 3.0f, zeroY, (float)volumeFader.getRight() + 3.0f, zeroY, 2.0f);
+    // NOTA: La línea de 0dB ahora la dibuja el LookAndFeel del fader.
 
     g.setFont(11.0f);
     g.setColour(juce::Colours::white.withAlpha(0.5f));
@@ -116,15 +180,16 @@ void LayerMixerModule::paint(juce::Graphics& g)
     g.drawText("MID-L", eqMidLow.getBounds().translated(0, 22), juce::Justification::centred, false);
     g.drawText("LOW", eqLow.getBounds().translated(0, 22), juce::Justification::centred, false);
 
+    // VOLVEMOS A TU CÓDIGO ORIGINAL PARA EL TEXTO
     g.setFont(juce::Font(12.0f, juce::Font::bold));
     g.setColour(layerColor);
-    juce::String volText = juce::String(volumeFader.getValue(), 1) + " dB";
+    juce::String volText = juce::String(volumeFader.getValue(), 1) + " dB"; // Mantiene tu decimal
     g.drawText(volText, volumeFader.getX() - 10, volumeFader.getBottom() + 2, volumeFader.getWidth() + 20, 15, juce::Justification::centred);
 }
 
 void LayerMixerModule::resized()
 {
-    // Ahora usamos todo el espacio, porque el editor ya nos ha recortado el ancho
+    // VOLVEMOS A TUS DIMENSIONES ORIGINALES
     auto area = getLocalBounds().reduced(5);
 
     auto faderArea = area.removeFromRight(area.getWidth() * 0.35f);
