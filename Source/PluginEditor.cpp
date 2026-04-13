@@ -309,6 +309,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                     }
                 }
                 // -----------------------------------------------------------------
+                g.setColour(juce::Colours::white);
                 g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
             }
         }
