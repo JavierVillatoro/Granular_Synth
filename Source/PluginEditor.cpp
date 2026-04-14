@@ -90,6 +90,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
         thumbnailL3.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL3)));
     if (audioProcessor.isAudioLoadedL4 && audioProcessor.lastLoadedFilePathL4.isNotEmpty())
         thumbnailL4.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL4)));
+    audioProcessor.addChangeListener(this);;
 }
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
@@ -118,6 +119,7 @@ Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
         audioProcessor.apvts.removeParameterListener("L" + juce::String(i) + "_MUTE", this);
         audioProcessor.apvts.removeParameterListener("L" + juce::String(i) + "_SOLO", this);
     }
+    audioProcessor.removeChangeListener(this);
 }
 
 void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
@@ -606,7 +608,35 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
     }
 }
 
-void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) { repaint(); }
+//void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) { repaint(); }
+void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    // 1. Si el mensaje viene de la miniatura, solo repintamos y SALIMOS para no crear bucle
+    if (source == &thumbnail || source == &thumbnailL2 || source == &thumbnailL3 || source == &thumbnailL4)
+    {
+        repaint();
+        return;
+    }
+
+    // 2. Si el mensaje viene del PROCESADOR (porque llegó un WAV nuevo)
+    if (source == &audioProcessor)
+    {
+        // Actualizamos las fuentes solo si han cambiado realmente
+        if (audioProcessor.isAudioLoadedL1)
+            thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL1)));
+
+        if (audioProcessor.isAudioLoadedL2)
+            thumbnailL2.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL2)));
+
+        if (audioProcessor.isAudioLoadedL3)
+            thumbnailL3.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL3)));
+
+        if (audioProcessor.isAudioLoadedL4)
+            thumbnailL4.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL4)));
+
+        repaint();
+    }
+}
 
 void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
 {

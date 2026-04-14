@@ -721,7 +721,8 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
             lastLoadedFilePathL4 = path;
             isUpdatingBufferL4.store(false);
         }
-
+        
+        sendChangeMessage();
         DBG("Archivo cargado en Capa " + juce::String(layerIndex) + ": " + file.getFileName());
     }
 }

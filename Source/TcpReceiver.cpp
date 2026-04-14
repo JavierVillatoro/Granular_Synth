@@ -47,17 +47,17 @@ void TcpReceiver::stopListening()
 
 void TcpReceiver::run()
 {
-    bool audioReceived = false; // <-- LA CLAVE: No nos iremos hasta que esto sea true
-
-    while (!threadShouldExit() && !audioReceived)
+    // 1. QUITAMOS la variable audioReceived del bucle para que sea persistente
+    while (!threadShouldExit())
     {
+        // Esperamos una conexión (esto bloquea el hilo hasta que llega algo)
         juce::StreamingSocket* clientConnection = listenerSocket->waitForNextConnection();
 
         if (clientConnection != nullptr && !threadShouldExit())
         {
             DBG("¡Conexión entrante detectada!");
 
-            // 1. Leer las cabeceras HTTP
+            // --- TU LÓGICA DE CABECERAS (Igual) ---
             juce::String headerString;
             char charBuf[1];
             while (clientConnection->read(charBuf, 1, true) == 1) {
@@ -71,10 +71,10 @@ void TcpReceiver::run()
                 contentLength = headerString.substring(idx + 15).trimStart().getIntValue();
             }
 
-            // 2. Si es un POST y tiene peso, ¡es nuestro audio!
+            // --- TU LÓGICA DE PROCESAMIENTO (Modificada levemente) ---
             if (contentLength > 0 && headerString.contains("POST"))
             {
-                DBG("Descargando archivo WAV de " + juce::String(contentLength) + " bytes...");
+                DBG("Descargando audio de " + juce::String(contentLength) + " bytes...");
 
                 juce::MemoryBlock audioData;
                 audioData.setSize((size_t)contentLength);
@@ -90,24 +90,21 @@ void TcpReceiver::run()
                 tempFile.replaceWithData(audioData.getData(), audioData.getSize());
 
                 juce::String filePath = tempFile.getFullPathName();
-                DBG("Archivo guardado con éxito en: " + filePath);
 
+                // Usamos callAsync para cargar el audio y apagar el botón REC en la UI
                 juce::MessageManager::callAsync([this, filePath] {
                     processorRef.loadFile(filePath, targetLayer);
 
+                    // Esto apaga el botón rojo automáticamente al terminar
                     auto* p = processorRef.apvts.getParameter("L" + juce::String(targetLayer) + "_REC");
                     if (p != nullptr) p->setValueNotifyingHost(0.0f);
                     });
 
-                audioReceived = true; // ¡AHORA SÍ SALIMOS DEL BUCLE MAESTRO!
-            }
-            else
-            {
-                // Si es un ping de seguridad del navegador (OPTIONS), lo ignoramos y seguimos escuchando
-                DBG("Petición de seguridad del navegador ignorada. Esperando el audio real...");
+                // ¡IMPORTANTE! No ponemos audioReceived = true. 
+                // El bucle volverá arriba y esperará el siguiente mensaje o que apagues el REC.
             }
 
-            // 3. Responder SIEMPRE con las cabeceras mágicas para calmar al navegador
+            // --- RESPUESTA HTTP (Obligatoria para que el móvil no se quede esperando) ---
             juce::String response = "HTTP/1.1 200 OK\r\n"
                 "Access-Control-Allow-Origin: *\r\n"
                 "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n"

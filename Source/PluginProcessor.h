@@ -14,7 +14,8 @@
 #include "TcpReceiver.h"
 
 class Granular_SynthAudioProcessor : public juce::AudioProcessor,
-                                     public juce::AudioProcessorValueTreeState::Listener
+                                     public juce::AudioProcessorValueTreeState::Listener,
+                                     public juce::ChangeBroadcaster
 {
 public:
     Granular_SynthAudioProcessor();
