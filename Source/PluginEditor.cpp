@@ -795,5 +795,41 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
     else if (activeLayer == 4) handleLayerDrag(layer4Area, "L4_", viewStartRatioL4, zoomFactorL4, audioProcessor.windowStartRatioL4);
 }
 
-void Granular_SynthAudioProcessorEditor::timerCallback() { repaint(); }
+void Granular_SynthAudioProcessorEditor::timerCallback()
+{
+    // 1. Comprobamos si el Hilo TCP ha metido un archivo nuevo en la Capa 1
+    if (audioProcessor.lastLoadedFilePathL1 != currentPathL1) {
+        currentPathL1 = audioProcessor.lastLoadedFilePathL1; // Actualizamos la memoria
+        if (currentPathL1.isNotEmpty()) {
+            thumbnail.setSource(new juce::FileInputSource(juce::File(currentPathL1)));
+        }
+    }
+
+    // 2. Comprobamos la Capa 2
+    if (audioProcessor.lastLoadedFilePathL2 != currentPathL2) {
+        currentPathL2 = audioProcessor.lastLoadedFilePathL2;
+        if (currentPathL2.isNotEmpty()) {
+            thumbnailL2.setSource(new juce::FileInputSource(juce::File(currentPathL2)));
+        }
+    }
+
+    // 3. Comprobamos la Capa 3
+    if (audioProcessor.lastLoadedFilePathL3 != currentPathL3) {
+        currentPathL3 = audioProcessor.lastLoadedFilePathL3;
+        if (currentPathL3.isNotEmpty()) {
+            thumbnailL3.setSource(new juce::FileInputSource(juce::File(currentPathL3)));
+        }
+    }
+
+    // 4. Comprobamos la Capa 4
+    if (audioProcessor.lastLoadedFilePathL4 != currentPathL4) {
+        currentPathL4 = audioProcessor.lastLoadedFilePathL4;
+        if (currentPathL4.isNotEmpty()) {
+            thumbnailL4.setSource(new juce::FileInputSource(juce::File(currentPathL4)));
+        }
+    }
+
+    // Finalmente, redibujamos la pantalla
+    repaint();
+}
 

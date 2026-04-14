@@ -77,6 +77,11 @@ private:
     juce::AudioThumbnail thumbnailL3;
     juce::AudioThumbnail thumbnailL4;
 
+    juce::String currentPathL1;
+    juce::String currentPathL2;
+    juce::String currentPathL3;
+    juce::String currentPathL4;
+
     EngineModule engineModule{ audioProcessor.apvts, "L1_" };
     ScanModule scanModule{ audioProcessor.apvts, "L1_" };
     SprayModule sprayModule{ audioProcessor.apvts, "L1_" };

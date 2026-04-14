@@ -11,8 +11,10 @@
 #include <JuceHeader.h>
 #include "GranularVoice.h"
 #include "LfoModule.h"
+#include "TcpReceiver.h"
 
-class Granular_SynthAudioProcessor : public juce::AudioProcessor
+class Granular_SynthAudioProcessor : public juce::AudioProcessor,
+                                     public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     Granular_SynthAudioProcessor();
@@ -23,6 +25,8 @@ public:
 
     juce::AudioFormatManager& getFormatManager() { return formatManager; }
     void releaseResources() override;
+
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
 
 #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
@@ -156,6 +160,9 @@ private:
     float lastMuteGainL2 = 1.0f;
     float lastMuteGainL3 = 1.0f;
     float lastMuteGainL4 = 1.0f;
+
+    
+    std::unique_ptr<TcpReceiver> tcpReceiver;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessor)
 };
