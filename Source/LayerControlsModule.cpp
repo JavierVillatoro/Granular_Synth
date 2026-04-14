@@ -64,8 +64,8 @@ public:
         juce::String fullText = box.getText();
         juce::String shortText = "DAW"; // Por defecto
 
-        if (fullText.contains("UDP")) shortText = "UDP";
-        else if (fullText.contains("TCP")) shortText = "TCP";
+        if (fullText.contains("WIFI")) shortText = "WIFI";
+        else if (fullText.contains("USB")) shortText = "USB";
 
         // Dibujamos nuestro texto personalizado
         g.setColour(juce::Colours::white.withAlpha(0.8f));
@@ -120,9 +120,11 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     recButton.setLookAndFeel(recStyle.get());
 
     // 3. Menú Desplegable
-    recModeBox.addItem("DAW Input / Mic", 1);
-    recModeBox.addItem("WiFi Live (UDP)", 2);
-    recModeBox.addItem("WiFi File (TCP)", 3);
+    recModeBox.addItem("DAW / MIC IN", 1);
+    recModeBox.addItem("WIFI FILE (TCP)", 2);
+    recModeBox.addItem("USB FILE (TCP)", 3);
+
+    // Hacemos el texto nativo invisible para que no se superponga con nuestro shortText
 
     // Hacemos el texto nativo invisible para que no se superponga con nuestro shortText
     recModeBox.setColour(juce::ComboBox::textColourId, juce::Colours::transparentBlack);

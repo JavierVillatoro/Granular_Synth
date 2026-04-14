@@ -673,7 +673,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
 
             // --- NUEVOS PARÁMETROS DE GRABACIÓN ---
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_REC", "Record", false));
-            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_REC_MODE", "Rec Mode", juce::StringArray{ "DAW Input", "WiFi Live", "WiFi File" }, 0));
+            // Actualizado para TCP Dual (WiFi y USB)
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_REC_MODE", "Rec Mode",
+                juce::StringArray{ "DAW / MIC IN", "WIFI FILE (TCP)", "USB FILE (TCP)" }, 0));
         };
 
     addLayerParameters("L1"); addLayerParameters("L2"); addLayerParameters("L3"); addLayerParameters("L4");
@@ -726,33 +728,27 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
 
 void Granular_SynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Si el parámetro que ha cambiado termina en "_REC" (ej. "L1_REC")
     if (parameterID.endsWith("_REC"))
     {
-        // Averiguamos qué número de capa es (1, 2, 3 o 4)
         int layerIndex = parameterID.substring(1, 2).getIntValue();
-
         bool isRecording = (newValue > 0.5f);
 
         if (isRecording)
         {
-            // Leemos en qué modo está el ComboBox de esa capa concreta
-            // Nota: El índice en APVTS empieza en 0. (0 = DAW, 1 = UDP, 2 = TCP)
             int currentMode = (int)apvts.getRawParameterValue("L" + juce::String(layerIndex) + "_REC_MODE")->load();
 
-            if (currentMode == 2) // Si está en modo TCP
+            // Si es 1 (WIFI) o 2 (USB), encendemos el servidor 8080
+            if (currentMode == 1 || currentMode == 2)
             {
                 tcpReceiver->startListening(layerIndex);
             }
             else
             {
-                // Si le das a grabar pero NO está en TCP, nos aseguramos de que el servidor esté apagado por si acaso
                 tcpReceiver->stopListening();
             }
         }
         else
         {
-            // Si apagamos el botón rojo, detenemos el servidor de escucha
             tcpReceiver->stopListening();
         }
     }

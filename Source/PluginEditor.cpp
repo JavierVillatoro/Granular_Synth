@@ -332,12 +332,20 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.setColour(juce::Colours::red.withAlpha(pulse));
             g.drawRect(area, 2);
 
-            // Determinar el mensaje según el modo seleccionado
+            // Determinar el mensaje según el modo seleccionado y pedir la IP
             int recMode = (int)audioProcessor.apvts.getRawParameterValue(prefix + "REC_MODE")->load();
             juce::String statusText = "";
-            if (recMode == 0) statusText = juce::String::charToString(0x25CF) + " DAW AUDIO ROUTING...";
-            else if (recMode == 1) statusText = juce::String::charToString(0x25CF) + " WIFI LIVE: LISTENING UDP...";
-            else if (recMode == 2) statusText = juce::String::charToString(0x25CF) + " WIFI FILE: WAITING TCP DUMP...";
+            juce::String currentIP = audioProcessor.getLocalIPAddress(); // <--- LLAMADA MÁGICA
+
+            if (recMode == 0) {
+                statusText = juce::String::charToString(0x25CF) + " DAW AUDIO ROUTING...";
+            }
+            else if (recMode == 1) {
+                statusText = juce::String::charToString(0x25CF) + " WIFI DUMP | IP: " + currentIP;
+            }
+            else if (recMode == 2) {
+                statusText = juce::String::charToString(0x25CF) + " USB DUMP | IP: " + currentIP;
+            }
 
             // Fuente elegante, un poco espaciada
             g.setFont(juce::Font(18.0f, juce::Font::bold).withExtraKerningFactor(0.1f));

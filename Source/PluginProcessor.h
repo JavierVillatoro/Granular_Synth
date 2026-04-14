@@ -53,6 +53,30 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    
+    juce::String getLocalIPAddress()
+    {
+        auto allIPs = juce::IPAddress::getAllAddresses();
+        juce::String bestIP = "Desconocida (Abre el WiFi/USB)";
+
+        for (auto& ip : allIPs) {
+            juce::String ipStr = ip.toString();
+
+            // Filtramos localhost (127), raras (169), Multicast (224) 
+            // Y AHORA: Filtramos 192.168.56.x (Adaptadores fantasma de VirtualBox/Docker)
+            if (ip != juce::IPAddress::local() && !ipStr.startsWith("169.") &&
+                !ipStr.startsWith("224.") && !ipStr.startsWith("192.168.56."))
+            {
+                // Prioridad a redes locales típicas
+                if (ipStr.startsWith("192.168.") || ipStr.startsWith("10.") || ipStr.startsWith("172.")) {
+                    return ipStr; // Devuelve la primera BUENA de verdad
+                }
+                bestIP = ipStr;
+            }
+        }
+        return bestIP;
+    }
+
     juce::AudioProcessorValueTreeState apvts;
 
     // --- LOS 4 JEFES ---
