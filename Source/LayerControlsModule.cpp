@@ -132,8 +132,35 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     recModeBox.setLookAndFeel(comboStyle.get());
     addAndMakeVisible(recModeBox);
 
-    // ¡CORRECCIÓN VITAL! Cambiamos REC_MODE por R_MODE para que se enlace bien
+    // Cambiamos REC_MODE por R_MODE para que se enlace bien
     recModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "R_MODE", recModeBox);
+
+    // ==========================================================
+    // --- ESTILO DE LOS NUEVOS BOTONES (GRN, PLY, CUE) ---
+    // ==========================================================
+    auto setupModeButton = [this, mainColor](juce::TextButton& btn, juce::String text, bool isRadio) {
+        btn.setButtonText(text);
+        btn.setClickingTogglesState(true);
+        if (isRadio) btn.setRadioGroupId(199); // Magia: Los botones con ID 199 se apagan entre sí
+
+        btn.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        btn.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.4f));
+        btn.setColour(juce::TextButton::buttonOnColourId, mainColor.withAlpha(0.3f));
+        btn.setColour(juce::TextButton::textColourOnId, mainColor);
+        addAndMakeVisible(btn);
+        };
+
+    // Los configuramos llamando a la función
+    setupModeButton(grnButton, "GRN", true);  // true = pertenece al grupo de radio
+    setupModeButton(plyButton, "PLY", true);  // true = pertenece al grupo de radio
+    setupModeButton(cueButton, "CUE", false); // false = es un interruptor libre
+
+    // Colores especiales para CUE (Amarillo clásico de DJ Mixer)
+    cueButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::yellow.withAlpha(0.4f));
+    cueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::yellow);
+
+    // Encendemos el modo Granular por defecto sin enviar mensajes (solo visual)
+    grnButton.setToggleState(true, juce::dontSendNotification);
 
     // 4. Slider de Paneo (¡DEVUELVO LOS COLORES A LOS DOTS!)
     panSlider.setSliderStyle(juce::Slider::LinearHorizontal);
@@ -180,4 +207,19 @@ void LayerControlsModule::resized()
 
     int comboW = 75; // Más corto, ya que ahora solo pone DAW, UDP o TCP
     recModeBox.setBounds(rightEdge - (stdBtnW * 2) - gap - comboW - gap, topMargin, comboW, 20);
+
+    // --- ZONA INFERIOR DERECHA (Nuevos Botones Alineados) ---
+    int bottomY = area.getHeight() - 25;
+
+    // 1. Calculamos el píxel exacto donde empieza el borde izquierdo del menú desplegable
+    int comboX = rightEdge - (stdBtnW * 2) - gap - comboW - gap;
+
+    // 2. Hacemos los botones un pelín más pequeños (37px en vez de 40px). 
+    // Esto hace que los 3 botones encajen justo debajo de la zona del menú + el botón REC.
+    int newBtnW = 37;
+
+    // 3. Los colocamos de IZQUIERDA a DERECHA partiendo del comboX
+    grnButton.setBounds(comboX, bottomY, newBtnW, 20);
+    plyButton.setBounds(comboX + newBtnW + gap, bottomY, newBtnW, 20);
+    cueButton.setBounds(comboX + (newBtnW * 2) + (gap * 2), bottomY, newBtnW, 20);
 }

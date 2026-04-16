@@ -31,6 +31,10 @@ private:
     juce::ComboBox recModeBox;
 
     juce::Slider panSlider;
+
+    juce::TextButton grnButton;
+    juce::TextButton plyButton;
+    juce::TextButton cueButton;
     
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> playAttach;
