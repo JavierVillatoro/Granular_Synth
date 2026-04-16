@@ -25,14 +25,17 @@ void TcpReceiver::startListening(int layerToUpdate)
 {
     targetLayer = layerToUpdate;
 
+    // 1. EL ESCUDO: Si ya está escuchando, no destruimos la conexión, solo actualizamos la capa
+    if (isThreadRunning() || listenerSocket != nullptr) {
+        DBG("El TCP ya estaba abierto. Actualizamos destino a capa " + juce::String(targetLayer));
+        return;
+    }
+
     listenerSocket = std::make_unique<juce::StreamingSocket>();
 
     if (listenerSocket->createListener(8080)) {
         DBG("Servidor TCP Iniciado en puerto 8080. Esperando audio para la capa " + juce::String(targetLayer));
         startThread();
-    }
-    else {
-        DBG("ERROR: No se pudo abrir el puerto 8080 (quizás ya está en uso).");
     }
 }
 
@@ -41,23 +44,23 @@ void TcpReceiver::stopListening()
     signalThreadShouldExit();
     if (listenerSocket != nullptr) {
         listenerSocket->close();
+        listenerSocket.reset(); // 2. Limpiamos la memoria para que el escudo sepa que está libre
     }
     stopThread(2000);
 }
 
 void TcpReceiver::run()
 {
-    // 1. QUITAMOS la variable audioReceived del bucle para que sea persistente
     while (!threadShouldExit())
     {
-        // Esperamos una conexión (esto bloquea el hilo hasta que llega algo)
+        // Esperamos una conexión
         juce::StreamingSocket* clientConnection = listenerSocket->waitForNextConnection();
 
         if (clientConnection != nullptr && !threadShouldExit())
         {
             DBG("¡Conexión entrante detectada!");
 
-            // --- TU LÓGICA DE CABECERAS (Igual) ---
+            // --- LÓGICA DE CABECERAS ---
             juce::String headerString;
             char charBuf[1];
             while (clientConnection->read(charBuf, 1, true) == 1) {
@@ -71,7 +74,7 @@ void TcpReceiver::run()
                 contentLength = headerString.substring(idx + 15).trimStart().getIntValue();
             }
 
-            // --- TU LÓGICA DE PROCESAMIENTO (Modificada levemente) ---
+            // --- LÓGICA DE PROCESAMIENTO ---
             if (contentLength > 0 && headerString.contains("POST"))
             {
                 DBG("Descargando audio de " + juce::String(contentLength) + " bytes...");
@@ -85,24 +88,23 @@ void TcpReceiver::run()
                     totalRead += readNow;
                 }
 
+                //juce::File tempFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                    //.getChildFile("granular_wifi_layer_" + juce::String(targetLayer) + ".wav");
+                // NUEVO: Añadimos un "sello de tiempo" para que el nombre del archivo sea 100% único cada vez
+                juce::String uniqueName = "granular_wifi_layer_" + juce::String(targetLayer) + "_" + juce::String(juce::Time::getMillisecondCounter()) + ".wav";
+
                 juce::File tempFile = juce::File::getSpecialLocation(juce::File::tempDirectory)
-                    .getChildFile("granular_wifi_layer_" + juce::String(targetLayer) + ".wav");
+                    .getChildFile(uniqueName);
                 tempFile.replaceWithData(audioData.getData(), audioData.getSize());
 
                 juce::String filePath = tempFile.getFullPathName();
 
-                // Usamos callAsync para cargar el audio y apagar el botón REC en la UI
+                // Usamos callAsync para cargar el audio en el hilo principal
                 juce::MessageManager::callAsync([this, filePath] {
                     processorRef.loadFile(filePath, targetLayer);
-
-                    // Esto apaga el botón rojo automáticamente al terminar
-                    auto* p = processorRef.apvts.getParameter("L" + juce::String(targetLayer) + "_REC");
-                    if (p != nullptr) p->setValueNotifyingHost(0.0f);
                     });
 
-                // ¡IMPORTANTE! No ponemos audioReceived = true. 
-                // El bucle volverá arriba y esperará el siguiente mensaje o que apagues el REC.
-            }
+            } // <--- ¡ESTA ERA LA LLAVE QUE FALTABA! Cierra el 'if (contentLength > 0)'
 
             // --- RESPUESTA HTTP (Obligatoria para que el móvil no se quede esperando) ---
             juce::String response = "HTTP/1.1 200 OK\r\n"

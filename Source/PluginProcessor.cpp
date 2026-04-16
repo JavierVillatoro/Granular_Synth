@@ -54,6 +54,16 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     apvts.addParameterListener("L2_REC", this);
     apvts.addParameterListener("L3_REC", this);
     apvts.addParameterListener("L4_REC", this);
+
+    // --- NUEVO: SERVIDOR OSC (Control en Tiempo Real) ---
+    if (connect(9000))
+    {
+        // Le decimos a JUCE que escuche TODOS los mensajes OSC que lleguen.
+        // (La magia de separarlos la hacemos abajo en oscMessageReceived)
+        juce::OSCReceiver::addListener(this);
+
+        DBG("Servidor OSC Iniciado en el puerto 9000");
+    }
 }
 
 Granular_SynthAudioProcessor::~Granular_SynthAudioProcessor()
@@ -674,8 +684,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             // --- NUEVOS PARÁMETROS DE GRABACIÓN ---
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_REC", "Record", false));
             // Actualizado para TCP Dual (WiFi y USB)
-            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_REC_MODE", "Rec Mode",
-                juce::StringArray{ "DAW / MIC IN", "WIFI FILE (TCP)", "USB FILE (TCP)" }, 0));
+            //params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_REC_MODE", "Rec Mode",
+                //juce::StringArray{ "DAW / MIC IN", "WIFI FILE (TCP)", "USB FILE (TCP)" }, 0));
+
+            // Actualizado: Solo DAW y WIFI (Adiós USB)
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_R_MODE", "Rec Mode",
+                juce::StringArray{ "DAW / MIC IN", "WIFI FILE (TCP)" }, 0));
         };
 
     addLayerParameters("L1"); addLayerParameters("L2"); addLayerParameters("L3"); addLayerParameters("L4");
@@ -736,10 +750,10 @@ void Granular_SynthAudioProcessor::parameterChanged(const juce::String& paramete
 
         if (isRecording)
         {
-            int currentMode = (int)apvts.getRawParameterValue("L" + juce::String(layerIndex) + "_REC_MODE")->load();
+            int currentMode = (int)apvts.getRawParameterValue("L" + juce::String(layerIndex) + "_R_MODE")->load();
 
-            // Si es 1 (WIFI) o 2 (USB), encendemos el servidor 8080
-            if (currentMode == 1 || currentMode == 2)
+            // Si es 1 (WIFI), encendemos el servidor 8080
+            if (currentMode == 1)
             {
                 tcpReceiver->startListening(layerIndex);
             }
@@ -751,6 +765,40 @@ void Granular_SynthAudioProcessor::parameterChanged(const juce::String& paramete
         else
         {
             tcpReceiver->stopListening();
+        }
+    }
+}
+
+void Granular_SynthAudioProcessor::oscMessageReceived(const juce::OSCMessage& message)
+{
+    juce::String address = message.getAddressPattern().toString();
+
+    // 1. SINCRONIZACIÓN DE CAPA (Acepta tanto Float como Int)
+    if (address == "/SELECT_LAYER" && message.size() == 1)
+    {
+        int layer = 0;
+        if (message[0].isFloat32()) layer = (int)message[0].getFloat32();
+        else if (message[0].isInt32()) layer = message[0].getInt32();
+
+        if (layer > 0) {
+            uiLayerRequested.store(layer);
+            // Avisamos directamente a la interfaz que repinte ya
+            juce::MessageManager::callAsync([this]() { sendChangeMessage(); });
+        }
+        return;
+    }
+
+    // 2. MAPEO DE PARÁMETROS NORMALES
+    if (message.size() == 1)
+    {
+        float rawValue = 0.0f;
+        if (message[0].isFloat32()) rawValue = message[0].getFloat32();
+        else if (message[0].isInt32()) rawValue = (float)message[0].getInt32();
+
+        juce::String paramID = address.substring(1);
+        if (auto* param = apvts.getParameter(paramID))
+        {
+            param->setValueNotifyingHost(rawValue);
         }
     }
 }

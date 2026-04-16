@@ -74,13 +74,15 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     audioProcessor.apvts.addParameterListener("L4_GRAIN_SIZE", this);
     audioProcessor.apvts.addParameterListener("L4_SHAPE", this);
 
+    startTimerHz(30); // <--- Arrancamos el reloj a 30 FPS
+
     
     for (int i = 1; i <= 4; ++i) {
         audioProcessor.apvts.addParameterListener("L" + juce::String(i) + "_MUTE", this);
         audioProcessor.apvts.addParameterListener("L" + juce::String(i) + "_SOLO", this);
     }
 
-    startTimerHz(30);
+    //startTimerHz(30);
 
     if (audioProcessor.isAudioLoadedL1 && audioProcessor.lastLoadedFilePathL1.isNotEmpty())
         thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL1)));
@@ -335,18 +337,16 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.drawRect(area, 2);
 
             // Determinar el mensaje según el modo seleccionado y pedir la IP
-            int recMode = (int)audioProcessor.apvts.getRawParameterValue(prefix + "REC_MODE")->load();
+            int recMode = (int)audioProcessor.apvts.getRawParameterValue(prefix + "R_MODE")->load();
             juce::String statusText = "";
             juce::String currentIP = audioProcessor.getLocalIPAddress(); // <--- LLAMADA MÁGICA
 
             if (recMode == 0) {
                 statusText = juce::String::charToString(0x25CF) + " DAW AUDIO ROUTING...";
             }
-            else if (recMode == 1) {
+            else {
+                // Ahora el modo 1 es exclusivamente el WIFI
                 statusText = juce::String::charToString(0x25CF) + " WIFI DUMP | IP: " + currentIP;
-            }
-            else if (recMode == 2) {
-                statusText = juce::String::charToString(0x25CF) + " USB DUMP | IP: " + currentIP;
             }
 
             // Fuente elegante, un poco espaciada
@@ -416,7 +416,11 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.7f));
     // CORRECCIÓN: Forzamos fuente plana
     g.setFont(juce::Font(14.0f, juce::Font::plain));
-    g.drawText("MATRIX", matrixArea, juce::Justification::centred);
+    //g.drawText("MATRIX", matrixArea, juce::Justification::centred);
+    g.setFont(juce::Font(12.0f, juce::Font::bold));
+    g.setColour(juce::Colours::white.withAlpha(0.6f));
+    juce::String currentIP = audioProcessor.getLocalIPAddress();
+    g.drawText("IP: " + currentIP, matrixArea.withTrimmedTop(5).withTrimmedLeft(8), juce::Justification::topLeft);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
     // CORRECCIÓN: Forzamos fuente plana
@@ -609,34 +613,6 @@ void Granular_SynthAudioProcessorEditor::filesDropped(const juce::StringArray& f
 }
 
 //void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source) { repaint(); }
-void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
-{
-    // 1. Si el mensaje viene de la miniatura, solo repintamos y SALIMOS para no crear bucle
-    if (source == &thumbnail || source == &thumbnailL2 || source == &thumbnailL3 || source == &thumbnailL4)
-    {
-        repaint();
-        return;
-    }
-
-    // 2. Si el mensaje viene del PROCESADOR (porque llegó un WAV nuevo)
-    if (source == &audioProcessor)
-    {
-        // Actualizamos las fuentes solo si han cambiado realmente
-        if (audioProcessor.isAudioLoadedL1)
-            thumbnail.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL1)));
-
-        if (audioProcessor.isAudioLoadedL2)
-            thumbnailL2.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL2)));
-
-        if (audioProcessor.isAudioLoadedL3)
-            thumbnailL3.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL3)));
-
-        if (audioProcessor.isAudioLoadedL4)
-            thumbnailL4.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL4)));
-
-        repaint();
-    }
-}
 
 void Granular_SynthAudioProcessorEditor::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
 {
@@ -833,41 +809,64 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
     else if (activeLayer == 4) handleLayerDrag(layer4Area, "L4_", viewStartRatioL4, zoomFactorL4, audioProcessor.windowStartRatioL4);
 }
 
+void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source)
+{
+    // 1. Evitar bucles de repintado de las miniaturas
+    if (source == &thumbnail || source == &thumbnailL2 || source == &thumbnailL3 || source == &thumbnailL4)
+    {
+        repaint();
+        return;
+    }
+
+    // 2. Mensajes que vienen del Motor C++ (Cambios de Capa o Nuevo Audio)
+    if (source == &audioProcessor)
+    {
+        // --- A: SINCRONIZACIÓN DE CAPAS (El móvil pide cambiar la vista) ---
+        int requestedLayer = audioProcessor.uiLayerRequested.load();
+        if (requestedLayer != 0)
+        {
+            activeLayer = requestedLayer; // Actualizamos la variable global
+
+            // Actualizamos todos los módulos a la capa que marca el móvil
+            engineModule.setLayer(activeLayer); scanModule.setLayer(activeLayer); sprayModule.setLayer(activeLayer);
+            pitchModule.setLayer(activeLayer); filterModule.setLayer(activeLayer); spaceModule.setLayer(activeLayer);
+            choirModule.setLayer(activeLayer); distModule.setLayer(activeLayer); envelopeModule.setLayer(activeLayer);
+            mixerModule1.setLayer(activeLayer); monk1.setLayer(activeLayer); monk2.setLayer(activeLayer);
+            monk3.setLayer(activeLayer); monk4.setLayer(activeLayer);
+
+            // Reiniciamos el chivato
+            audioProcessor.uiLayerRequested.store(0);
+        }
+
+        // --- B: ACTUALIZACIÓN DE ONDAS DE AUDIO (Con tu seguro anti-bucles) ---
+        if (audioProcessor.lastLoadedFilePathL1 != currentPathL1) {
+            currentPathL1 = audioProcessor.lastLoadedFilePathL1;
+            if (currentPathL1.isNotEmpty()) thumbnail.setSource(new juce::FileInputSource(juce::File(currentPathL1)));
+        }
+
+        if (audioProcessor.lastLoadedFilePathL2 != currentPathL2) {
+            currentPathL2 = audioProcessor.lastLoadedFilePathL2;
+            if (currentPathL2.isNotEmpty()) thumbnailL2.setSource(new juce::FileInputSource(juce::File(currentPathL2)));
+        }
+
+        if (audioProcessor.lastLoadedFilePathL3 != currentPathL3) {
+            currentPathL3 = audioProcessor.lastLoadedFilePathL3;
+            if (currentPathL3.isNotEmpty()) thumbnailL3.setSource(new juce::FileInputSource(juce::File(currentPathL3)));
+        }
+
+        if (audioProcessor.lastLoadedFilePathL4 != currentPathL4) {
+            currentPathL4 = audioProcessor.lastLoadedFilePathL4;
+            if (currentPathL4.isNotEmpty()) thumbnailL4.setSource(new juce::FileInputSource(juce::File(currentPathL4)));
+        }
+
+        repaint();
+    }
+}
+
 void Granular_SynthAudioProcessorEditor::timerCallback()
 {
-    // 1. Comprobamos si el Hilo TCP ha metido un archivo nuevo en la Capa 1
-    if (audioProcessor.lastLoadedFilePathL1 != currentPathL1) {
-        currentPathL1 = audioProcessor.lastLoadedFilePathL1; // Actualizamos la memoria
-        if (currentPathL1.isNotEmpty()) {
-            thumbnail.setSource(new juce::FileInputSource(juce::File(currentPathL1)));
-        }
-    }
-
-    // 2. Comprobamos la Capa 2
-    if (audioProcessor.lastLoadedFilePathL2 != currentPathL2) {
-        currentPathL2 = audioProcessor.lastLoadedFilePathL2;
-        if (currentPathL2.isNotEmpty()) {
-            thumbnailL2.setSource(new juce::FileInputSource(juce::File(currentPathL2)));
-        }
-    }
-
-    // 3. Comprobamos la Capa 3
-    if (audioProcessor.lastLoadedFilePathL3 != currentPathL3) {
-        currentPathL3 = audioProcessor.lastLoadedFilePathL3;
-        if (currentPathL3.isNotEmpty()) {
-            thumbnailL3.setSource(new juce::FileInputSource(juce::File(currentPathL3)));
-        }
-    }
-
-    // 4. Comprobamos la Capa 4
-    if (audioProcessor.lastLoadedFilePathL4 != currentPathL4) {
-        currentPathL4 = audioProcessor.lastLoadedFilePathL4;
-        if (currentPathL4.isNotEmpty()) {
-            thumbnailL4.setSource(new juce::FileInputSource(juce::File(currentPathL4)));
-        }
-    }
-
-    // Finalmente, redibujamos la pantalla
+    // Solo repintamos la pantalla a 30 FPS para que la animación REC 
+    // y la aguja de reproducción se muevan fluidamente.
     repaint();
 }
 

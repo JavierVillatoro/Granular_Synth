@@ -15,11 +15,17 @@
 
 class Granular_SynthAudioProcessor : public juce::AudioProcessor,
                                      public juce::AudioProcessorValueTreeState::Listener,
-                                     public juce::ChangeBroadcaster
+                                     public juce::ChangeBroadcaster,
+                                     public juce::OSCReceiver, // <--- NUEVO
+                                     public juce::OSCReceiver::Listener<juce::OSCReceiver::MessageLoopCallback>
 {
 public:
     Granular_SynthAudioProcessor();
     ~Granular_SynthAudioProcessor() override;
+
+    void oscMessageReceived(const juce::OSCMessage& message) override;
+
+    std::atomic<int> uiLayerRequested{ 0 };
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void loadFile(const juce::String& path, int layerIndex);

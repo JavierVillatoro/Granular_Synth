@@ -122,11 +122,8 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     // 3. Menú Desplegable
     recModeBox.addItem("DAW / MIC IN", 1);
     recModeBox.addItem("WIFI FILE (TCP)", 2);
-    recModeBox.addItem("USB FILE (TCP)", 3);
+    // ¡BORRAMOS LA LÍNEA DEL USB AQUÍ!
 
-    // Hacemos el texto nativo invisible para que no se superponga con nuestro shortText
-
-    // Hacemos el texto nativo invisible para que no se superponga con nuestro shortText
     recModeBox.setColour(juce::ComboBox::textColourId, juce::Colours::transparentBlack);
     recModeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
     recModeBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
@@ -134,7 +131,9 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     comboStyle = std::make_unique<ComboStyle>();
     recModeBox.setLookAndFeel(comboStyle.get());
     addAndMakeVisible(recModeBox);
-    recModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "REC_MODE", recModeBox);
+
+    // ¡CORRECCIÓN VITAL! Cambiamos REC_MODE por R_MODE para que se enlace bien
+    recModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "R_MODE", recModeBox);
 
     // 4. Slider de Paneo (¡DEVUELVO LOS COLORES A LOS DOTS!)
     panSlider.setSliderStyle(juce::Slider::LinearHorizontal);
