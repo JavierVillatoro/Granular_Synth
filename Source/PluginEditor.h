@@ -116,6 +116,8 @@ private:
     bool ignoreDragForPosition = false;
 
     juce::Rectangle<int> matrixArea;
+    juce::Rectangle<int> presetsArea; 
+    juce::Rectangle<int> ipArea;
     juce::Rectangle<int> mixerArea;
     juce::Rectangle<int> masterArea;
     juce::Rectangle<int> distArea;

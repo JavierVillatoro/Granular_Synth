@@ -390,8 +390,16 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xff121212));
     g.fillRect(rightMixerArea);
 
+    // --- PINTAR LOS BLOQUES PARA VER EL ESPACIO ---
+    //g.setColour(juce::Colours::darkgrey.withAlpha(0.6f));
+    //g.fillRect(matrixArea);
+    //g.setColour(juce::Colours::lightgrey.withAlpha(0.2f)); // Gris más claro para los presets
+    //g.fillRect(presetsArea);
+    // -----------------------------------------------------
+
     g.setColour(themeColor.withAlpha(0.3f));
     g.drawRect(matrixArea, 1);
+    g.drawRect(presetsArea, 1); // Borde para los presets
     g.drawRect(mixerArea, 1);
     g.drawRect(masterArea, 1);
     g.drawRect(distArea, 1);
@@ -419,8 +427,13 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     //g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.setFont(juce::Font(12.0f, juce::Font::bold));
     g.setColour(juce::Colours::white.withAlpha(0.6f));
+    //juce::String currentIP = audioProcessor.getLocalIPAddress();
+    //g.drawText("IP: " + currentIP, matrixArea.withTrimmedTop(5).withTrimmedLeft(8), juce::Justification::topLeft);
+    //g.drawText("MIX", mixerArea, juce::Justification::centred);
+
     juce::String currentIP = audioProcessor.getLocalIPAddress();
-    g.drawText("IP: " + currentIP, matrixArea.withTrimmedTop(5).withTrimmedLeft(8), juce::Justification::topLeft);
+    // NUEVO: Usamos ipArea en lugar de matrixArea para la IP
+    g.drawText("IP: " + currentIP, ipArea.withTrimmedLeft(8), juce::Justification::centredLeft);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
     // CORRECCIÓN: Forzamos fuente plana
@@ -512,7 +525,17 @@ void Granular_SynthAudioProcessorEditor::resized()
     auto rightColumn = area.removeFromRight(area.getWidth() * 0.35f);
     auto leftColumn = area;
 
-    matrixArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f);
+    //matrixArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f);
+    // 1. Tomamos toda la mitad superior libre (encima del Mixer/Voces)
+    auto topEmptyArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f);
+
+    // 2. ZONA PROTEGIDA: Aislamos la IP arriba del todo (25 píxeles de alto)
+    ipArea = topEmptyArea.removeFromTop(25);
+    topEmptyArea.removeFromTop(5); // Un pequeño margen de respiración
+
+    // 3. EL CUADRADO LIBRE: Lo dividimos 60% Matrix / 40% Presets
+    matrixArea = topEmptyArea.removeFromTop(topEmptyArea.getHeight() * 0.6f);
+    presetsArea = topEmptyArea;
 
     auto bottomHalf = leftColumn;
     mixerArea = bottomHalf.removeFromLeft(bottomHalf.getWidth() * 0.45f);
