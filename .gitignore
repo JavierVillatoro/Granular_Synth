@@ -9,6 +9,7 @@ x64/
 x86/
 Debug/
 Release/
+Executable/
 
 # 3. User files and IDE caches
 *.user
