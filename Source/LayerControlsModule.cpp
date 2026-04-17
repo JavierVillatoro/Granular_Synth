@@ -46,7 +46,7 @@ public:
 };
 
 // =============================================================================
-// --- ESTILO DEL MENÚ DESPLEGABLE (Camaleónico) ---
+// --- ESTILO DEL MENÚ DESPLEGABLE  ---
 // =============================================================================
 class ComboStyle : public juce::LookAndFeel_V4 {
 public:
@@ -136,7 +136,7 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     recModeAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "R_MODE", recModeBox);
 
     // ==========================================================
-    // --- ESTILO DE LOS NUEVOS BOTONES (GRN, PLY, CUE) ---
+    // --- ESTILO DE LOS BOTONES (GRN, PLY, CUE) ---
     // ==========================================================
     auto setupModeButton = [this, mainColor](juce::TextButton& btn, juce::String text, bool isRadio) {
         btn.setButtonText(text);
@@ -189,7 +189,7 @@ void LayerControlsModule::resized()
     int topMargin = 8;
     int sideMargin = 10;
 
-    // --- ZONA IZQUIERDA ---
+    
     playButton.setBounds(sideMargin, topMargin, stdBtnW, 20);
     midiButton.setBounds(sideMargin + stdBtnW + gap, topMargin, stdBtnW, 20);
     holdButton.setBounds(sideMargin + (stdBtnW * 2) + (gap * 2), topMargin, stdBtnW, 20);
@@ -197,28 +197,21 @@ void LayerControlsModule::resized()
     int transportWidth = (stdBtnW * 3) + (gap * 2);
     panSlider.setBounds(sideMargin, area.getHeight() - 25, transportWidth, 20);
 
-    // --- ZONA DERECHA ---
+    
     int rightEdge = area.getWidth() - sideMargin;
 
     muteButton.setBounds(rightEdge - stdBtnW, topMargin, stdBtnW, 20);
-
-    // El Rec con forma de píldora (mide 40 de ancho, pero el diseño ovalado le da el toque)
     recButton.setBounds(rightEdge - (stdBtnW * 2) - gap, topMargin, stdBtnW, 20);
 
     int comboW = 75; // Más corto, ya que ahora solo pone DAW, UDP o TCP
     recModeBox.setBounds(rightEdge - (stdBtnW * 2) - gap - comboW - gap, topMargin, comboW, 20);
 
-    // --- ZONA INFERIOR DERECHA (Nuevos Botones Alineados) ---
     int bottomY = area.getHeight() - 25;
 
-    // 1. Calculamos el píxel exacto donde empieza el borde izquierdo del menú desplegable
     int comboX = rightEdge - (stdBtnW * 2) - gap - comboW - gap;
 
-    // 2. Hacemos los botones un pelín más pequeños (37px en vez de 40px). 
-    // Esto hace que los 3 botones encajen justo debajo de la zona del menú + el botón REC.
     int newBtnW = 37;
 
-    // 3. Los colocamos de IZQUIERDA a DERECHA partiendo del comboX
     grnButton.setBounds(comboX, bottomY, newBtnW, 20);
     plyButton.setBounds(comboX + newBtnW + gap, bottomY, newBtnW, 20);
     cueButton.setBounds(comboX + (newBtnW * 2) + (gap * 2), bottomY, newBtnW, 20);
