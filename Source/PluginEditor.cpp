@@ -99,7 +99,34 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     if (audioProcessor.isAudioLoadedL4 && audioProcessor.lastLoadedFilePathL4.isNotEmpty())
         thumbnailL4.setSource(new juce::FileInputSource(juce::File(audioProcessor.lastLoadedFilePathL4)));
     audioProcessor.addChangeListener(this);;
-}
+
+    auto setupClearButton = [this](juce::TextButton& btn, int layerIndex) {
+        // Fondo transparente, texto rojo oscuro/suave
+        btn.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        btn.setColour(juce::TextButton::textColourOffId, juce::Colours::red.withAlpha(0.6f));
+        // Al pasar el ratón (hover), rojo brillante
+        btn.setColour(juce::TextButton::textColourOnId, juce::Colours::red.brighter());
+
+        // Sin bordes
+        btn.setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+
+        btn.getLookAndFeel().setColour(juce::TextButton::textColourOffId, juce::Colours::red);
+
+        addAndMakeVisible(btn);
+
+        // La acción destructiva
+        btn.onClick = [this, layerIndex] {
+            audioProcessor.clearFile(layerIndex);
+            };
+        };
+
+    // Aplicamos a los 4 botones
+    setupClearButton(clearBtnL1, 1);
+    setupClearButton(clearBtnL2, 2);
+    setupClearButton(clearBtnL3, 3);
+    setupClearButton(clearBtnL4, 4);
+} 
+
 
 Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 {
@@ -514,17 +541,34 @@ void Granular_SynthAudioProcessorEditor::resized()
     int layerHeight = wavesArea.getHeight() / 4;
 
     // Capas
+    int btnSize = 18;
+
+    // --- LA NUEVA POSICIÓN (Arriba a la izquierda de DAW) ---
+    // 160 es la distancia aproximada en píxeles de todo tu bloque derecho. 
+    // Si la "X" se monta encima de "DAW", sube este número a 170 o 180. Si queda muy lejos, bájalo a 150.
+    int paddingX = 170;
+    int paddingY = 10;  // Separación desde el "techo" de la capa
+
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     layer1Controls.setBounds(layer1Area);
+    // Cambiamos getBottom() por getY() para anclarlo arriba
+    clearBtnL1.setBounds(layer1Area.getRight() - paddingX - btnSize, layer1Area.getY() + paddingY, btnSize, btnSize);
+    clearBtnL1.toFront(false);
 
     auto layer2Area = wavesArea.removeFromTop(layerHeight);
     layer2Controls.setBounds(layer2Area);
+    clearBtnL2.setBounds(layer2Area.getRight() - paddingX - btnSize, layer2Area.getY() + paddingY, btnSize, btnSize);
+    clearBtnL2.toFront(false);
 
     auto layer3Area = wavesArea.removeFromTop(layerHeight);
     layer3Controls.setBounds(layer3Area);
+    clearBtnL3.setBounds(layer3Area.getRight() - paddingX - btnSize, layer3Area.getY() + paddingY, btnSize, btnSize);
+    clearBtnL3.toFront(false);
 
     auto layer4Area = wavesArea.removeFromTop(layerHeight);
     layer4Controls.setBounds(layer4Area);
+    clearBtnL4.setBounds(layer4Area.getRight() - paddingX - btnSize, layer4Area.getY() + paddingY, btnSize, btnSize);
+    clearBtnL4.toFront(false);
 
     // Mixer / Master
     auto area = rightMixerArea;
@@ -793,6 +837,12 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     else if (layer4Area.contains(event.getPosition())) handleLayerClick(layer4Area, 4, "L4_");
 }
 
+//void Granular_SynthAudioProcessorEditor::mouseDoubleClick(const juce::MouseEvent& event)
+//{
+    //audioProcessor.clearFile(activeLayer);
+    //repaint();
+//}
+
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
 {
     if (ignoreDragForPosition) return; // Si tocamos un botón antes, ignoramos el arrastre
@@ -889,6 +939,11 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
             currentPathL4 = audioProcessor.lastLoadedFilePathL4;
             if (currentPathL4.isNotEmpty()) thumbnailL4.setSource(new juce::FileInputSource(juce::File(currentPathL4)));
         }
+
+        if (!audioProcessor.isAudioLoadedL1) thumbnail.clear();
+        if (!audioProcessor.isAudioLoadedL2) thumbnailL2.clear();
+        if (!audioProcessor.isAudioLoadedL3) thumbnailL3.clear();
+        if (!audioProcessor.isAudioLoadedL4) thumbnailL4.clear();
 
         repaint();
     }

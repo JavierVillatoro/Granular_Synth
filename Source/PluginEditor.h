@@ -43,6 +43,7 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
+    //void mouseDoubleClick(const juce::MouseEvent& event) override;
 
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
     void filesDropped(const juce::StringArray& files, int x, int y) override;
@@ -70,6 +71,11 @@ private:
     LayerControlsModule layer2Controls;
     LayerControlsModule layer3Controls;
     LayerControlsModule layer4Controls;
+
+    juce::TextButton clearBtnL1{ "X" };
+    juce::TextButton clearBtnL2{ "X" };
+    juce::TextButton clearBtnL3{ "X" };
+    juce::TextButton clearBtnL4{ "X" };
 
     Granular_SynthAudioProcessor& audioProcessor;
     PresetModule presetModule{ audioProcessor };

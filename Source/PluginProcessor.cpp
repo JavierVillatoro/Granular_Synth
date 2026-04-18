@@ -566,7 +566,13 @@ void Granular_SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destDa
 {
     juce::MemoryOutputStream stream(destData, true);
 
-    // LA SOLUCIÓN: Hacemos la "fotografía" segura
+    // 1. Inyectamos las rutas de los audios antes de que el DAW guarde
+    apvts.state.setProperty("AUDIO_PATH_L1", lastLoadedFilePathL1, nullptr);
+    apvts.state.setProperty("AUDIO_PATH_L2", lastLoadedFilePathL2, nullptr);
+    apvts.state.setProperty("AUDIO_PATH_L3", lastLoadedFilePathL3, nullptr);
+    apvts.state.setProperty("AUDIO_PATH_L4", lastLoadedFilePathL4, nullptr);
+
+    // 2. Hacemos la fotografía
     auto state = apvts.copyState();
 
     if (state.isValid()) {
@@ -576,12 +582,22 @@ void Granular_SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destDa
 
 void Granular_SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    // Leemos el bloque de bytes directamente y lo reconstruimos como un ValueTree
     auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
 
-    // Si la lectura ha sido un éxito (los datos no estaban corruptos), reemplazamos el estado
     if (tree.isValid()) {
+        // 1. Restauramos los knobs guardados por el DAW
         apvts.replaceState(tree);
+
+        // 2. Recuperamos los audios y los cargamos a la memoria RAM
+        juce::String path1 = tree.getProperty("AUDIO_PATH_L1").toString();
+        juce::String path2 = tree.getProperty("AUDIO_PATH_L2").toString();
+        juce::String path3 = tree.getProperty("AUDIO_PATH_L3").toString();
+        juce::String path4 = tree.getProperty("AUDIO_PATH_L4").toString();
+
+        if (path1.isNotEmpty()) loadFile(path1, 1);
+        if (path2.isNotEmpty()) loadFile(path2, 2);
+        if (path3.isNotEmpty()) loadFile(path3, 3);
+        if (path4.isNotEmpty()) loadFile(path4, 4);
     }
 }
 
@@ -758,6 +774,34 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
     }
 }
 
+void Granular_SynthAudioProcessor::clearFile(int layerIndex)
+{
+    if (layerIndex == 1) {
+        audioBufferL1.clear();
+        isAudioLoadedL1 = false;
+        lastLoadedFilePathL1 = "";
+    }
+    else if (layerIndex == 2) {
+        audioBufferL2.clear();
+        isAudioLoadedL2 = false;
+        lastLoadedFilePathL2 = "";
+    }
+    else if (layerIndex == 3) {
+        audioBufferL3.clear();
+        isAudioLoadedL3 = false;
+        lastLoadedFilePathL3 = "";
+    }
+    else if (layerIndex == 4) {
+        audioBufferL4.clear();
+        isAudioLoadedL4 = false;
+        lastLoadedFilePathL4 = "";
+    }
+
+    // Avisamos a la UI para que repinte las pantallas en negro
+    sendChangeMessage();
+    DBG("Audio eliminado de la Capa " + juce::String(layerIndex));
+}
+
 void Granular_SynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
     if (parameterID.endsWith("_REC"))
@@ -838,24 +882,26 @@ juce::File getPresetFolder()
 
 void Granular_SynthAudioProcessor::savePreset(int presetIndex)
 {
-    // 1. Nombre del archivo
     juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
     juce::File presetFile = getPresetFolder().getChildFile(fileName);
-
-    // 2. Flujo de escritura
     juce::FileOutputStream stream(presetFile);
 
     if (stream.openedOk()) {
         stream.setPosition(0);
         stream.truncate();
 
-        // 3. LA SOLUCIÓN: Hacemos una "fotografía" segura del estado actual
+        // 1. INYECTAMOS LOS TEXTOS (Rutas de los audios) en el árbol VIVO
+        apvts.state.setProperty("AUDIO_PATH_L1", lastLoadedFilePathL1, nullptr);
+        apvts.state.setProperty("AUDIO_PATH_L2", lastLoadedFilePathL2, nullptr);
+        apvts.state.setProperty("AUDIO_PATH_L3", lastLoadedFilePathL3, nullptr);
+        apvts.state.setProperty("AUDIO_PATH_L4", lastLoadedFilePathL4, nullptr);
+
+        // 2. Hacemos la fotografía con los knobs + los textos
         auto state = apvts.copyState();
 
-        // 4. CINTURÓN DE SEGURIDAD sobre la copia
         if (state.isValid()) {
             state.writeToStream(stream);
-            DBG("Preset BINARIO guardado en: " + presetFile.getFullPathName());
+            DBG("Preset BINARIO guardado con audio en: " + presetFile.getFullPathName());
         }
         else {
             DBG("Error: La copia del estado es inválida.");
@@ -868,20 +914,35 @@ void Granular_SynthAudioProcessor::savePreset(int presetIndex)
 
 void Granular_SynthAudioProcessor::loadPreset(int presetIndex)
 {
-    // 1. Buscamos el archivo
     juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
     juce::File presetFile = getPresetFolder().getChildFile(fileName);
 
     if (presetFile.existsAsFile()) {
-        // 2. Abrimos un flujo de lectura desde el archivo físico
         juce::FileInputStream stream(presetFile);
 
         if (stream.openedOk()) {
-            // 3. Reconstruimos el árbol a partir de los bytes
             auto tree = juce::ValueTree::readFromStream(stream);
 
             if (tree.isValid()) {
+                // 1. Restauramos los knobs
                 apvts.replaceState(tree);
+
+                // 2. RECUPERAMOS LOS TEXTOS y cargamos los archivos físicamente
+                juce::String path1 = tree.getProperty("AUDIO_PATH_L1").toString();
+                juce::String path2 = tree.getProperty("AUDIO_PATH_L2").toString();
+                juce::String path3 = tree.getProperty("AUDIO_PATH_L3").toString();
+                juce::String path4 = tree.getProperty("AUDIO_PATH_L4").toString();
+
+                if (path1.isNotEmpty())
+                    loadFile(path1, 1);
+                else
+                    clearFile(1);
+
+                // Repite lo mismo para path2, path3 y path4
+                if (path2.isNotEmpty()) loadFile(path2, 2); else clearFile(2);
+                if (path3.isNotEmpty()) loadFile(path3, 3); else clearFile(3);
+                if (path4.isNotEmpty()) loadFile(path4, 4); else clearFile(4);
+
                 DBG("Preset BINARIO cargado con exito: " + fileName);
             }
         }
@@ -900,4 +961,11 @@ void Granular_SynthAudioProcessor::initSynth()
         }
     }
     DBG("Sintetizador reseteado a valores iniciales.");
+}
+
+bool Granular_SynthAudioProcessor::doesPresetExist(int presetIndex)
+{
+    juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
+    juce::File presetFile = getPresetFolder().getChildFile(fileName);
+    return presetFile.existsAsFile();
 }

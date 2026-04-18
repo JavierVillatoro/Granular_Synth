@@ -16,7 +16,7 @@
 class Granular_SynthAudioProcessor : public juce::AudioProcessor,
                                      public juce::AudioProcessorValueTreeState::Listener,
                                      public juce::ChangeBroadcaster,
-                                     public juce::OSCReceiver, // <--- NUEVO
+                                     public juce::OSCReceiver, 
                                      public juce::OSCReceiver::Listener<juce::OSCReceiver::MessageLoopCallback>
 {
 public:
@@ -30,6 +30,8 @@ public:
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void loadFile(const juce::String& path, int layerIndex);
 
+    void clearFile(int layerIndex);
+
     juce::AudioFormatManager& getFormatManager() { return formatManager; }
     void releaseResources() override;
 
@@ -37,6 +39,7 @@ public:
 
     void savePreset(int presetIndex);
     void loadPreset(int presetIndex);
+    bool doesPresetExist(int presetIndex);
     void initSynth();
 
 #ifndef JucePlugin_PreferredChannelConfigurations

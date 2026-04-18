@@ -15,6 +15,7 @@ PresetModule::PresetModule(Granular_SynthAudioProcessor& p) : audioProcessor(p)
     // 1. Configuramos los 16 botones
     for (int i = 0; i < 16; ++i)
     {
+        presetHasData[i] = audioProcessor.doesPresetExist(i);
         //juce::String presetName = juce::String(i + 1).paddedLeft('0', 2);
         juce::String presetName = juce::String(i + 1);
         presetButtons[i].setButtonText(presetName);
