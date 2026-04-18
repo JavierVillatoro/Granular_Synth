@@ -57,6 +57,12 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(monk2);
     addAndMakeVisible(monk3);
     addAndMakeVisible(monk4);
+    addAndMakeVisible(presetModule);
+
+    
+
+    // El INIT borra la selección visual al hacer clic
+    //initButton.onClick = [this] { currentPresetIndex = -1; updatePresetButtonColors(); };
 
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
     audioProcessor.apvts.addParameterListener("L1_GRAIN_SIZE", this);
@@ -537,6 +543,8 @@ void Granular_SynthAudioProcessorEditor::resized()
     matrixArea = topEmptyArea.removeFromTop(topEmptyArea.getHeight() * 0.6f);
     presetsArea = topEmptyArea;
 
+    presetModule.setBounds(presetsArea);
+
     auto bottomHalf = leftColumn;
     mixerArea = bottomHalf.removeFromLeft(bottomHalf.getWidth() * 0.45f);
     fxArea = bottomHalf;
@@ -754,7 +762,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
         pitchModule.setLayer(layer); filterModule.setLayer(layer); spaceModule.setLayer(layer);
         choirModule.setLayer(layer); distModule.setLayer(layer); envelopeModule.setLayer(layer);
         mixerModule1.setLayer(layer); monk1.setLayer(layer); monk2.setLayer(layer);
-        monk3.setLayer(layer); monk4.setLayer(layer);
+        monk3.setLayer(layer); monk4.setLayer(layer);presetModule.setLayer(layer);
         };
 
     bool isPanMode = event.mods.isAltDown() || event.mods.isRightButtonDown();

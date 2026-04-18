@@ -35,6 +35,10 @@ public:
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
+    void savePreset(int presetIndex);
+    void loadPreset(int presetIndex);
+    void initSynth();
+
 #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 #endif

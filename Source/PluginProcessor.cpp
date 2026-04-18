@@ -64,6 +64,8 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
 
         DBG("Servidor OSC Iniciado en el puerto 9000");
     }
+
+    //apvts.state = juce::ValueTree("GRANULAR_SYNTH_STATE");
 }
 
 Granular_SynthAudioProcessor::~Granular_SynthAudioProcessor()
@@ -562,10 +564,25 @@ juce::AudioProcessorEditor* Granular_SynthAudioProcessor::createEditor()
 //==============================================================================
 void Granular_SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
+    juce::MemoryOutputStream stream(destData, true);
+
+    // LA SOLUCIÓN: Hacemos la "fotografía" segura
+    auto state = apvts.copyState();
+
+    if (state.isValid()) {
+        state.writeToStream(stream);
+    }
 }
 
 void Granular_SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    // Leemos el bloque de bytes directamente y lo reconstruimos como un ValueTree
+    auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
+
+    // Si la lectura ha sido un éxito (los datos no estaban corruptos), reemplazamos el estado
+    if (tree.isValid()) {
+        apvts.replaceState(tree);
+    }
 }
 
 //==============================================================================
@@ -801,4 +818,86 @@ void Granular_SynthAudioProcessor::oscMessageReceived(const juce::OSCMessage& me
             param->setValueNotifyingHost(rawValue);
         }
     }
+}
+
+// ==============================================================================
+// --- SISTEMA DE PRESETS (NIVEL 3 - BINARIO CUSTOM) ---
+// ==============================================================================
+
+// Función auxiliar: Crea/Busca la carpeta en Mis Documentos
+juce::File getPresetFolder()
+{
+    juce::File docsDir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory);
+    juce::File presetFolder = docsDir.getChildFile("Granular_Synth_Presets");
+
+    if (!presetFolder.exists()) {
+        presetFolder.createDirectory();
+    }
+    return presetFolder;
+}
+
+void Granular_SynthAudioProcessor::savePreset(int presetIndex)
+{
+    // 1. Nombre del archivo
+    juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
+    juce::File presetFile = getPresetFolder().getChildFile(fileName);
+
+    // 2. Flujo de escritura
+    juce::FileOutputStream stream(presetFile);
+
+    if (stream.openedOk()) {
+        stream.setPosition(0);
+        stream.truncate();
+
+        // 3. LA SOLUCIÓN: Hacemos una "fotografía" segura del estado actual
+        auto state = apvts.copyState();
+
+        // 4. CINTURÓN DE SEGURIDAD sobre la copia
+        if (state.isValid()) {
+            state.writeToStream(stream);
+            DBG("Preset BINARIO guardado en: " + presetFile.getFullPathName());
+        }
+        else {
+            DBG("Error: La copia del estado es inválida.");
+        }
+    }
+    else {
+        DBG("Error: No se pudo abrir el archivo para escribir.");
+    }
+}
+
+void Granular_SynthAudioProcessor::loadPreset(int presetIndex)
+{
+    // 1. Buscamos el archivo
+    juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
+    juce::File presetFile = getPresetFolder().getChildFile(fileName);
+
+    if (presetFile.existsAsFile()) {
+        // 2. Abrimos un flujo de lectura desde el archivo físico
+        juce::FileInputStream stream(presetFile);
+
+        if (stream.openedOk()) {
+            // 3. Reconstruimos el árbol a partir de los bytes
+            auto tree = juce::ValueTree::readFromStream(stream);
+
+            if (tree.isValid()) {
+                apvts.replaceState(tree);
+                DBG("Preset BINARIO cargado con exito: " + fileName);
+            }
+        }
+    }
+    else {
+        DBG("El preset no existe en disco: " + fileName);
+    }
+}
+
+void Granular_SynthAudioProcessor::initSynth()
+{
+    // Reset de parámetros a valores de fábrica
+    for (auto* param : getParameters()) {
+        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param)) {
+            p->setValueNotifyingHost(p->getDefaultValue());
+        }
+    }
+    DBG("Sintetizador reseteado a valores iniciales.");
 }

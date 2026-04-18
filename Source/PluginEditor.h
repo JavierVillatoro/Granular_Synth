@@ -25,6 +25,7 @@
 #include "LayerMixerModule.h"
 #include "FxFormantModule.h"
 #include "ChoirModule.h"
+#include "PresetModule.h"
 
 class Granular_SynthAudioProcessorEditor : public juce::AudioProcessorEditor,
     public juce::FileDragAndDropTarget,
@@ -63,6 +64,7 @@ public:
 private:
     MasterModule masterModule;
     BpmModule bpmModule;
+    //PresetModule presetModule{ audioProcessor };
 
     LayerControlsModule layer1Controls;
     LayerControlsModule layer2Controls;
@@ -70,6 +72,7 @@ private:
     LayerControlsModule layer4Controls;
 
     Granular_SynthAudioProcessor& audioProcessor;
+    PresetModule presetModule{ audioProcessor };
 
     juce::AudioThumbnailCache thumbnailCache;
     juce::AudioThumbnail thumbnail;
