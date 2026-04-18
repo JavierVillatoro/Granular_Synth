@@ -39,5 +39,10 @@ private:
     void updatePresetButtonColors();
     bool presetHasData[16] = { false };
 
+    void mouseDown(const juce::MouseEvent& event) override;
+
+    int lastClickedIndex = -1;
+    juce::uint32 lastClickTime = 0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetModule)
 };

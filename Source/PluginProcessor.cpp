@@ -594,10 +594,10 @@ void Granular_SynthAudioProcessor::setStateInformation(const void* data, int siz
         juce::String path3 = tree.getProperty("AUDIO_PATH_L3").toString();
         juce::String path4 = tree.getProperty("AUDIO_PATH_L4").toString();
 
-        if (path1.isNotEmpty()) loadFile(path1, 1);
-        if (path2.isNotEmpty()) loadFile(path2, 2);
-        if (path3.isNotEmpty()) loadFile(path3, 3);
-        if (path4.isNotEmpty()) loadFile(path4, 4);
+        if (path1.isNotEmpty()) loadFile(path1, 1); else clearFile(1);
+        if (path2.isNotEmpty()) loadFile(path2, 2); else clearFile(2);
+        if (path3.isNotEmpty()) loadFile(path3, 3); else clearFile(3);
+        if (path4.isNotEmpty()) loadFile(path4, 4); else clearFile(4);
     }
 }
 
@@ -776,30 +776,53 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
 
 void Granular_SynthAudioProcessor::clearFile(int layerIndex)
 {
-    if (layerIndex == 1) {
-        audioBufferL1.clear();
-        isAudioLoadedL1 = false;
-        lastLoadedFilePathL1 = "";
-    }
-    else if (layerIndex == 2) {
-        audioBufferL2.clear();
-        isAudioLoadedL2 = false;
-        lastLoadedFilePathL2 = "";
-    }
-    else if (layerIndex == 3) {
-        audioBufferL3.clear();
-        isAudioLoadedL3 = false;
-        lastLoadedFilePathL3 = "";
-    }
-    else if (layerIndex == 4) {
-        audioBufferL4.clear();
-        isAudioLoadedL4 = false;
-        lastLoadedFilePathL4 = "";
-    }
+    // 1. Apagamos solo las notas de la capa que vamos a borrar
+    if (layerIndex == 1) synthL1.allNotesOff(0, false);
+    else if (layerIndex == 2) synthL2.allNotesOff(0, false);
+    else if (layerIndex == 3) synthL3.allNotesOff(0, false);
+    else if (layerIndex == 4) synthL4.allNotesOff(0, false);
 
-    // Avisamos a la UI para que repinte las pantallas en negro
-    sendChangeMessage();
-    DBG("Audio eliminado de la Capa " + juce::String(layerIndex));
+    // 2. Preparamos la orden "BORRAR CAPA" (Acción 2)
+    pendingAction = 2;
+    pendingLayerToClear = layerIndex;
+
+    // 3. Arrancamos el reloj
+    startTimer(40);
+}
+
+void Granular_SynthAudioProcessor::timerCallback()
+{
+    stopTimer(); // Apagamos el cronómetro para que no se repita en bucle
+
+    if (pendingAction == 1)
+    {
+        // === EJECUTAR EL INIT TOTAL ===
+        for (auto* param : getParameters()) {
+            if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param)) {
+                p->setValueNotifyingHost(p->getDefaultValue());
+            }
+        }
+
+        // Vaciamos la RAM ahora que hay silencio total
+        audioBufferL1.clear(); isAudioLoadedL1 = false; lastLoadedFilePathL1 = "";
+        audioBufferL2.clear(); isAudioLoadedL2 = false; lastLoadedFilePathL2 = "";
+        audioBufferL3.clear(); isAudioLoadedL3 = false; lastLoadedFilePathL3 = "";
+        audioBufferL4.clear(); isAudioLoadedL4 = false; lastLoadedFilePathL4 = "";
+
+        sendChangeMessage(); // Repintar pantalla en negro
+        DBG("INIT ejecutado de forma segura y sin clicks.");
+    }
+    else if (pendingAction == 2)
+    {
+        // === EJECUTAR EL BORRADO DE UNA SOLA CAPA (La "X") ===
+        if (pendingLayerToClear == 1) { audioBufferL1.clear(); isAudioLoadedL1 = false; lastLoadedFilePathL1 = ""; }
+        else if (pendingLayerToClear == 2) { audioBufferL2.clear(); isAudioLoadedL2 = false; lastLoadedFilePathL2 = ""; }
+        else if (pendingLayerToClear == 3) { audioBufferL3.clear(); isAudioLoadedL3 = false; lastLoadedFilePathL3 = ""; }
+        else if (pendingLayerToClear == 4) { audioBufferL4.clear(); isAudioLoadedL4 = false; lastLoadedFilePathL4 = ""; }
+
+        sendChangeMessage(); // Repintar pantalla
+        DBG("Capa " + juce::String(pendingLayerToClear) + " borrada de forma segura.");
+    }
 }
 
 void Granular_SynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
@@ -954,13 +977,17 @@ void Granular_SynthAudioProcessor::loadPreset(int presetIndex)
 
 void Granular_SynthAudioProcessor::initSynth()
 {
-    // Reset de parámetros a valores de fábrica
-    for (auto* param : getParameters()) {
-        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param)) {
-            p->setValueNotifyingHost(p->getDefaultValue());
-        }
-    }
-    DBG("Sintetizador reseteado a valores iniciales.");
+    // 1. Apagamos TODAS las notas para que hagan un micro fade-out
+    synthL1.allNotesOff(0, false);
+    synthL2.allNotesOff(0, false);
+    synthL3.allNotesOff(0, false);
+    synthL4.allNotesOff(0, false);
+
+    // 2. Preparamos la orden "INIT TOTAL" (Acción 1)
+    pendingAction = 1;
+
+    // 3. Arrancamos el reloj (40 ms de espera para evitar el click)
+    startTimer(40);
 }
 
 bool Granular_SynthAudioProcessor::doesPresetExist(int presetIndex)
@@ -968,4 +995,15 @@ bool Granular_SynthAudioProcessor::doesPresetExist(int presetIndex)
     juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
     juce::File presetFile = getPresetFolder().getChildFile(fileName);
     return presetFile.existsAsFile();
+}
+
+void Granular_SynthAudioProcessor::deletePreset(int presetIndex)
+{
+    juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
+    juce::File presetFile = getPresetFolder().getChildFile(fileName);
+
+    if (presetFile.existsAsFile()) {
+        presetFile.deleteFile(); // Destruye el archivo físico
+        DBG("Preset eliminado del disco: " + fileName);
+    }
 }

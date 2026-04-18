@@ -17,7 +17,8 @@ class Granular_SynthAudioProcessor : public juce::AudioProcessor,
                                      public juce::AudioProcessorValueTreeState::Listener,
                                      public juce::ChangeBroadcaster,
                                      public juce::OSCReceiver, 
-                                     public juce::OSCReceiver::Listener<juce::OSCReceiver::MessageLoopCallback>
+                                     public juce::OSCReceiver::Listener<juce::OSCReceiver::MessageLoopCallback>,
+                                     public juce::Timer
 {
 public:
     Granular_SynthAudioProcessor();
@@ -39,6 +40,7 @@ public:
 
     void savePreset(int presetIndex);
     void loadPreset(int presetIndex);
+    void deletePreset(int presetIndex);
     bool doesPresetExist(int presetIndex);
     void initSynth();
 
@@ -152,6 +154,12 @@ public:
     std::atomic<float> visualHpfCutoff{ 20.0f };
     std::atomic<float> visualMeterL{ -60.0f };
     std::atomic<float> visualMeterR{ -60.0f };
+
+    // --- HERRAMIENTAS ANTI-CLICK ---
+    void timerCallback() override;
+    int pendingAction = 0; // 1 = Hacer Init, 2 = Borrar Capa
+    int pendingLayerToClear = 0;
+
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();

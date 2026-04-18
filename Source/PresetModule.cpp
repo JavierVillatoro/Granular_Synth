@@ -30,9 +30,29 @@ PresetModule::PresetModule(Granular_SynthAudioProcessor& p) : audioProcessor(p)
         addAndMakeVisible(presetButtons[i]);
         presetButtons[i].getProperties().set("minimumHeight", 10);
 
+        presetButtons[i].addMouseListener(this, false);
+
         presetButtons[i].onClick = [this, i] {
             currentPresetIndex = i;
-            // Aquí en la Fase 2 llamaremos a audioProcessor.loadPreset(i);
+
+            // 1. Detectamos si es un Doble Clic (menos de 300ms entre clics en el mismo botón)
+            juce::uint32 now = juce::Time::getMillisecondCounter();
+            if (lastClickedIndex == i && (now - lastClickTime) < 300)
+            {
+                // ¡DOBLE CLIC! Actuamos igual que el botón LOAD
+                if (presetHasData[i]) {
+                    audioProcessor.loadPreset(i);
+                }
+                else {
+                    audioProcessor.initSynth(); // Si está vacío, carga el Init
+                }
+                loadedPresetIndex = i;
+            }
+
+            // 2. Guardamos los datos para el próximo clic
+            lastClickedIndex = i;
+            lastClickTime = now;
+
             updatePresetButtonColors();
             };
     }
@@ -66,9 +86,14 @@ PresetModule::PresetModule(Granular_SynthAudioProcessor& p) : audioProcessor(p)
 
     // --- LÓGICA DEL BOTÓN LOAD ---
     loadButton.onClick = [this] {
-        if (currentPresetIndex != -1 && presetHasData[currentPresetIndex]) {
-            audioProcessor.loadPreset(currentPresetIndex);
-            loadedPresetIndex = currentPresetIndex; // NUEVO: Al cargar, se convierte en el cargado
+        if (currentPresetIndex != -1) {
+            if (presetHasData[currentPresetIndex]) {
+                audioProcessor.loadPreset(currentPresetIndex);
+            }
+            else {
+                audioProcessor.initSynth(); // NUEVO: Si está vacío, reset.
+            }
+            loadedPresetIndex = currentPresetIndex;
             updatePresetButtonColors();
         }
         };
@@ -161,4 +186,52 @@ void PresetModule::updatePresetButtonColors()
         }
     }
     repaint();
+}
+
+void PresetModule::mouseDown(const juce::MouseEvent& event)
+{
+    // 1. ¿Es un clic derecho? (JUCE lo llama "PopupMenu")
+    if (event.mods.isPopupMenu())
+    {
+        // 2. Buscamos a qué botón exacto se le hizo el clic
+        for (int i = 0; i < 16; ++i)
+        {
+            if (event.originalComponent == &presetButtons[i])
+            {
+                // 3. Solo abrimos el menú si ese botón tiene un preset guardado
+                if (presetHasData[i])
+                {
+                    juce::PopupMenu menu;
+                    // Añadimos la opción de borrar (ID 1, Texto "DELETE Preset X")
+                    menu.addItem(1, "DELETE Preset " + juce::String(i + 1));
+
+                    // Mostramos el menú anclado al botón
+                    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presetButtons[i]),
+                        [this, i](int result)
+                        {
+                            if (result == 1) // Si el usuario hizo clic izquierdo en "DELETE"
+                            {
+                                // A. Borramos el archivo del disco duro
+                                audioProcessor.deletePreset(i);
+
+                                // B. Le decimos a la pantalla que ese botón vuelve a estar vacío
+                                presetHasData[i] = false;
+
+                                // C. Si el preset que acabamos de borrar era el que estaba sonando...
+                                // ¡Vaciamos el sintetizador para que no suene un audio fantasma!
+                                if (loadedPresetIndex == i || currentPresetIndex == i) {
+                                    audioProcessor.initSynth();
+                                    loadedPresetIndex = -1;
+                                    currentPresetIndex = -1;
+                                }
+
+                                // D. Repintamos las lucecitas de los botones
+                                updatePresetButtonColors();
+                            }
+                        });
+                }
+                break; // Ya encontramos el botón, dejamos de buscar
+            }
+        }
+    }
 }
