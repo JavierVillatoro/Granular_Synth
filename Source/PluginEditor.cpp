@@ -58,6 +58,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(monk3);
     addAndMakeVisible(monk4);
     addAndMakeVisible(presetModule);
+    addAndMakeVisible(matrixModule);
 
     
 
@@ -585,6 +586,7 @@ void Granular_SynthAudioProcessorEditor::resized()
 
     // 3. EL CUADRADO LIBRE: Lo dividimos 60% Matrix / 40% Presets
     matrixArea = topEmptyArea.removeFromTop(topEmptyArea.getHeight() * 0.6f);
+    matrixModule.setBounds(matrixArea);
     presetsArea = topEmptyArea;
 
     presetModule.setBounds(presetsArea);

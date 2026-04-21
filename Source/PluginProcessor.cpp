@@ -66,6 +66,12 @@ Granular_SynthAudioProcessor::Granular_SynthAudioProcessor()
     }
 
     //apvts.state = juce::ValueTree("GRANULAR_SYNTH_STATE");
+    for (auto* param : getParameters()) {
+        if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*>(param)) {
+            apvts.addParameterListener(p->paramID, this);
+        }
+    }
+    
 }
 
 Granular_SynthAudioProcessor::~Granular_SynthAudioProcessor()
@@ -197,6 +203,17 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported(const BusesLayout& lay
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    // 1. CAPTURAR MODWHEEL Y AFTERTOUCH
+    for (const auto metadata : midiMessages)
+    {
+        auto msg = metadata.getMessage();
+        if (msg.isController() && msg.getControllerNumber() == 1) { // CC 1 es ModWheel
+            globalModWheel.store(msg.getControllerValue() / 127.0f); // Lo normalizamos de 0.0 a 1.0
+        }
+        else if (msg.isChannelPressure() || msg.isAftertouch()) {
+            globalAftertouch.store(msg.getChannelPressureValue() / 127.0f);
+        }
+    }
     // ==========================================================
     // --- 1. LEER EL RELOJ MAESTRO (DAW o MANUAL) ---
     // ==========================================================
@@ -827,6 +844,22 @@ void Granular_SynthAudioProcessor::timerCallback()
 
 void Granular_SynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
+    // --- TRAMPA CLICK-TO-MAP ---
+    int mappingCol = activeMappingColumn.load();
+    if (mappingCol != -1)
+    {
+        // Evitamos mapear botones de sistema
+        if (!parameterID.contains("_MUTE") && !parameterID.contains("_PLAY") &&
+            !parameterID.contains("_REC") && !parameterID.contains("_SOLO"))
+        {
+            targetColumns[mappingCol] = parameterID; // Asignamos el parámetro a la columna
+            activeMappingColumn.store(-1);           // Desarmamos la trampa
+
+            juce::MessageManager::callAsync([this] { sendChangeMessage(); });
+            DBG("Columna " + juce::String(mappingCol) + " ahora controla: " + parameterID);
+            return; // Salimos
+        }
+    }
     if (parameterID.endsWith("_REC"))
     {
         int layerIndex = parameterID.substring(1, 2).getIntValue();
@@ -1006,4 +1039,52 @@ void Granular_SynthAudioProcessor::deletePreset(int presetIndex)
         presetFile.deleteFile(); // Destruye el archivo físico
         DBG("Preset eliminado del disco: " + fileName);
     }
+}
+
+//void Granular_SynthAudioProcessor::setMappingMode(int slotIndex) {
+    //activeMappingSlot.store(slotIndex); // Armamos la trampa
+//}
+
+//void Granular_SynthAudioProcessor::setModSource(int slotIndex, int sourceID) {
+    //if (slotIndex >= 0 && slotIndex < 6) modSources[slotIndex] = sourceID;
+//}
+
+//void Granular_SynthAudioProcessor::setModDepth(int slotIndex, float depth) {
+    //if (slotIndex >= 0 && slotIndex < 6) modDepths[slotIndex] = depth;
+//}
+
+void Granular_SynthAudioProcessor::setMappingColumn(int colIndex) {
+    activeMappingColumn.store(colIndex);
+}
+
+void Granular_SynthAudioProcessor::setGridDepth(int sourceRow, int targetCol, float depth) {
+    if (sourceRow >= 0 && sourceRow < 6 && targetCol >= 0 && targetCol < 6) {
+        modDepths[sourceRow][targetCol] = depth;
+    }
+}
+
+float Granular_SynthAudioProcessor::getMatrixModulation(const juce::String& paramID, float voiceVelocity, float voiceEnv2, float voiceLFO1, float voiceLFO2)
+{
+    float totalModOffset = 0.0f;
+
+    // Buscamos en las 6 columnas a ver si el parámetro está asignado
+    for (int c = 0; c < 6; ++c)
+    {
+        if (targetColumns[c] == paramID)
+        {
+            // ¡BINGO! El parámetro está en esta columna 'c'. Sumamos las 6 fuentes (filas).
+            // modDepths va de -100 a 100. Lo dividimos por 100.0f para convertirlo en un multiplicador de -1.0 a 1.0
+
+            totalModOffset += (voiceVelocity * (modDepths[0][c] / 100.0f));
+            totalModOffset += (globalModWheel.load() * (modDepths[1][c] / 100.0f));
+            totalModOffset += (globalAftertouch.load() * (modDepths[2][c] / 100.0f));
+            totalModOffset += (voiceEnv2 * (modDepths[3][c] / 100.0f));
+            totalModOffset += (voiceLFO1 * (modDepths[4][c] / 100.0f));
+            totalModOffset += (voiceLFO2 * (modDepths[5][c] / 100.0f));
+
+            break; // Ya lo hemos encontrado, salimos del bucle rápido
+        }
+    }
+
+    return totalModOffset; // Esto nos devolverá un número entre -6.0 y +6.0 (normalmente entre -1.0 y 1.0)
 }

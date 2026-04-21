@@ -107,10 +107,14 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float winStart = 0.0f;
     float winLen = 1.0f;
 
-    if (auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor))
+    // EL FIX: Declaramos processor FUERA de un if para que esté disponible en toda la función
+    auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor);
+
+    // Solo continuamos si hemos podido conectarnos al cerebro del plugin
+    if (processor != nullptr)
     {
         if (myPrefix == "L1_") {
-            if (processor->isUpdatingBufferL1.load()) return; // OBEDECER AL SEMÁFORO
+            if (processor->isUpdatingBufferL1.load()) return;
             currentBuffer = &processor->audioBufferL1; winStart = processor->windowStartRatioL1.load(); winLen = processor->windowLengthRatioL1.load();
         }
         else if (myPrefix == "L2_") {
@@ -144,6 +148,55 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float filterResLpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_LPF")->load();
     float filterHpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_HPF")->load();
     float filterResHpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_HPF")->load();
+
+    // =========================================================================================
+    // --- NUEVA SECCIÓN DE MATRIZ: APLICAR MODULACIÓN (OFFSET) ---
+    // =========================================================================================
+
+    if (processor)
+    {
+        // 1. Obtenemos los valores de las fuentes de modulación exclusivas de esta Voz
+        // Asumiendo que tu LFO te da un valor de 0 a 1 (o -1 a 1), pásalos aquí.
+        // Como no veo la declaración de ENV2 en este scope, uso 0.0f temporalmente. Reemplázalo.
+        float voiceEnv2 = 0.0f; // Sustituye por tu cálculo real del Envelope 2
+        float voiceLFO1 = currentLfo1Value; // Asumiendo que esta variable ya existe en tu voz
+        float voiceLFO2 = currentLfo2Value;
+
+        // 2. PEDIMOS A LA MATRIZ CUÁNTA MODULACIÓN HAY PARA CADA PARÁMETRO
+        // Recibiremos un valor típicamente entre -1.0 y 1.0 (o un poco más si se suman varias fuentes)
+
+        float modFilterLpf = processor->getMatrixModulation(myPrefix + "FILTER_LPF", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
+        float modPosition = processor->getMatrixModulation(myPrefix + "POSITION", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
+        float modGrainSize = processor->getMatrixModulation(myPrefix + "GRAIN_SIZE", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
+
+        // 3. APLICAMOS LA ESCALA APROPIADA Y SUMAMOS AL VALOR BASE
+
+        // A. Frecuencia del Filtro (Escala Exponencial masiva)
+        // Si modFilterLpf es 1.0, el filtro sube 10000 Hz.
+        if (modFilterLpf != 0.0f) {
+            filterLpfFreq = juce::jlimit(20.0f, 20000.0f, filterLpfFreq + (modFilterLpf * 10000.0f));
+        }
+
+        // B. Posición del Grano (Lineal 0.0 a 1.0)
+        if (modPosition != 0.0f) {
+            positionKnob = juce::jlimit(0.0f, 1.0f, positionKnob + (modPosition * 0.5f));
+        }
+
+        // C. Tamaño del Grano (Lineal 0.01 a 1.0)
+        if (modGrainSize != 0.0f) {
+            sizeRatio = juce::jlimit(0.01f, 1.0f, sizeRatio + (modGrainSize * 0.5f));
+        }
+
+        // ---> Repite el paso 2 y 3 para cualquier otro parámetro que quieras modular (Spray, Pitch, Mix...)
+    }
+    // =========================================================================================
+
+    // ... (Tu código continúa normal: Bucle de Audio, etc.) ...
+
+    // NOTA IMPORTANTE: Para el LPF Maestro, tenías esta línea:
+    // float modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, filterLpfFreq + modFromLfo1 + modFromLfo2);
+    // Como ahora la matriz maneja el LFO, puedes usar simplemente 'filterLpfFreq' aquí, 
+    // ya que la matriz ya le sumó el LFO más arriba si el usuario lo mapeó.
 
     float monkMixes[4];
     for (int m = 0; m < 4; ++m) {

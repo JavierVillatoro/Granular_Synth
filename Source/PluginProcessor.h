@@ -44,6 +44,24 @@ public:
     bool doesPresetExist(int presetIndex);
     void initSynth();
 
+    // --- SISTEMA DE MODULACIÓN (MATRIX GRID) ---
+    // 6 Fuentes fijas: 0=Vel, 1=ModWheel, 2=Aftertouch, 3=Env2, 4=LFO1, 5=LFO2
+    // 8 Destinos dinámicos (Columnas)
+    juce::String targetColumns[6] = { "", "", "", "", "", "" };
+
+    // Matriz 2D: modDepths[fuente][destino]
+    float modDepths[6][8] = { {0.0f} };
+
+    std::atomic<int> activeMappingColumn{ -1 }; // -1 = No estamos mapeando
+
+    void setMappingColumn(int colIndex);
+    void setGridDepth(int sourceRow, int targetCol, float depth);
+
+    // Funciones que usará la interfaz
+    //void setMappingMode(int slotIndex);
+    //void setModSource(int slotIndex, int sourceID);
+    //void setModDepth(int slotIndex, float depth);
+
 #ifndef JucePlugin_PreferredChannelConfigurations
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 #endif
@@ -159,6 +177,13 @@ public:
     void timerCallback() override;
     int pendingAction = 0; // 1 = Hacer Init, 2 = Borrar Capa
     int pendingLayerToClear = 0;
+
+    // --- ESTADO MIDI PARA LA MATRIZ ---
+    std::atomic<float> globalModWheel{ 0.0f };
+    std::atomic<float> globalAftertouch{ 0.0f };
+
+    // Función puente que calculará la modulación exacta para cualquier parámetro
+    float getMatrixModulation(const juce::String& targetParamID, float voiceVelocity, float voiceEnv2, float voiceLFO1, float voiceLFO2);
 
 
 private:

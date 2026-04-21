@@ -26,6 +26,7 @@
 #include "FxFormantModule.h"
 #include "ChoirModule.h"
 #include "PresetModule.h"
+#include "MatrixModule.h"
 
 class Granular_SynthAudioProcessorEditor : public juce::AudioProcessorEditor,
     public juce::FileDragAndDropTarget,
@@ -106,6 +107,7 @@ private:
     FxFormantModule monk2{ audioProcessor.apvts, "L1_", 2 };
     FxFormantModule monk3{ audioProcessor.apvts, "L1_", 3 };
     FxFormantModule monk4{ audioProcessor.apvts, "L1_", 4 };
+    MatrixModule matrixModule{ audioProcessor };
 
     double zoomFactor = 1.0;
     double viewStartRatio = 0.0;
