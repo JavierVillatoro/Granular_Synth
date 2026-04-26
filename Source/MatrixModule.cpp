@@ -48,22 +48,33 @@ MatrixModule::MatrixModule(Granular_SynthAudioProcessor& p) : audioProcessor(p)
             gridSquares[r][c].setRange(-100.0, 100.0, 1.0); // Enteros de -100 a 100
             gridSquares[r][c].setValue(0.0);
 
-            // Colores del texto de la matriz
+            // Colores del texto de la matriz inicial
             gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::grey.withAlpha(0.5f));
             gridSquares[r][c].setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack); // Sin borde
 
+            // --- NUEVO ONVALUECHANGE CON COLORES DINÁMICOS ---
             gridSquares[r][c].onValueChange = [this, r, c] {
                 float val = (float)gridSquares[r][c].getValue();
                 audioProcessor.setGridDepth(r, c, val);
 
-                // Color dinámico: Gris si es 0, Blanco puro si hay valor
+                // Averiguar qué parámetro controla esta columna para saber su color
+                juce::String targetID = audioProcessor.targetColumns[c];
+                juce::Colour layerColor = juce::Colours::white; // Por defecto (para parámetros globales)
+
+                if (targetID.startsWith("L1")) layerColor = juce::Colours::cyan;
+                else if (targetID.startsWith("L2")) layerColor = juce::Colours::magenta;
+                else if (targetID.startsWith("L3")) layerColor = juce::Colours::orange;
+                else if (targetID.startsWith("L4")) layerColor = juce::Colours::lime;
+
+                // Color dinámico: Gris translúcido si es 0, color de capa si hay valor
                 if (val == 0.0f) {
-                    gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::grey.withAlpha(0.5f));
+                    gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::grey.withAlpha(0.3f));
                 }
                 else {
-                    gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::white);
+                    gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, layerColor);
                 }
                 };
+
             addAndMakeVisible(gridSquares[r][c]);
         }
     }
@@ -143,8 +154,6 @@ void MatrixModule::changeListenerCallback(juce::ChangeBroadcaster* source)
     {
         // 1. OBTENER EL ID Y DECIDIR EL COLOR
         juce::String targetID = audioProcessor.targetColumns[c];
-
-        // Color por defecto para parámetros Globales (Reverb, Delay, Tempo...)
         juce::Colour layerColor = juce::Colours::white.withAlpha(0.8f);
 
         if (targetID.startsWith("L1")) layerColor = juce::Colours::cyan;
@@ -161,26 +170,27 @@ void MatrixModule::changeListenerCallback(juce::ChangeBroadcaster* source)
                 targetButtons[c].setColour(juce::ComboBox::outlineColourId, juce::Colours::white.withAlpha(0.15f));
             }
             else {
-                // Formateo limpio: quitamos la 'L1_' y dejamos hasta 6 letras
                 juce::String shortName = targetID.substring(targetID.indexOf("_") + 1).substring(0, 6);
                 targetButtons[c].setButtonText(shortName);
-
                 targetButtons[c].setColour(juce::TextButton::textColourOffId, layerColor);
                 targetButtons[c].setColour(juce::ComboBox::outlineColourId, layerColor.withAlpha(0.6f));
             }
         }
 
-        // 3. ACTUALIZAR LOS COLORES DE LOS NÚMEROS EN LA CUADRÍCULA
+        // 3. SINCRONIZAR LOS NÚMEROS Y SUS COLORES CON LA MEMORIA REAL
         for (int r = 0; r < 6; ++r)
         {
-            float val = (float)gridSquares[r][c].getValue();
+            // A. Extraemos el valor real de la memoria del procesador
+            float realMemoryValue = audioProcessor.modDepths[r][c];
 
-            if (val == 0.0f) {
-                // Si es 0, lo dejamos apagado para que la matriz se vea limpia
-                gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::grey.withAlpha(0.2f));
+            // B. Forzamos al slider a mostrar ese número (sin disparar un bucle infinito)
+            gridSquares[r][c].setValue(realMemoryValue, juce::dontSendNotification);
+
+            // C. Repintamos el color
+            if (realMemoryValue == 0.0f) {
+                gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, juce::Colours::grey.withAlpha(0.3f));
             }
             else {
-                // Si tiene valor, lo encendemos con el color de su capa o blanco si es global
                 gridSquares[r][c].setColour(juce::Slider::textBoxTextColourId, layerColor);
             }
         }

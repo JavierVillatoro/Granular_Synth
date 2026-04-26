@@ -133,7 +133,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     if (currentBuffer == nullptr || currentBuffer->getNumSamples() == 0) return;
 
-    // --- LECTURA DE PARÁMETROS ---
+    // =========================================================================================
+    // --- 1. LECTURA BASE DE PARÁMETROS (TODOS LOS MÓDULOS DE LA VOZ) ---
+    // =========================================================================================
+
+    // Granular
     float positionKnob = apvts->getRawParameterValue(myPrefix + "POSITION")->load();
     float sizeRatio = apvts->getRawParameterValue(myPrefix + "GRAIN_SIZE")->load();
     float scanSpeed = apvts->getRawParameterValue(myPrefix + "SCAN_SPEED")->load();
@@ -144,69 +148,124 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float sprayPitch = apvts->getRawParameterValue(myPrefix + "SPRAY_PITCH")->load();
     float scanMode = apvts->getRawParameterValue(myPrefix + "SCAN_MODE")->load();
 
+    // Filtros Maestro
     float filterLpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_LPF")->load();
     float filterResLpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_LPF")->load();
     float filterHpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_HPF")->load();
     float filterResHpf = apvts->getRawParameterValue(myPrefix + "FILTER_RES_HPF")->load();
 
-    // =========================================================================================
-    // --- NUEVA SECCIÓN DE MATRIZ: APLICAR MODULACIÓN (OFFSET) ---
-    // =========================================================================================
+    // Pitch
+    float pitchTrans = apvts->getRawParameterValue(myPrefix + "PITCH_TRANS")->load();
+    float pitchFine = apvts->getRawParameterValue(myPrefix + "PITCH_FINE")->load();
+    float pitchScale = apvts->getRawParameterValue(myPrefix + "PITCH_SCALE")->load();
 
+    // Envolvente de Amplificador (AMP)
+    float ampA = apvts->getRawParameterValue(myPrefix + "AMP_A")->load();
+    float ampD = apvts->getRawParameterValue(myPrefix + "AMP_D")->load();
+    float ampS = apvts->getRawParameterValue(myPrefix + "AMP_S")->load();
+    float ampR = apvts->getRawParameterValue(myPrefix + "AMP_R")->load();
+
+    // Efectos Internos (Ensemble y Halo)
+    float ensRateVal = apvts->getRawParameterValue(myPrefix + "ENS_RATE")->load();
+    float ensDepthVal = apvts->getRawParameterValue(myPrefix + "ENS_DEPTH")->load();
+    float ensWidthVal = apvts->getRawParameterValue(myPrefix + "ENS_WIDTH")->load();
+    float ensMixVal = apvts->getRawParameterValue(myPrefix + "ENS_MIX")->load();
+
+    float haloPitchVal = apvts->getRawParameterValue(myPrefix + "HALO_PITCH")->load();
+    float haloShimmerVal = apvts->getRawParameterValue(myPrefix + "HALO_SHIMMER")->load();
+    float haloColorVal = apvts->getRawParameterValue(myPrefix + "HALO_COLOR")->load();
+    float haloMixVal = apvts->getRawParameterValue(myPrefix + "HALO_MIX")->load();
+
+    // EQ y Volumen
+    float eqLow = apvts->getRawParameterValue(myPrefix + "EQ_LOW")->load();
+    float eqMidL = apvts->getRawParameterValue(myPrefix + "EQ_MID_LOW")->load();
+    float eqMidH = apvts->getRawParameterValue(myPrefix + "EQ_MID_HIGH")->load();
+    float eqHigh = apvts->getRawParameterValue(myPrefix + "EQ_HIGH")->load();
+    float mixVol = apvts->getRawParameterValue(myPrefix + "MIX_VOL")->load();
+
+    // Formantes / Monjes (Leemos los 4 aquí arriba para poder modularlos)
+    float mX[4], mY[4], monkMixes[4];
+    for (int m = 0; m < 4; ++m) {
+        juce::String vPref = myPrefix + "M" + juce::String(m + 1);
+        mX[m] = apvts->getRawParameterValue(vPref + "_X")->load();
+        mY[m] = apvts->getRawParameterValue(vPref + "_Y")->load();
+        monkMixes[m] = apvts->getRawParameterValue(vPref + "_MIX")->load();
+    }
+
+    // =========================================================================================
+    // --- 2. LA MATRIZ MAESTRA: APLICACIÓN DE MODULACIÓN TOTAL ---
+    // =========================================================================================
     if (processor)
     {
-        // 1. Obtenemos los valores de las fuentes de modulación exclusivas de esta Voz
-        // Asumiendo que tu LFO te da un valor de 0 a 1 (o -1 a 1), pásalos aquí.
-        // Como no veo la declaración de ENV2 en este scope, uso 0.0f temporalmente. Reemplázalo.
-        float voiceEnv2 = 0.0f; // Sustituye por tu cálculo real del Envelope 2
-        float voiceLFO1 = currentLfo1Value; // Asumiendo que esta variable ya existe en tu voz
-        float voiceLFO2 = currentLfo2Value;
+        float vVel = currentVelocity;
+        float vEnv2 = 0.0f; // (Lo conectaremos pronto)
+        float vLfo1 = currentLfo1Value;
+        float vLfo2 = currentLfo2Value;
 
-        // 2. PEDIMOS A LA MATRIZ CUÁNTA MODULACIÓN HAY PARA CADA PARÁMETRO
-        // Recibiremos un valor típicamente entre -1.0 y 1.0 (o un poco más si se suman varias fuentes)
+        auto applyMod = [&](const juce::String& paramName, float& targetVar, float minVal, float maxVal, float scaleAmount)
+            {
+                float mod = processor->getMatrixModulation(myPrefix + paramName, vVel, vEnv2, vLfo1, vLfo2);
+                if (mod != 0.0f) targetVar = juce::jlimit(minVal, maxVal, targetVar + (mod * scaleAmount));
+            };
 
-        float modFilterLpf = processor->getMatrixModulation(myPrefix + "FILTER_LPF", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
-        float modPosition = processor->getMatrixModulation(myPrefix + "POSITION", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
-        float modGrainSize = processor->getMatrixModulation(myPrefix + "GRAIN_SIZE", currentVelocity, voiceEnv2, voiceLFO1, voiceLFO2);
+        // Granular Engine
+        applyMod("POSITION", positionKnob, 0.0f, 1.0f, 0.5f);
+        applyMod("GRAIN_SIZE", sizeRatio, 0.01f, 1.0f, 0.5f);
+        applyMod("SCAN_SPEED", scanSpeed, -2.0f, 2.0f, 2.0f);
+        applyMod("DENSITY", density, 1.0f, 120.0f, 60.0f);
+        applyMod("SHAPE", shapeParam, 0.0f, 1.0f, 0.5f);
+        applyMod("SPRAY_POS", sprayPos, 0.0f, 1.0f, 0.5f);
+        applyMod("SPRAY_PAN", sprayPan, 0.0f, 1.0f, 0.5f);
+        applyMod("SPRAY_PITCH", sprayPitch, 0.0f, 12.0f, 12.0f);
 
-        // 3. APLICAMOS LA ESCALA APROPIADA Y SUMAMOS AL VALOR BASE
+        // Pitch & Filter
+        applyMod("PITCH_TRANS", pitchTrans, -24.0f, 24.0f, 24.0f);
+        applyMod("PITCH_FINE", pitchFine, -1.0f, 1.0f, 1.0f);
+        applyMod("FILTER_LPF", filterLpfFreq, 20.0f, 20000.0f, 8000.0f);
+        applyMod("FILTER_HPF", filterHpfFreq, 20.0f, 20000.0f, 8000.0f);
+        applyMod("FILTER_RES_LPF", filterResLpf, 0.7f, 2.5f, 1.0f);
+        applyMod("FILTER_RES_HPF", filterResHpf, 0.7f, 2.5f, 1.0f);
 
-        // A. Frecuencia del Filtro (Escala Exponencial masiva)
-        // Si modFilterLpf es 1.0, el filtro sube 10000 Hz.
-        if (modFilterLpf != 0.0f) {
-            filterLpfFreq = juce::jlimit(20.0f, 20000.0f, filterLpfFreq + (modFilterLpf * 10000.0f));
+        // Envolvente AMP
+        applyMod("AMP_A", ampA, 0.01f, 5.0f, 2.0f);
+        applyMod("AMP_D", ampD, 0.01f, 5.0f, 2.0f);
+        applyMod("AMP_S", ampS, 0.0f, 1.0f, 0.5f);
+        applyMod("AMP_R", ampR, 0.01f, 5.0f, 2.0f);
+
+        // Halo & Ensemble
+        applyMod("HALO_PITCH", haloPitchVal, 0.0f, 1.0f, 0.5f);
+        applyMod("HALO_SHIMMER", haloShimmerVal, 0.0f, 1.0f, 0.5f);
+        applyMod("HALO_COLOR", haloColorVal, 0.0f, 1.0f, 0.5f);
+        applyMod("HALO_MIX", haloMixVal, 0.0f, 1.0f, 0.5f);
+
+        applyMod("ENS_RATE", ensRateVal, 0.0f, 1.0f, 0.5f);
+        applyMod("ENS_DEPTH", ensDepthVal, 0.0f, 1.0f, 0.5f);
+        applyMod("ENS_WIDTH", ensWidthVal, 0.0f, 1.0f, 0.5f);
+        applyMod("ENS_MIX", ensMixVal, 0.0f, 1.0f, 0.5f);
+
+        // Mixer & EQ
+        applyMod("MIX_VOL", mixVol, -60.0f, 6.0f, 12.0f);
+        applyMod("EQ_LOW", eqLow, -60.0f, 15.0f, 15.0f);
+        applyMod("EQ_MID_LOW", eqMidL, -60.0f, 15.0f, 15.0f);
+        applyMod("EQ_MID_HIGH", eqMidH, -60.0f, 15.0f, 15.0f);
+        applyMod("EQ_HIGH", eqHigh, -60.0f, 15.0f, 15.0f);
+
+        // Formantes (Monjes)
+        for (int m = 0; m < 4; ++m) {
+            juce::String mStr = "M" + juce::String(m + 1);
+            applyMod(mStr + "_X", mX[m], 0.0f, 1.0f, 0.5f);
+            applyMod(mStr + "_Y", mY[m], 0.0f, 1.0f, 0.5f);
+            applyMod(mStr + "_MIX", monkMixes[m], 0.0f, 1.0f, 0.5f);
         }
-
-        // B. Posición del Grano (Lineal 0.0 a 1.0)
-        if (modPosition != 0.0f) {
-            positionKnob = juce::jlimit(0.0f, 1.0f, positionKnob + (modPosition * 0.5f));
-        }
-
-        // C. Tamaño del Grano (Lineal 0.01 a 1.0)
-        if (modGrainSize != 0.0f) {
-            sizeRatio = juce::jlimit(0.01f, 1.0f, sizeRatio + (modGrainSize * 0.5f));
-        }
-
-        // ---> Repite el paso 2 y 3 para cualquier otro parámetro que quieras modular (Spray, Pitch, Mix...)
     }
+
+    // =========================================================================================
+    // --- 3. CONVERSIÓN FINAL POST-MATRIZ (Configurar Filtros y Efectos) ---
     // =========================================================================================
 
-    // ... (Tu código continúa normal: Bucle de Audio, etc.) ...
-
-    // NOTA IMPORTANTE: Para el LPF Maestro, tenías esta línea:
-    // float modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, filterLpfFreq + modFromLfo1 + modFromLfo2);
-    // Como ahora la matriz maneja el LFO, puedes usar simplemente 'filterLpfFreq' aquí, 
-    // ya que la matriz ya le sumó el LFO más arriba si el usuario lo mapeó.
-
-    float monkMixes[4];
     for (int m = 0; m < 4; ++m) {
-        juce::String vPrefix = myPrefix + "M" + juce::String(m + 1);
-        float vX = apvts->getRawParameterValue(vPrefix + "_X")->load();
-        float vY = apvts->getRawParameterValue(vPrefix + "_Y")->load();
-        monkMixes[m] = apvts->getRawParameterValue(vPrefix + "_MIX")->load();
-
         if (monkMixes[m] > 0.001f) {
-            float pos = vX * 4.0f; int index = (int)pos; float frac = pos - index;
+            float pos = mX[m] * 4.0f; int index = (int)pos; float frac = pos - index;
             const float f1_t[5] = { 730.0f, 530.0f, 270.0f, 400.0f, 320.0f };
             const float f2_t[5] = { 1090.0f, 1840.0f, 2290.0f, 840.0f, 800.0f };
             const float f3_t[5] = { 2440.0f, 2480.0f, 3010.0f, 2400.0f, 2250.0f };
@@ -214,9 +273,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             float f2 = (index >= 4) ? f2_t[4] : f2_t[index] + frac * (f2_t[index + 1] - f2_t[index]);
             float f3 = (index >= 4) ? f3_t[4] : f3_t[index] + frac * (f3_t[index + 1] - f3_t[index]);
 
-            float shiftMap = 0.5f + vY;
-            f1 = juce::jlimit(20.0f, 20000.0f, f1 * shiftMap); f2 = juce::jlimit(20.0f, 20000.0f, f2 * shiftMap); f3 = juce::jlimit(20.0f, 20000.0f, f3 * shiftMap);
-            float q = 1.0f + (vY * 15.0f);
+            float shiftMap = 0.5f + mY[m];
+            f1 = juce::jlimit(20.0f, 20000.0f, f1 * shiftMap);
+            f2 = juce::jlimit(20.0f, 20000.0f, f2 * shiftMap);
+            f3 = juce::jlimit(20.0f, 20000.0f, f3 * shiftMap);
+            float q = 1.0f + (mY[m] * 15.0f);
 
             for (int i = 0; i < 2; ++i) {
                 formantFilters[m][0][i].setCutoffFrequency(f1); formantFilters[m][0][i].setResonance(q);
@@ -226,37 +287,23 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         }
     }
 
-    float ensRateVal = apvts->getRawParameterValue(myPrefix + "ENS_RATE")->load();
-    float ensDepthVal = apvts->getRawParameterValue(myPrefix + "ENS_DEPTH")->load();
-    float ensMixVal = apvts->getRawParameterValue(myPrefix + "ENS_MIX")->load();
-
     ensembleFX.setRate(0.1f + (ensRateVal * 3.9f));
     ensembleFX.setDepth(ensDepthVal);
-    ensembleFX.setMix(1.0f); // TRUCO: Siempre al 100% Wet porque hacemos el mix manualmente en paralelo
-
-    float haloPitchVal = apvts->getRawParameterValue(myPrefix + "HALO_PITCH")->load();
-    float haloShimmerVal = apvts->getRawParameterValue(myPrefix + "HALO_SHIMMER")->load();
-    float haloColorVal = apvts->getRawParameterValue(myPrefix + "HALO_COLOR")->load();
-    float haloMixVal = apvts->getRawParameterValue(myPrefix + "HALO_MIX")->load();
+    ensembleFX.setMix(1.0f);
 
     for (int i = 0; i < 2; ++i) {
         haloHighpass[i].setCutoffFrequency(juce::jlimit(20.0f, 20000.0f, 500.0f + (haloColorVal * 5000.0f)));
     }
 
-    ampAdsrParams.attack = apvts->getRawParameterValue(myPrefix + "AMP_A")->load(); ampAdsrParams.decay = apvts->getRawParameterValue(myPrefix + "AMP_D")->load();
-    ampAdsrParams.sustain = apvts->getRawParameterValue(myPrefix + "AMP_S")->load(); ampAdsrParams.release = apvts->getRawParameterValue(myPrefix + "AMP_R")->load();
+    ampAdsrParams.attack = ampA; ampAdsrParams.decay = ampD;
+    ampAdsrParams.sustain = ampS; ampAdsrParams.release = ampR;
     ampAdsr.setParameters(ampAdsrParams);
 
-    // CONFIGURACIÓN DEL FILTRO MAESTRO
-    float modFromLfo1 = currentLfo1Value * 2000.0f; float modFromLfo2 = (currentLfo2Value - 0.5f) * 4000.0f;
-    float modulatedLpfFreq = juce::jlimit(20.0f, 20000.0f, filterLpfFreq + modFromLfo1 + modFromLfo2);
     for (int i = 0; i < 2; ++i) {
-        lpf[i].setCutoffFrequency(modulatedLpfFreq); lpf[i].setResonance(filterResLpf);
-        hpf[i].setCutoffFrequency(filterHpfFreq); hpf[i].setResonance(filterResHpf);
+        lpf[i].setCutoffFrequency(juce::jlimit(20.0f, 20000.0f, filterLpfFreq)); lpf[i].setResonance(filterResLpf);
+        hpf[i].setCutoffFrequency(juce::jlimit(20.0f, 20000.0f, filterHpfFreq)); hpf[i].setResonance(filterResHpf);
     }
 
-    float pitchTrans = apvts->getRawParameterValue(myPrefix + "PITCH_TRANS")->load(); float pitchFine = apvts->getRawParameterValue(myPrefix + "PITCH_FINE")->load();
-    float pitchScale = apvts->getRawParameterValue(myPrefix + "PITCH_SCALE")->load();
     float finalBasePitchRatio = pitchRatio * std::pow(2.0f, (pitchTrans + pitchFine) / 12.0f);
 
     float activeAudioSeconds = (currentBuffer->getNumSamples() / getSampleRate()) * winLen;
@@ -266,12 +313,13 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
 
     auto sr = getSampleRate();
     for (int i = 0; i < 2; ++i) {
-        eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(apvts->getRawParameterValue(myPrefix + "EQ_LOW")->load()));
-        eqMidLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 500.0f, 0.7f, juce::Decibels::decibelsToGain(apvts->getRawParameterValue(myPrefix + "EQ_MID_LOW")->load()));
-        eqMidHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 2500.0f, 0.7f, juce::Decibels::decibelsToGain(apvts->getRawParameterValue(myPrefix + "EQ_MID_HIGH")->load()));
-        eqHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr, 10000.0f, 0.7f, juce::Decibels::decibelsToGain(apvts->getRawParameterValue(myPrefix + "EQ_HIGH")->load()));
+        eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(eqLow));
+        eqMidLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidL));
+        eqMidHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sr, 2500.0f, 0.7f, juce::Decibels::decibelsToGain(eqMidH));
+        eqHighFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr, 10000.0f, 0.7f, juce::Decibels::decibelsToGain(eqHigh));
     }
-    float mixerVolGain = juce::Decibels::decibelsToGain(apvts->getRawParameterValue(myPrefix + "MIX_VOL")->load());
+
+    float mixerVolGain = juce::Decibels::decibelsToGain(mixVol);
 
     // =======================================================================
     // BUCLE DE AUDIO

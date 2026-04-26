@@ -426,15 +426,21 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     synthL3.renderNextBlock(renderBufferL3, processedMidiL3, 0, buffer.getNumSamples());
     synthL4.renderNextBlock(renderBufferL4, processedMidiL4, 0, buffer.getNumSamples());
 
-    auto applyLayerPan = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix) {
-        float panVal = apvts.getRawParameterValue(prefix + "PAN")->load() / 100.0f; // Pasa de -100/100 a -1.0/1.0
+    // ==========================================================
+    // --- PANEO Y EFECTOS EXTERNOS (CON MATRIZ INYECTADA) ---
+    // ==========================================================
 
-        // Matemática de paneo de potencia constante (Circular)
-        float panMapped = (panVal + 1.0f) * 0.5f; // Mapea a 0.0 - 1.0
+    auto applyLayerPan = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix) {
+        float panVal = apvts.getRawParameterValue(prefix + "PAN")->load();
+
+        // Matriz para PAN (Se mueve de -100 a +100)
+        float modPan = getMatrixModulation(prefix + "PAN", 0.0f, 0.0f, globalLfo1Value, globalLfo2Value);
+        if (modPan != 0.0f) panVal = juce::jlimit(-100.0f, 100.0f, panVal + (modPan * 100.0f));
+
+        float panMapped = (panVal / 100.0f + 1.0f) * 0.5f;
         float gainL = std::cos(panMapped * juce::MathConstants<float>::halfPi);
         float gainR = std::sin(panMapped * juce::MathConstants<float>::halfPi);
 
-        // Aplicamos la ganancia destructivamente a cada canal
         layerBuffer.applyGain(0, 0, layerBuffer.getNumSamples(), gainL);
         layerBuffer.applyGain(1, 0, layerBuffer.getNumSamples(), gainR);
         };
@@ -447,8 +453,21 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     auto applyEffectsToLayer = [this](juce::AudioBuffer<float>& layerBuffer, juce::String prefix, juce::dsp::Reverb& reverb)
         {
             float driveParam = apvts.getRawParameterValue(prefix + "DIST_DRIVE")->load();
-            float mixDist = apvts.getRawParameterValue(prefix + "DIST_MIX")->load() / 100.0f;
+            float mixDist = apvts.getRawParameterValue(prefix + "DIST_MIX")->load();
             int typeParam = (int)apvts.getRawParameterValue(prefix + "DIST_TYPE")->load();
+            float mixReverb = apvts.getRawParameterValue(prefix + "SPACE_MIX")->load();
+
+            // Lambda local para la matriz externa
+            auto applyExtMod = [&](const juce::String& paramName, float& targetVar, float minVal, float maxVal, float scale) {
+                float mod = getMatrixModulation(prefix + paramName, 0.0f, 0.0f, globalLfo1Value, globalLfo2Value);
+                if (mod != 0.0f) targetVar = juce::jlimit(minVal, maxVal, targetVar + (mod * scale));
+                };
+
+            applyExtMod("DIST_DRIVE", driveParam, 0.0f, 100.0f, 50.0f);
+            applyExtMod("DIST_MIX", mixDist, 0.0f, 100.0f, 50.0f);
+            applyExtMod("SPACE_MIX", mixReverb, 0.0f, 1.0f, 0.5f);
+
+            mixDist /= 100.0f; // Convertimos mix de Distorsión a 0.0 - 1.0
 
             if (mixDist > 0.001f) {
                 float driveMult = juce::jmap(driveParam, 0.0f, 100.0f, 1.0f, 15.0f);
@@ -475,9 +494,9 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
                 }
             }
 
+            // ESPACIO REVERBERANTE GLOBAL
             float spaceSize = apvts.getRawParameterValue("SPACE_SIZE")->load();
             float spaceFback = apvts.getRawParameterValue("SPACE_FBACK")->load();
-            float mixReverb = apvts.getRawParameterValue(prefix + "SPACE_MIX")->load();
 
             juce::Reverb::Parameters params;
             params.roomSize = spaceSize;
@@ -952,6 +971,17 @@ void Granular_SynthAudioProcessor::savePreset(int presetIndex)
         apvts.state.setProperty("AUDIO_PATH_L3", lastLoadedFilePathL3, nullptr);
         apvts.state.setProperty("AUDIO_PATH_L4", lastLoadedFilePathL4, nullptr);
 
+        // --- INYECTAR LA MATRIZ DE MODULACIÓN ---
+        for (int c = 0; c < 6; ++c) {
+            // Guardamos el nombre del destino (ej: "L1_FILTER_LPF")
+            apvts.state.setProperty("MOD_TARGET_" + juce::String(c), targetColumns[c], nullptr);
+
+            // Guardamos las 6 profundidades de esa columna
+            for (int r = 0; r < 6; ++r) {
+                apvts.state.setProperty("MOD_DEPTH_" + juce::String(r) + "_" + juce::String(c), modDepths[r][c], nullptr);
+            }
+        }
+
         // 2. Hacemos la fotografía con los knobs + los textos
         auto state = apvts.copyState();
 
@@ -999,6 +1029,18 @@ void Granular_SynthAudioProcessor::loadPreset(int presetIndex)
                 if (path3.isNotEmpty()) loadFile(path3, 3); else clearFile(3);
                 if (path4.isNotEmpty()) loadFile(path4, 4); else clearFile(4);
 
+                // --- RECUPERAR LA MATRIZ DE MODULACIÓN ---
+                for (int c = 0; c < 6; ++c) {
+                    targetColumns[c] = tree.getProperty("MOD_TARGET_" + juce::String(c)).toString();
+
+                    for (int r = 0; r < 6; ++r) {
+                        modDepths[r][c] = (float)tree.getProperty("MOD_DEPTH_" + juce::String(r) + "_" + juce::String(c));
+                    }
+                }
+
+                // Forzamos a la pantalla a repintarse para mostrar los nuevos datos de la matriz
+                juce::MessageManager::callAsync([this]() { sendChangeMessage(); });
+
                 DBG("Preset BINARIO cargado con exito: " + fileName);
             }
         }
@@ -1015,6 +1057,14 @@ void Granular_SynthAudioProcessor::initSynth()
     synthL2.allNotesOff(0, false);
     synthL3.allNotesOff(0, false);
     synthL4.allNotesOff(0, false);
+
+    // --- NUEVO: LIMPIAR LA MATRIZ DE MEMORIA ---
+    for (int c = 0; c < 6; ++c) {
+        targetColumns[c] = "";
+        for (int r = 0; r < 6; ++r) {
+            modDepths[r][c] = 0.0f;
+        }
+    }
 
     // 2. Preparamos la orden "INIT TOTAL" (Acción 1)
     pendingAction = 1;
