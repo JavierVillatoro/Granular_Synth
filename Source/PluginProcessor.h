@@ -21,6 +21,9 @@ class Granular_SynthAudioProcessor : public juce::AudioProcessor,
                                      public juce::Timer
 {
 public:
+    // Candado
+    juce::CriticalSection audioMutex;
+
     Granular_SynthAudioProcessor();
     ~Granular_SynthAudioProcessor() override;
 

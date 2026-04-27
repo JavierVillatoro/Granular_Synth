@@ -30,6 +30,9 @@ void GranularVoice::stopNote(float velocity, bool allowTailOff)
         clearCurrentNote();
         ampAdsr.reset();
         isPlaying = false;
+
+        // --- NUEVO: MATAR FANTASMAS AL PARAR EN SECO ---
+        for (int i = 0; i < 128; ++i) visualGrainEnv[i].store(0.0f);
     }
 }
 
@@ -101,7 +104,10 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
 
 void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
 {
-    if (!isPlaying || getSampleRate() <= 0.0) return;
+    if (!isPlaying || getSampleRate() <= 0.0) {
+        for (int i = 0; i < 128; ++i) visualGrainEnv[i].store(0.0f);
+        return;
+    }
 
     juce::AudioBuffer<float>* currentBuffer = nullptr;
     float winStart = 0.0f;

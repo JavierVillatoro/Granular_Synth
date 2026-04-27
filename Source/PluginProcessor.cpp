@@ -203,6 +203,9 @@ bool Granular_SynthAudioProcessor::isBusesLayoutSupported(const BusesLayout& lay
 
 void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    // --- 1. ECHAMOS EL CANDADO MIENTRAS EL AUDIO SUENA ---
+    const juce::ScopedLock sl(audioMutex);
+
     // 1. CAPTURAR MODWHEEL Y AFTERTOUCH
     for (const auto metadata : midiMessages)
     {
@@ -776,6 +779,8 @@ void Granular_SynthAudioProcessor::loadFile(const juce::String& path, int layerI
         juce::AudioBuffer<float> tempBuffer((int)reader->numChannels, (int)reader->lengthInSamples);
         reader->read(&tempBuffer, 0, (int)reader->lengthInSamples, 0, true, true);
 
+        const juce::ScopedLock sl(audioMutex);
+
         if (layerIndex == 1) {
             isUpdatingBufferL1.store(true); // SEMÁFORO EN ROJO (Para el audio)
             audioBufferL1.makeCopyOf(tempBuffer);
@@ -829,6 +834,7 @@ void Granular_SynthAudioProcessor::clearFile(int layerIndex)
 void Granular_SynthAudioProcessor::timerCallback()
 {
     stopTimer(); // Apagamos el cronómetro para que no se repita en bucle
+    const juce::ScopedLock sl(audioMutex);
 
     if (pendingAction == 1)
     {
