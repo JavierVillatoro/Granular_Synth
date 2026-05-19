@@ -27,7 +27,9 @@ A high-performance, real-time 4-layer granular synthesizer plugin (VST3 / Standa
 
 The project includes a custom-built mobile application that acts as a wireless remote control for the synthesizer, communicating via TCP/IP and the OSC protocol.
 
-![Flutter Remote App](Images/Flutter.jpeg)
+<div align="center">
+  <img src="Images/Flutter.jpeg" alt="Flutter Remote App" width="300">
+</div>
 
 * **Real-Time Synchronization:** Tap into the plugin's local IP address to control granular engines on the fly.
 * **Layer Focus:** Quickly switch between Layer 1 to Layer 4 parameters straight from your smartphone.
