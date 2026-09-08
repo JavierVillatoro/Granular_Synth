@@ -55,7 +55,7 @@ public:
     {
         if (parameterID.contains("POSITION") || parameterID.contains("GRAIN_SIZE") ||
             parameterID.contains("SHAPE") || parameterID.contains("MUTE") ||
-            parameterID.contains("SOLO") || parameterID.contains("REC")) // <-- ¡AÑADIDO "REC"!
+            parameterID.contains("SOLO") || parameterID.contains("REC")) // <-- ï¿½Aï¿½ADIDO "REC"!
         {
             juce::MessageManager::callAsync([this] { repaint(); });
         }

@@ -60,9 +60,9 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(presetModule);
     addAndMakeVisible(matrixModule);
 
-    
 
-    // El INIT borra la selección visual al hacer clic
+
+    // El INIT borra la selecciï¿½n visual al hacer clic
     //initButton.onClick = [this] { currentPresetIndex = -1; updatePresetButtonColors(); };
 
     audioProcessor.apvts.addParameterListener("L1_POSITION", this);
@@ -105,7 +105,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
         // Fondo transparente, texto rojo oscuro/suave
         btn.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
         btn.setColour(juce::TextButton::textColourOffId, juce::Colours::red.withAlpha(0.6f));
-        // Al pasar el ratón (hover), rojo brillante
+        // Al pasar el ratï¿½n (hover), rojo brillante
         btn.setColour(juce::TextButton::textColourOnId, juce::Colours::red.brighter());
 
         // Sin bordes
@@ -115,7 +115,7 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
 
         addAndMakeVisible(btn);
 
-        // La acción destructiva
+        // La acciï¿½n destructiva
         btn.onClick = [this, layerIndex] {
             audioProcessor.clearFile(layerIndex);
             };
@@ -161,7 +161,7 @@ Granular_SynthAudioProcessorEditor::~Granular_SynthAudioProcessorEditor()
 void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
     // ==========================================================
-    // --- 1. MAGIA DE COLOR: TEMA DINÁMICO SEGÚN LA CAPA ---
+    // --- 1. MAGIA DE COLOR: TEMA DINï¿½MICO SEGï¿½N LA CAPA ---
     // ==========================================================
     juce::Colour themeColor = juce::Colours::cyan;
     if (activeLayer == 2) themeColor = juce::Colours::magenta;
@@ -191,7 +191,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     bool s3 = audioProcessor.apvts.getRawParameterValue("L3_SOLO")->load() > 0.5f;
     bool s4 = audioProcessor.apvts.getRawParameterValue("L4_SOLO")->load() > 0.5f;
 
-    // Leemos quién está grabando
+    // Leemos quiï¿½n estï¿½ grabando
     bool r1 = audioProcessor.apvts.getRawParameterValue("L1_REC")->load() > 0.5f;
     bool r2 = audioProcessor.apvts.getRawParameterValue("L2_REC")->load() > 0.5f;
     bool r3 = audioProcessor.apvts.getRawParameterValue("L3_REC")->load() > 0.5f;
@@ -207,18 +207,18 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     auto drawLayerButtons = [&](juce::Rectangle<int> area, juce::Colour color, int num, bool isSolo, bool isMute, float layerAlpha) {
 
         // --- NUEVO: CANDADO DE FUENTE ---
-        // Forzamos la fuente plana y tamaño normal para que el "Grabando..." gigante no contamine esto
+        // Forzamos la fuente plana y tamaï¿½o normal para que el "Grabando..." gigante no contamine esto
         g.setFont(juce::Font(14.0f, juce::Font::plain));
 
         // --- NUEVO: AJUSTE DE ALTURA ---
-        // Le restamos 25 de abajo, pero lo trasladamos (0, -3) para separarlo del borde inferior 3 píxeles
+        // Le restamos 25 de abajo, pero lo trasladamos (0, -3) para separarlo del borde inferior 3 pï¿½xeles
         auto btnArea = area.removeFromBottom(25).translated(0, -3).removeFromRight(55).withTrimmedRight(5);
 
         juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
         btnArea.removeFromRight(5);
         juce::Rectangle<int> btnSolo = btnArea.removeFromRight(20);
 
-        // MUTE/NUM BUTTON (Invertido: brilla si la capa está ON/no muteada)
+        // MUTE/NUM BUTTON (Invertido: brilla si la capa estï¿½ ON/no muteada)
         g.setColour(!isMute ? color.withAlpha(juce::jmax(0.5f, layerAlpha)) : juce::Colours::grey.withAlpha(0.2f));
         g.fillRect(btnNum);
         g.setColour(juce::Colours::white.withAlpha(!isMute ? 1.0f : 0.3f));
@@ -236,13 +236,13 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         };
 
     // ==========================================================
-    // --- LÓGICA DE DIBUJO DE CAPAS (HYBRID RENDER + REC MODE) ---
+    // --- Lï¿½GICA DE DIBUJO DE CAPAS (HYBRID RENDER + REC MODE) ---
     // ==========================================================
     auto drawLayer = [&](juce::Rectangle<int> area, juce::Colour color, float alpha, juce::AudioThumbnail& thumb, juce::String prefix, double zF, double vsR, int num, bool isSolo, bool isMute, bool isRec, juce::AudioBuffer<float>* rawBuffer, juce::Synthesiser& synth) {
         g.setColour(color.withAlpha(0.6f * alpha));
         g.drawRect(area, 2);
 
-        // Si está en modo REC, atenuamos la onda al máximo para que quede en segundo plano (efecto fantasma)
+        // Si estï¿½ en modo REC, atenuamos la onda al mï¿½ximo para que quede en segundo plano (efecto fantasma)
         float drawAlpha = isRec ? 0.08f : alpha;
 
         if (thumb.getNumChannels() > 0) {
@@ -355,7 +355,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         }
 
         // ==========================================================
-        // --- OVERLAY ELEGANTE DE GRABACIÓN (LA RESPIRACIÓN) ---
+        // --- OVERLAY ELEGANTE DE GRABACIï¿½N (LA RESPIRACIï¿½N) ---
         // ==========================================================
         if (isRec) {
             // Onda senoidal basada en el tiempo (pulso de 0.2 a 0.8)
@@ -370,10 +370,10 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             g.setColour(juce::Colours::red.withAlpha(pulse));
             g.drawRect(area, 2);
 
-            // Determinar el mensaje según el modo seleccionado y pedir la IP
+            // Determinar el mensaje segï¿½n el modo seleccionado y pedir la IP
             int recMode = (int)audioProcessor.apvts.getRawParameterValue(prefix + "R_MODE")->load();
             juce::String statusText = "";
-            juce::String currentIP = audioProcessor.getLocalIPAddress(); // <--- LLAMADA MÁGICA
+            juce::String currentIP = audioProcessor.getLocalIPAddress(); // <--- LLAMADA Mï¿½GICA
 
             if (recMode == 0) {
                 statusText = juce::String::charToString(0x25CF) + " DAW AUDIO ROUTING...";
@@ -398,7 +398,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         drawLayerButtons(area, color, num, isSolo, isMute, alpha);
         };
 
-    // Llamadas a drawLayer pasándole el nuevo parámetro `r1`, `r2`, etc.
+    // Llamadas a drawLayer pasï¿½ndole el nuevo parï¿½metro `r1`, `r2`, etc.
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     drawLayer(layer1Area, juce::Colours::cyan, a1, thumbnail, "L1_", zoomFactor, viewStartRatio, 1, s1, m1, r1, &audioProcessor.audioBufferL1, audioProcessor.getSynthesiserL1());
 
@@ -427,7 +427,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     // --- PINTAR LOS BLOQUES PARA VER EL ESPACIO ---
     //g.setColour(juce::Colours::darkgrey.withAlpha(0.6f));
     //g.fillRect(matrixArea);
-    //g.setColour(juce::Colours::lightgrey.withAlpha(0.2f)); // Gris más claro para los presets
+    //g.setColour(juce::Colours::lightgrey.withAlpha(0.2f)); // Gris mï¿½s claro para los presets
     //g.fillRect(presetsArea);
     // -----------------------------------------------------
 
@@ -456,7 +456,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawRect(stutterAreaRect, 1);
 
     g.setColour(juce::Colours::white.withAlpha(0.7f));
-    // CORRECCIÓN: Forzamos fuente plana
+    // CORRECCIï¿½N: Forzamos fuente plana
     g.setFont(juce::Font(14.0f, juce::Font::plain));
     //g.drawText("MATRIX", matrixArea, juce::Justification::centred);
     g.setFont(juce::Font(12.0f, juce::Font::bold));
@@ -470,7 +470,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
     g.drawText("IP: " + currentIP, ipArea.withTrimmedLeft(8), juce::Justification::centredLeft);
     g.drawText("MIX", mixerArea, juce::Justification::centred);
 
-    // CORRECCIÓN: Forzamos fuente plana
+    // CORRECCIï¿½N: Forzamos fuente plana
     g.setFont(juce::Font(11.0f, juce::Font::plain));
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.drawText("VOICE 1", vowelAreaRect.withTrimmedTop(5), juce::Justification::centredTop);
@@ -511,7 +511,7 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
             int numKnobs = knobNames[modIndex].size();
             if (numKnobs > 0) {
                 int labelWidth = labelArea.getWidth() / numKnobs;
-                // CORRECCIÓN: Forzamos fuente plana
+                // CORRECCIï¿½N: Forzamos fuente plana
                 g.setFont(juce::Font(12.0f, juce::Font::plain));
                 g.setColour(juce::Colours::white.withAlpha(0.4f));
                 for (int i = 0; i < numKnobs; ++i) {
@@ -544,11 +544,11 @@ void Granular_SynthAudioProcessorEditor::resized()
     // Capas
     int btnSize = 18;
 
-    // --- LA NUEVA POSICIÓN (Arriba a la izquierda de DAW) ---
-    // 160 es la distancia aproximada en píxeles de todo tu bloque derecho. 
-    // Si la "X" se monta encima de "DAW", sube este número a 170 o 180. Si queda muy lejos, bájalo a 150.
+    // --- LA NUEVA POSICIï¿½N (Arriba a la izquierda de DAW) ---
+    // 160 es la distancia aproximada en pï¿½xeles de todo tu bloque derecho. 
+    // Si la "X" se monta encima de "DAW", sube este nï¿½mero a 170 o 180. Si queda muy lejos, bï¿½jalo a 150.
     int paddingX = 170;
-    int paddingY = 10;  // Separación desde el "techo" de la capa
+    int paddingY = 10;  // Separaciï¿½n desde el "techo" de la capa
 
     auto layer1Area = wavesArea.removeFromTop(layerHeight);
     layer1Controls.setBounds(layer1Area);
@@ -580,9 +580,9 @@ void Granular_SynthAudioProcessorEditor::resized()
     // 1. Tomamos toda la mitad superior libre (encima del Mixer/Voces)
     auto topEmptyArea = leftColumn.removeFromTop(leftColumn.getHeight() * 0.5f);
 
-    // 2. ZONA PROTEGIDA: Aislamos la IP arriba del todo (25 píxeles de alto)
+    // 2. ZONA PROTEGIDA: Aislamos la IP arriba del todo (25 pï¿½xeles de alto)
     ipArea = topEmptyArea.removeFromTop(25);
-    topEmptyArea.removeFromTop(5); // Un pequeño margen de respiración
+    topEmptyArea.removeFromTop(5); // Un pequeï¿½o margen de respiraciï¿½n
 
     // 3. EL CUADRADO LIBRE: Lo dividimos 60% Matrix / 40% Presets
     matrixArea = topEmptyArea.removeFromTop(topEmptyArea.getHeight() * 0.6f);
@@ -611,7 +611,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     monk3.setBounds(areaM3);
     monk4.setBounds(areaM4);
 
-    // Módulos verticales derechos (Master, Dist, BPM)
+    // Mï¿½dulos verticales derechos (Master, Dist, BPM)
     masterArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distArea = rightColumn.removeFromTop(rightColumn.getHeight() * 0.5f);
     distModule.setBounds(distArea);
@@ -619,7 +619,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     bpmArea = rightColumn;
     bpmModule.setBounds(bpmArea);
 
-    // Módulos inferiores (Fila 1 y 2)
+    // Mï¿½dulos inferiores (Fila 1 y 2)
     int moduleWidth = bottomModulesArea.getWidth() / 4;
     int moduleHeight = bottomModulesArea.getHeight() / 2;
 
@@ -646,7 +646,7 @@ void Granular_SynthAudioProcessorEditor::resized()
     juce::Rectangle<int> choirRect = lastBlock.removeFromLeft(halfW);
     juce::Rectangle<int> spaceRect = lastBlock; // Space se queda con la mitad derecha
 
-    // Ahora sí, le pasamos el rectángulo correcto al módulo
+    // Ahora sï¿½, le pasamos el rectï¿½ngulo correcto al mï¿½dulo
     spaceModule.setBounds(spaceRect.reduced(2));
     choirModule.setBounds(choirRect.reduced(2));
 }
@@ -772,7 +772,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     auto layer3Area = bounds.removeFromTop(layerHeight);
     auto layer4Area = bounds.removeFromTop(layerHeight);
 
-    // 1. Comprobar Botones Pequeños Inferiores (MUTE/SOLO en la onda)
+    // 1. Comprobar Botones Pequeï¿½os Inferiores (MUTE/SOLO en la onda)
     auto getButtonsArea = [&](juce::Rectangle<int> area) {
         auto btnArea = area.removeFromBottom(25).removeFromRight(55).withTrimmedRight(5);
         juce::Rectangle<int> btnNum = btnArea.removeFromRight(20);
@@ -801,7 +801,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
     if (checkButtons(layer3Area, "L3_")) { ignoreDragForPosition = true; return; }
     if (checkButtons(layer4Area, "L4_")) { ignoreDragForPosition = true; return; }
 
-    // 2. Lógica Universal de Selección y Posicionamiento
+    // 2. Lï¿½gica Universal de Selecciï¿½n y Posicionamiento
     auto updateModules = [&](int layer) {
         activeLayer = layer;
         engineModule.setLayer(layer); scanModule.setLayer(layer); sprayModule.setLayer(layer);
@@ -847,7 +847,7 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
 
 void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event)
 {
-    if (ignoreDragForPosition) return; // Si tocamos un botón antes, ignoramos el arrastre
+    if (ignoreDragForPosition) return; // Si tocamos un botï¿½n antes, ignoramos el arrastre
 
     auto bounds = getLocalBounds();
     bounds.removeFromBottom(300);
@@ -866,7 +866,7 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
 
     auto handleLayerDrag = [&](juce::Rectangle<int>& area, juce::String prefix, double& vSR, double zF, std::atomic<float>& winStartRatioToStore) {
         if (isPanMode) {
-            // MODO NAVEGACIÓN (Arrastrar Cámara con Clic Derecho)
+            // MODO NAVEGACIï¿½N (Arrastrar Cï¿½mara con Clic Derecho)
             double panShift = ((double)deltaX / (double)area.getWidth()) / zF;
             vSR -= panShift;
             double maxStart = juce::jmax(0.0, 1.0 - (1.0 / zF));
@@ -874,7 +874,7 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
             winStartRatioToStore.store((float)vSR);
         }
         else {
-            // MODO SCRUBBING (Mover el Cabezal de Posición con Clic Izquierdo)
+            // MODO SCRUBBING (Mover el Cabezal de Posiciï¿½n con Clic Izquierdo)
             float clickX = event.getPosition().x - area.getX();
             float ratioInScreen = juce::jlimit(0.0f, 1.0f, clickX / (float)area.getWidth());
 
@@ -904,13 +904,13 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
     // 2. Mensajes que vienen del Motor C++ (Cambios de Capa o Nuevo Audio)
     if (source == &audioProcessor)
     {
-        // --- A: SINCRONIZACIÓN DE CAPAS (El móvil pide cambiar la vista) ---
+        // --- A: SINCRONIZACIï¿½N DE CAPAS (El mï¿½vil pide cambiar la vista) ---
         int requestedLayer = audioProcessor.uiLayerRequested.load();
         if (requestedLayer != 0)
         {
             activeLayer = requestedLayer; // Actualizamos la variable global
 
-            // Actualizamos todos los módulos a la capa que marca el móvil
+            // Actualizamos todos los mï¿½dulos a la capa que marca el mï¿½vil
             engineModule.setLayer(activeLayer); scanModule.setLayer(activeLayer); sprayModule.setLayer(activeLayer);
             pitchModule.setLayer(activeLayer); filterModule.setLayer(activeLayer); spaceModule.setLayer(activeLayer);
             choirModule.setLayer(activeLayer); distModule.setLayer(activeLayer); envelopeModule.setLayer(activeLayer);
@@ -921,7 +921,7 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
             audioProcessor.uiLayerRequested.store(0);
         }
 
-        // --- B: ACTUALIZACIÓN DE ONDAS DE AUDIO (Con tu seguro anti-bucles) ---
+        // --- B: ACTUALIZACIï¿½N DE ONDAS DE AUDIO (Con tu seguro anti-bucles) ---
         if (audioProcessor.lastLoadedFilePathL1 != currentPathL1) {
             currentPathL1 = audioProcessor.lastLoadedFilePathL1;
             if (currentPathL1.isNotEmpty()) thumbnail.setSource(new juce::FileInputSource(juce::File(currentPathL1)));
@@ -953,8 +953,8 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
 
 void Granular_SynthAudioProcessorEditor::timerCallback()
 {
-    // Solo repintamos la pantalla a 30 FPS para que la animación REC 
-    // y la aguja de reproducción se muevan fluidamente.
+    // Solo repintamos la pantalla a 30 FPS para que la animaciï¿½n REC 
+    // y la aguja de reproducciï¿½n se muevan fluidamente.
     repaint();
 }
 

@@ -610,6 +610,7 @@ void Granular_SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destDa
     apvts.state.setProperty("AUDIO_PATH_L2", lastLoadedFilePathL2, nullptr);
     apvts.state.setProperty("AUDIO_PATH_L3", lastLoadedFilePathL3, nullptr);
     apvts.state.setProperty("AUDIO_PATH_L4", lastLoadedFilePathL4, nullptr);
+    apvts.state.setProperty("PHONE_IP", phoneIpAddress, nullptr);
 
     // 2. Hacemos la fotografía
     auto state = apvts.copyState();
@@ -637,6 +638,11 @@ void Granular_SynthAudioProcessor::setStateInformation(const void* data, int siz
         if (path2.isNotEmpty()) loadFile(path2, 2); else clearFile(2);
         if (path3.isNotEmpty()) loadFile(path3, 3); else clearFile(3);
         if (path4.isNotEmpty()) loadFile(path4, 4); else clearFile(4);
+
+        // 3. Reconectamos el envio OSC al movil con la IP guardada
+        juce::String savedPhoneIp = tree.getProperty("PHONE_IP").toString();
+        if (savedPhoneIp.isNotEmpty())
+            setPhoneIP(savedPhoneIp);
     }
 }
 
@@ -867,8 +873,25 @@ void Granular_SynthAudioProcessor::timerCallback()
     }
 }
 
+void Granular_SynthAudioProcessor::setPhoneIP(const juce::String& ip)
+{
+    phoneIpAddress = ip;
+    apvts.state.setProperty("PHONE_IP", ip, nullptr);
+
+    oscSender.disconnect();
+    if (ip.isNotEmpty())
+        oscSender.connect(ip, phoneOscPort);
+}
+
 void Granular_SynthAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
+    // --- SINCRONIZACION EN VIVO CON EL MOVIL ---
+    // Reenviamos genericamente cualquier cambio (igual que oscMessageReceived
+    // los recibe genericamente), asi cualquier parametro nuevo se sincroniza
+    // solo. El movil solo actualiza su estado local al recibir esto, nunca
+    // vuelve a enviar OSC de vuelta, asi que no hay bucle de realimentacion.
+    oscSender.send("/" + parameterID, newValue);
+
     // --- TRAMPA CLICK-TO-MAP ---
     int mappingCol = activeMappingColumn.load();
     if (mappingCol != -1)

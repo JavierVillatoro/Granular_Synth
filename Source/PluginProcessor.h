@@ -41,6 +41,13 @@ public:
 
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
+    // --- SINCRONIZACION EN VIVO CON EL MOVIL (Feature: OSC de vuelta) ---
+    // Reenvia por OSC cualquier cambio de parametro (preset, automatizacion,
+    // GUI o el propio OSC entrante) a la IP del movil, en el puerto 9001
+    // (distinto del 9000 de entrada). Se llama desde parameterChanged().
+    void setPhoneIP(const juce::String& ip);
+    juce::String getPhoneIP() const { return phoneIpAddress; }
+
     void savePreset(int presetIndex);
     void loadPreset(int presetIndex);
     void deletePreset(int presetIndex);
@@ -258,8 +265,13 @@ private:
     float lastMuteGainL3 = 1.0f;
     float lastMuteGainL4 = 1.0f;
 
-    
+
     std::unique_ptr<TcpReceiver> tcpReceiver;
+
+    // --- SINCRONIZACION EN VIVO CON EL MOVIL ---
+    juce::OSCSender oscSender;
+    juce::String phoneIpAddress;
+    static constexpr int phoneOscPort = 9001;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Granular_SynthAudioProcessor)
 };
