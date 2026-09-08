@@ -94,24 +94,47 @@ public:
     juce::String getLocalIPAddress()
     {
         auto allIPs = juce::IPAddress::getAllAddresses();
-        juce::String bestIP = "Desconocida (Abre el WiFi/USB)";
 
-        for (auto& ip : allIPs) {
+        // Adaptadores fantasma conocidos que NUNCA queremos devolver
+        // (VirtualBox Host-Only, Docker Toolbox, etc.)
+        auto isGhostAdapter = [](const juce::String& ipStr)
+        {
+            return ipStr.startsWith("169.")         // APIPA / sin red real
+                || ipStr.startsWith("224.")          // Multicast
+                || ipStr.startsWith("192.168.56.")   // VirtualBox Host-Only
+                || ipStr.startsWith("192.168.99.")   // Docker Toolbox
+                || ipStr.startsWith("10.0.75.");     // Docker Desktop (legacy NAT)
+        };
+
+        // Recogemos todas las candidatas validas en el orden que las da el SO
+        // (ese orden NO es fiable: Windows suele listar antes los adaptadores
+        // virtuales de Docker/WSL/Hyper-V que la tarjeta WiFi/Ethernet real)
+        juce::StringArray candidates;
+        for (auto& ip : allIPs)
+        {
             juce::String ipStr = ip.toString();
-
-            // Filtramos localhost (127), raras (169), Multicast (224) 
-            // Y AHORA: Filtramos 192.168.56.x (Adaptadores fantasma de VirtualBox/Docker)
-            if (ip != juce::IPAddress::local() && !ipStr.startsWith("169.") &&
-                !ipStr.startsWith("224.") && !ipStr.startsWith("192.168.56."))
-            {
-                // Prioridad a redes locales típicas
-                if (ipStr.startsWith("192.168.") || ipStr.startsWith("10.") || ipStr.startsWith("172.")) {
-                    return ipStr; // Devuelve la primera BUENA de verdad
-                }
-                bestIP = ipStr;
-            }
+            if (ip != juce::IPAddress::local() && !isGhostAdapter(ipStr))
+                candidates.add(ipStr);
         }
-        return bestIP;
+
+        // PASADA 1: 192.168.x.x -> el rango casi universal de routers domesticos.
+        // Si existe, es case casi seguro la red WiFi/Ethernet real.
+        for (auto& ipStr : candidates)
+            if (ipStr.startsWith("192.168."))
+                return ipStr;
+
+        // PASADA 2: 10.x.x.x -> tipico de redes domesticas/oficina mas grandes
+        for (auto& ipStr : candidates)
+            if (ipStr.startsWith("10."))
+                return ipStr;
+
+        // PASADA 3: 172.16.0.0/12 -> aqui es donde suelen vivir los adaptadores
+        // virtuales de Docker/WSL2/Hyper-V, asi que se comprueban en ultimo lugar
+        for (auto& ipStr : candidates)
+            if (ipStr.startsWith("172."))
+                return ipStr;
+
+        return candidates.isEmpty() ? juce::String("Desconocida (Abre el WiFi/USB)") : candidates[0];
     }
 
     juce::AudioProcessorValueTreeState apvts;
