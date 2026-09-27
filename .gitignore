@@ -45,3 +45,6 @@ Executable/
 # 6. OS generated files (Especially if moving the project to Mac)
 .DS_Store
 Thumbs.db
+
+Joselillo/
+Report.pdf

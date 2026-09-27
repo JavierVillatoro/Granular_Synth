@@ -9,17 +9,17 @@
 #include "LayerControlsModule.h"
 
 // =============================================================================
-// --- ESTILO DEL BOTÓN REC (Forma ovalada + Texto dinámico) ---
+// --- ESTILO DEL BOTï¿½N REC (Forma ovalada + Texto dinï¿½mico) ---
 // =============================================================================
 class RecStyle : public juce::LookAndFeel_V4 {
 public:
     void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
         bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override {
         auto bounds = button.getLocalBounds().toFloat();
-        float cornerSize = bounds.getHeight() / 2.0f; // Radio perfecto para óvalo
+        float cornerSize = bounds.getHeight() / 2.0f; // Radio perfecto para ï¿½valo
 
         if (button.getToggleState()) {
-            // SI ESTÁ GRABANDO (ON)
+            // SI ESTï¿½ GRABANDO (ON)
             g.setColour(juce::Colours::red.withAlpha(0.9f));
             g.fillRoundedRectangle(bounds, cornerSize);
 
@@ -28,7 +28,7 @@ public:
             g.drawRoundedRectangle(bounds.reduced(1.0f), cornerSize, 2.0f);
         }
         else {
-            // SI ESTÁ APAGADO (OFF)
+            // SI ESTï¿½ APAGADO (OFF)
             g.setColour(juce::Colours::transparentBlack);
             g.fillRoundedRectangle(bounds, cornerSize);
 
@@ -46,7 +46,7 @@ public:
 };
 
 // =============================================================================
-// --- ESTILO DEL MENÚ DESPLEGABLE  ---
+// --- ESTILO DEL MENï¿½ DESPLEGABLE  ---
 // =============================================================================
 class ComboStyle : public juce::LookAndFeel_V4 {
 public:
@@ -60,7 +60,7 @@ public:
         g.setColour(juce::Colours::white.withAlpha(0.1f));
         g.drawRoundedRectangle(0.5f, 0.5f, width - 1.0f, height - 1.0f, 4.0f, 1.0f);
 
-        // --- Lógica del texto corto ---
+        // --- Lï¿½gica del texto corto ---
         juce::String fullText = box.getText();
         juce::String shortText = "DAW"; // Por defecto
 
@@ -108,21 +108,21 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
         attach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvtsRef, paramId, btn);
         };
 
-    // 1. Botones Estándar
+    // 1. Botones Estï¿½ndar
     setupButton(playButton, "PLAY", paramPrefix + "PLAY", playAttach, mainColor);
     setupButton(midiButton, "MIDI", paramPrefix + "MIDI", midiAttach, mainColor);
     setupButton(holdButton, "HOLD", paramPrefix + "HOLD", holdAttach, mainColor);
     setupButton(muteButton, "MUTE", paramPrefix + "MUTE", muteAttach, mainColor);
 
-    // 2. Botón REC (Le ponemos su nuevo traje)
+    // 2. Botï¿½n REC (Le ponemos su nuevo traje)
     setupButton(recButton, "REC", paramPrefix + "REC", recAttach, juce::Colours::red);
     recStyle = std::make_unique<RecStyle>();
     recButton.setLookAndFeel(recStyle.get());
 
-    // 3. Menú Desplegable
+    // 3. Menï¿½ Desplegable
     recModeBox.addItem("DAW / MIC IN", 1);
     recModeBox.addItem("WIFI FILE (TCP)", 2);
-    // ¡BORRAMOS LA LÍNEA DEL USB AQUÍ!
+    // ï¿½BORRAMOS LA Lï¿½NEA DEL USB AQUï¿½!
 
     recModeBox.setColour(juce::ComboBox::textColourId, juce::Colours::transparentBlack);
     recModeBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::transparentBlack);
@@ -141,7 +141,7 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
     auto setupModeButton = [this, mainColor](juce::TextButton& btn, juce::String text, bool isRadio) {
         btn.setButtonText(text);
         btn.setClickingTogglesState(true);
-        if (isRadio) btn.setRadioGroupId(199); // Magia: Los botones con ID 199 se apagan entre sí
+        if (isRadio) btn.setRadioGroupId(199); // Magia: Los botones con ID 199 se apagan entre sï¿½
 
         btn.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
         btn.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.4f));
@@ -150,22 +150,66 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
         addAndMakeVisible(btn);
         };
 
-    // Los configuramos llamando a la función
+    // Los configuramos llamando a la funciï¿½n
     setupModeButton(grnButton, "GRN", true);  // true = pertenece al grupo de radio
     setupModeButton(plyButton, "PLY", true);  // true = pertenece al grupo de radio
     setupModeButton(cueButton, "CUE", false); // false = es un interruptor libre
 
-    // Colores especiales para CUE (Amarillo clásico de DJ Mixer)
+    // Colores especiales para CUE (Amarillo clï¿½sico de DJ Mixer)
     cueButton.setColour(juce::TextButton::buttonOnColourId, juce::Colours::yellow.withAlpha(0.4f));
     cueButton.setColour(juce::TextButton::textColourOnId, juce::Colours::yellow);
 
     // Encendemos el modo Granular por defecto sin enviar mensajes (solo visual)
     grnButton.setToggleState(true, juce::dontSendNotification);
 
-    // 4. Slider de Paneo (¡DEVUELVO LOS COLORES A LOS DOTS!)
+    // --- GRN/PLY: ahora ya tienen funcion real (antes eran solo visuales) ---
+    // El grupo de radio ya deja el aspecto visual correcto al pulsar; aqui
+    // solo hace falta escribir el parametro cuando el USUARIO pulsa cada uno.
+    grnButton.onClick = [this] {
+        if (auto* p = apvtsRef.getParameter(paramPrefix + "ENGINE_MODE"))
+            p->setValueNotifyingHost(0.0f);
+        };
+    plyButton.onClick = [this] {
+        if (auto* p = apvtsRef.getParameter(paramPrefix + "ENGINE_MODE"))
+            p->setValueNotifyingHost(1.0f);
+        };
+    // Y para el camino inverso (preset cargado, futuro control remoto...)
+    // escuchamos el parametro para mantener los botones sincronizados.
+    apvtsRef.addParameterListener(paramPrefix + "ENGINE_MODE", this);
+
+    // --- LOOP SYNC: sincroniza la duracion del bucle en modo PLY al BPM ---
+    loopSyncBox.addItem("FREE", 1);
+    loopSyncBox.addItem("16/1", 2);
+    loopSyncBox.addItem("8/1", 3);
+    loopSyncBox.addItem("4/1", 4);
+    loopSyncBox.addItem("2/1", 5);
+    loopSyncBox.addItem("1/1", 6);
+    loopSyncBox.addItem("1/2", 7);
+    loopSyncBox.addItem("1/4", 8);
+    loopSyncBox.addItem("1/8", 9);
+    loopSyncBox.addItem("1/16", 10);
+    loopSyncBox.setColour(juce::ComboBox::textColourId, mainColor);
+    loopSyncBox.setColour(juce::ComboBox::backgroundColourId, juce::Colours::black.withAlpha(0.3f));
+    loopSyncBox.setColour(juce::ComboBox::outlineColourId, juce::Colours::white.withAlpha(0.15f));
+    addAndMakeVisible(loopSyncBox);
+    loopSyncAttach = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(apvtsRef, paramPrefix + "LOOP_SYNC", loopSyncBox);
+
+    // --- FULL LOOP: toggle real. ON = el bucle en modo PLY abarca el audio
+    // entero; OFF = usa los 2 bordes arrastrables sobre la forma de onda
+    // (ver PluginEditor.cpp mouseDown/mouseDrag y GranularVoice.cpp).
+    fullLoopButton.setButtonText("FULL");
+    fullLoopButton.setClickingTogglesState(true);
+    fullLoopButton.setColour(juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    fullLoopButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white.withAlpha(0.4f));
+    fullLoopButton.setColour(juce::TextButton::buttonOnColourId, mainColor.withAlpha(0.3f));
+    fullLoopButton.setColour(juce::TextButton::textColourOnId, mainColor);
+    addAndMakeVisible(fullLoopButton);
+    fullLoopAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(apvtsRef, paramPrefix + "FULL_LOOP", fullLoopButton);
+
+    // 4. Slider de Paneo (ï¿½DEVUELVO LOS COLORES A LOS DOTS!)
     panSlider.setSliderStyle(juce::Slider::LinearHorizontal);
     panSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-    // AQUÍ ESTÁ LA LÍNEA QUE FALTABA:
+    // AQUï¿½ ESTï¿½ LA Lï¿½NEA QUE FALTABA:
     panSlider.setColour(juce::Slider::thumbColourId, mainColor);
     panSlider.setColour(juce::Slider::trackColourId, juce::Colours::white.withAlpha(0.3f));
     panSlider.setDoubleClickReturnValue(true, 0.0);
@@ -174,11 +218,22 @@ LayerControlsModule::LayerControlsModule(juce::AudioProcessorValueTreeState& apv
 }
 
 LayerControlsModule::~LayerControlsModule() {
+    apvtsRef.removeParameterListener(paramPrefix + "ENGINE_MODE", this);
     recButton.setLookAndFeel(nullptr);
     recModeBox.setLookAndFeel(nullptr);
 }
 
 void LayerControlsModule::paint(juce::Graphics& g) {}
+
+void LayerControlsModule::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    juce::ignoreUnused(parameterID);
+    // Se llama desde el hilo de mensajes (APVTS lo garantiza para Listener
+    // normal, no el RT), asi que tocar los botones aqui es seguro.
+    const bool isPly = newValue >= 0.5f;
+    grnButton.setToggleState(!isPly, juce::dontSendNotification);
+    plyButton.setToggleState(isPly, juce::dontSendNotification);
+}
 
 void LayerControlsModule::resized()
 {
@@ -197,13 +252,20 @@ void LayerControlsModule::resized()
     int transportWidth = (stdBtnW * 3) + (gap * 2);
     panSlider.setBounds(sideMargin, area.getHeight() - 25, transportWidth, 20);
 
-    
+    int loopSyncW = 70;
+    int loopSyncX = sideMargin + transportWidth + (gap * 4);
+    loopSyncBox.setBounds(loopSyncX, area.getHeight() - 25, loopSyncW, 20);
+
+    int fullLoopW = 40;
+    fullLoopButton.setBounds(loopSyncX + loopSyncW + gap, area.getHeight() - 25, fullLoopW, 20);
+
+
     int rightEdge = area.getWidth() - sideMargin;
 
     muteButton.setBounds(rightEdge - stdBtnW, topMargin, stdBtnW, 20);
     recButton.setBounds(rightEdge - (stdBtnW * 2) - gap, topMargin, stdBtnW, 20);
 
-    int comboW = 75; // Más corto, ya que ahora solo pone DAW, UDP o TCP
+    int comboW = 75; // Mï¿½s corto, ya que ahora solo pone DAW, UDP o TCP
     recModeBox.setBounds(rightEdge - (stdBtnW * 2) - gap - comboW - gap, topMargin, comboW, 20);
 
     int bottomY = area.getHeight() - 25;

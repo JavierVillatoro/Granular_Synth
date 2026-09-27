@@ -53,6 +53,13 @@ void GranularVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesi
     samplesUntilNextGrain = 0.0;
     autoScanOffset = 0.0;
 
+    // Modo PLAY: empieza siempre desde el principio del bucle, adelante,
+    // con jitter fresco en la primerisima vuelta.
+    loopPhase = 0.0;
+    loopDirSign = 1;
+    loopNeedsNewJitter = true;
+    loopHasWrapped = false;
+
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = getSampleRate();
     spec.maximumBlockSize = 1;
@@ -112,6 +119,10 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     juce::AudioBuffer<float>* currentBuffer = nullptr;
     float winStart = 0.0f;
     float winLen = 1.0f;
+    // Bordes de loop en modo PLY: estado propio, independiente del zoom/pan
+    // de GRN (winStart/winLen de arriba). Ver PluginEditor.cpp mouseDown/Drag.
+    float loopEdgeStart = 0.0f;
+    float loopEdgeEnd = 1.0f;
 
     // EL FIX: Declaramos processor FUERA de un if para que esté disponible en toda la función
     auto* processor = dynamic_cast<Granular_SynthAudioProcessor*>(&apvts->processor);
@@ -122,18 +133,22 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         if (myPrefix == "L1_") {
             if (processor->isUpdatingBufferL1.load()) return;
             currentBuffer = &processor->audioBufferL1; winStart = processor->windowStartRatioL1.load(); winLen = processor->windowLengthRatioL1.load();
+            loopEdgeStart = processor->loopStartRatioL1.load(); loopEdgeEnd = processor->loopEndRatioL1.load();
         }
         else if (myPrefix == "L2_") {
             if (processor->isUpdatingBufferL2.load()) return;
             currentBuffer = &processor->audioBufferL2; winStart = processor->windowStartRatioL2.load(); winLen = processor->windowLengthRatioL2.load();
+            loopEdgeStart = processor->loopStartRatioL2.load(); loopEdgeEnd = processor->loopEndRatioL2.load();
         }
         else if (myPrefix == "L3_") {
             if (processor->isUpdatingBufferL3.load()) return;
             currentBuffer = &processor->audioBufferL3; winStart = processor->windowStartRatioL3.load(); winLen = processor->windowLengthRatioL3.load();
+            loopEdgeStart = processor->loopStartRatioL3.load(); loopEdgeEnd = processor->loopEndRatioL3.load();
         }
         else if (myPrefix == "L4_") {
             if (processor->isUpdatingBufferL4.load()) return;
             currentBuffer = &processor->audioBufferL4; winStart = processor->windowStartRatioL4.load(); winLen = processor->windowLengthRatioL4.load();
+            loopEdgeStart = processor->loopStartRatioL4.load(); loopEdgeEnd = processor->loopEndRatioL4.load();
         }
     }
 
@@ -153,6 +168,12 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     float sprayPan = apvts->getRawParameterValue(myPrefix + "SPRAY_PAN")->load();
     float sprayPitch = apvts->getRawParameterValue(myPrefix + "SPRAY_PITCH")->load();
     float scanMode = apvts->getRawParameterValue(myPrefix + "SCAN_MODE")->load();
+
+    // Modo de motor (GRN=nube de granos / PLY=reproductor-looper) y, si es
+    // PLY, si la duracion del bucle esta libre (Size) o sincronizada al BPM.
+    int engineMode = (int)apvts->getRawParameterValue(myPrefix + "ENGINE_MODE")->load();
+    int loopSyncIdx = (int)apvts->getRawParameterValue(myPrefix + "LOOP_SYNC")->load();
+    bool fullLoop = apvts->getRawParameterValue(myPrefix + "FULL_LOOP")->load() > 0.5f;
 
     // Filtros Maestro
     float filterLpfFreq = apvts->getRawParameterValue(myPrefix + "FILTER_LPF")->load();
@@ -317,6 +338,40 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     int grainLength = (int)(getSampleRate() * grainSizeSeconds);
     double samplesBetweenGrains = getSampleRate() / juce::jmax(0.1f, density);
 
+    // --- MODO PLAY: inicio y duracion del bucle (se calculan una vez por bloque) ---
+    int loopStartSample = 0;
+    int loopLengthSamples = grainLength;
+    if (engineMode == 1)
+    {
+        // Full Loop ON: usa el zoom actual de la capa entero (winStart/winLen,
+        // el mismo de GRN) -- "toda la pantalla" tal y como este zoomeada, no
+        // el sample entero. OFF: usa los 2 bordes propios (loopEdgeStart/End),
+        // independientes del zoom, fijados a mano con arrastre en el editor.
+        float loopStartRatio = fullLoop ? juce::jlimit(0.0f, 1.0f, winStart) : juce::jlimit(0.0f, 1.0f, loopEdgeStart);
+        float loopEndRatio = fullLoop ? juce::jlimit(0.0f, 1.0f, winStart + winLen) : juce::jlimit(0.0f, 1.0f, loopEdgeEnd);
+        loopStartSample = (int)(loopStartRatio * (currentBuffer->getNumSamples() - 1));
+
+        // Tope duro: el bucle NUNCA debe leer mas alla del borde derecho
+        // (principio+esta distancia), pase lo que pase con LOOP_SYNC -- si un
+        // compas largo no cabe entre las 2 barras, se recorta a como quepa.
+        int maxLengthSamples = juce::jmax(1, (int)(juce::jlimit(0.0f, 1.0f, loopEndRatio - loopStartRatio) * (currentBuffer->getNumSamples() - 1)));
+
+        if (loopSyncIdx > 0)
+        {
+            // Indice del choice LOOP_SYNC -> duracion en beats (asumiendo 4/4).
+            // {"FREE","16/1","8/1","4/1","2/1","1/1","1/2","1/4","1/8","1/16"}
+            static const float beatsTable[10] = { 0.0f, 64.0f, 32.0f, 16.0f, 8.0f, 4.0f, 2.0f, 1.0f, 0.5f, 0.25f };
+            float beats = beatsTable[juce::jlimit(0, 9, loopSyncIdx)];
+            double bpm = juce::jmax(1.0, (processor != nullptr) ? processor->getCurrentBPM() : 120.0);
+            loopLengthSamples = juce::jmin(maxLengthSamples, juce::jmax(1, (int)(beats * (60.0 / bpm) * getSampleRate())));
+        }
+        else
+        {
+            // FREE: la duracion es la distancia entre los 2 bordes.
+            loopLengthSamples = maxLengthSamples;
+        }
+    }
+
     auto sr = getSampleRate();
     for (int i = 0; i < 2; ++i) {
         eqLowFilter[i].coefficients = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr, 100.0f, 0.7f, juce::Decibels::decibelsToGain(eqLow));
@@ -332,6 +387,11 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
     // =======================================================================
     for (int s = 0; s < numSamples; ++s)
     {
+        float totalL = 0.0f; float totalR = 0.0f;
+
+        if (engineMode == 0)
+        {
+        // ================== MOTOR GRANULAR (GRN) — SIN CAMBIOS ==================
         autoScanOffset += (double)scanSpeed / (double)currentBuffer->getNumSamples();
         float rawPos = positionKnob + (float)autoScanOffset;
         if (rawPos < 0.0f) rawPos = std::fmod(rawPos, 1.0f) + 1.0f;
@@ -383,7 +443,7 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             samplesUntilNextGrain += samplesBetweenGrains;
         }
 
-        float totalL = 0.0f; float totalR = 0.0f; int activeCount = 0; int grainIndex = 0;
+        int activeCount = 0; int grainIndex = 0;
         for (auto& grain : grains) {
             if (grain.isActive) {
                 activeCount++;
@@ -409,6 +469,86 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
         if (activeCount > 0) {
             float gainScale = 1.0f / std::sqrt((float)activeCount);
             totalL *= gainScale; totalR *= gainScale;
+        }
+        }
+        else
+        {
+        // ================== MODO PLAY: reproductor/looper simple ==================
+        // Direccion: SCAN_MODE (0 adelante, 1 atras, 2 ping-pong), igual que
+        // ya hace para el puntero de escaneo del grano.
+        int scanModeInt = juce::roundToInt(scanMode);
+        // Velocidad: SCAN_SPEED es solo magnitud aqui (la direccion ya la da
+        // SCAN_MODE), para que ambos controles no se pisen entre si.
+        float loopSpeedMul = juce::jmax(0.05f, 1.0f + scanSpeed);
+        double phaseStep = (double)(finalBasePitchRatio * loopJitterPitchRatio * loopSpeedMul) / (double)loopLengthSamples;
+
+        bool wrapped = false;
+        if (scanModeInt == 2) {
+            // Ping-pong: rebota en los dos extremos de la ventana.
+            loopPhase += phaseStep * loopDirSign;
+            if (loopPhase >= 1.0) { loopPhase = 2.0 - loopPhase; loopDirSign = -1; wrapped = true; }
+            else if (loopPhase <= 0.0) { loopPhase = -loopPhase; loopDirSign = 1; wrapped = true; }
+        }
+        else {
+            double dir = (scanModeInt == 1) ? -1.0 : 1.0;
+            loopPhase += phaseStep * dir;
+            if (loopPhase >= 1.0) { loopPhase -= 1.0; wrapped = true; }
+            else if (loopPhase < 0.0) { loopPhase += 1.0; wrapped = true; }
+        }
+
+        // Cada vez que empieza una vuelta nueva del bucle, variacion organica
+        // (Spray Pos/Pitch/Pan), igual de espiritu que el jitter de los granos.
+        if (loopNeedsNewJitter) {
+            loopNeedsNewJitter = false;
+            loopJitterPosOffsetSamples = (juce::Random::getSystemRandom().nextFloat() - 0.5f) * sprayPos * loopLengthSamples;
+
+            float rawPitchRand = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPitch;
+            int scaleModeJ = juce::roundToInt(pitchScale);
+            if (scaleModeJ == 1) rawPitchRand = std::round(rawPitchRand / 12.0f) * 12.0f;
+            else if (scaleModeJ == 2) rawPitchRand = std::round(rawPitchRand / 7.0f) * 7.0f;
+            else if (scaleModeJ == 3) rawPitchRand = std::round(rawPitchRand);
+            loopJitterPitchRatio = std::pow(2.0f, rawPitchRand / 12.0f);
+
+            float randomPan = (juce::Random::getSystemRandom().nextFloat() * 2.0f - 1.0f) * sprayPan;
+            loopJitterPanL = std::cos(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
+            loopJitterPanR = std::sin(juce::MathConstants<float>::pi * (randomPan + 1.0f) / 4.0f);
+        }
+        if (wrapped) { loopNeedsNewJitter = true; loopHasWrapped = true; }
+
+        int readOffset = (int)(loopPhase * loopLengthSamples) + (int)loopJitterPosOffsetSamples;
+        int readPos = juce::jlimit(0, currentBuffer->getNumSamples() - 1, loopStartSample + readOffset);
+
+        // Crossfade en la costura del bucle: mismo lenguaje que Shape en los
+        // granos (0 = curva suave y ancha, 1 = corte casi instantaneo), pero
+        // aplicado solo cerca de los 2 extremos, no a la vuelta entera (para
+        // que suene a reproduccion continua, no a "un grano gigante").
+        // El fade de ENTRADA solo se aplica a partir de la 2a vuelta: la
+        // primerisima vez que suena una nota debe atacar al instante (si no,
+        // "no se reproduce bien desde el principio" -> empieza en silencio y
+        // sube poco a poco, en vez de sonar de golpe al pulsar la tecla).
+        // En Full Loop ON los 2 bordes son "toda la pantalla" (no puntos de
+        // corte elegidos a mano), asi que no hace falta disimular la costura
+        // con un fade -- se oia como una bajada de volumen no deseada.
+        float envelope = 1.0f;
+        if (!fullLoop) {
+            float crossfadeWidth = 0.02f + (1.0f - shapeParam) * 0.18f;
+            if (loopHasWrapped && loopPhase < crossfadeWidth) {
+                float t = (float)(loopPhase / crossfadeWidth);
+                envelope = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::pi * t));
+            }
+            else if (loopPhase > 1.0 - crossfadeWidth) {
+                float t = (float)((1.0 - loopPhase) / crossfadeWidth);
+                envelope = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::pi * t));
+            }
+        }
+
+        visualGrainPos[0].store((float)readPos / (float)currentBuffer->getNumSamples());
+        visualGrainEnv[0].store(envelope);
+        for (int gi = 1; gi < 128; ++gi) visualGrainEnv[gi].store(0.0f);
+
+        float sample = currentBuffer->getReadPointer(0)[readPos] * envelope;
+        totalL = sample * loopJitterPanL;
+        totalR = sample * loopJitterPanR;
         }
 
         // =========================================================

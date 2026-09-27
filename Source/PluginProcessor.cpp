@@ -696,6 +696,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_MUTE", "Mute", false));
             params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_SOLO", "Solo", false));
 
+            // Modo de motor: GRN (nube de granos, el de siempre) o PLY
+            // (reproductor/looper simple, reutiliza toda la cadena de abajo).
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_ENGINE_MODE", "Engine Mode", juce::StringArray{ "GRN", "PLY" }, 0));
+
+            // Duracion del bucle en modo PLY: FREE usa los bordes arrastrables
+            // (ver L{n}_FULL_LOOP y loopStartRatio/loopEndRatio en el
+            // processor); el resto sincroniza al BPM interno (misma notacion
+            // "N/1" / "1/N" que LFO1_BEAT/LFO2_BEAT).
+            params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_LOOP_SYNC", "Loop Sync", juce::StringArray{ "FREE", "16/1", "8/1", "4/1", "2/1", "1/1", "1/2", "1/4", "1/8", "1/16" }, 0));
+
+            // Full Loop: ON = ignora los bordes y usa el sample entero (0..1);
+            // OFF = usa los bordes arrastrables sobre la forma de onda.
+            params.push_back(std::make_unique<juce::AudioParameterBool>(prefix + "_FULL_LOOP", "Full Loop", true));
+
             // Granular Engine
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_POSITION", "Position", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.5f));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_GRAIN_SIZE", "Grain Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 0.3f), 0.1f));

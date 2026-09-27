@@ -66,6 +66,16 @@ private:
     float currentVelocity = 0.0f;
     float pitchRatio = 1.0f;
 
+    // --- MODO PLAY (reproductor/looper simple, ver ENGINE_MODE) ---
+    double loopPhase = 0.0;      // 0..1 dentro de la vuelta actual del bucle
+    int loopDirSign = 1;         // +-1, para el rebote en modo ping-pong
+    bool loopNeedsNewJitter = true;
+    double loopJitterPosOffsetSamples = 0.0;
+    float loopJitterPitchRatio = 1.0f;
+    float loopJitterPanL = 1.0f;
+    float loopJitterPanR = 1.0f;
+    bool loopHasWrapped = false; // false = aun en la 1a vuelta desde la nota (sin fade-in)
+
     juce::AudioBuffer<float>* myBuffer;
     juce::AudioProcessorValueTreeState* apvts;
     juce::String myPrefix;
@@ -92,11 +102,11 @@ private:
     // 1. LA TIERRA: Filtro Pasa-Bajos para aislar el subgrave puro
     juce::dsp::StateVariableTPTFilter<float> subCrossoverFilter[2];
 
-    // 2. LA HUMANIDAD: Algoritmo de Chorus Multilínea de JUCE
+    // 2. LA HUMANIDAD: Algoritmo de Chorus Multilï¿½nea de JUCE
     juce::dsp::Chorus<float> ensembleFX;
 
     // 3. EL CIELO: Delay Line y Filtro Pasa-Altos para el Halo (Shimmer)
-    // Reservamos memoria para 2 segundos de delay máximo a 48kHz o 96kHz (100000 muestras)
+    // Reservamos memoria para 2 segundos de delay mï¿½ximo a 48kHz o 96kHz (100000 muestras)
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> haloDelay{ 100000 };
     juce::dsp::StateVariableTPTFilter<float> haloHighpass[2];
 

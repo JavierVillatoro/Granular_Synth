@@ -52,6 +52,9 @@ Granular_SynthAudioProcessorEditor::Granular_SynthAudioProcessorEditor(Granular_
     addAndMakeVisible(layer2Controls);
     addAndMakeVisible(layer3Controls);
     addAndMakeVisible(layer4Controls);
+
+    // "FULL" ahora es un toggle real con ButtonAttachment directo a
+    // L{n}_FULL_LOOP (ver LayerControlsModule.cpp) -- no necesita wiring aqui.
     addAndMakeVisible(mixerModule1);
     addAndMakeVisible(monk1);
     addAndMakeVisible(monk2);
@@ -246,6 +249,9 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
         float drawAlpha = isRec ? 0.08f : alpha;
 
         if (thumb.getNumChannels() > 0) {
+            auto engineModeParam = audioProcessor.apvts.getRawParameterValue(prefix + "ENGINE_MODE");
+            bool isPly = engineModeParam && engineModeParam->load() >= 0.5f;
+
             double totSecs = thumb.getTotalLength();
             double visSecs = totSecs / zF;
             double startT = vsR * totSecs;
@@ -297,36 +303,87 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                 double cursorTimeSeconds = absolutePos * totSecs;
                 float cursorX = area.getX() + (((cursorTimeSeconds)-startT) / visSecs) * area.getWidth();
 
-                float sizeRatio = sizeParam->load();
-                float shapeValue = shapeParam->load();
-                float activeAudioSeconds = (float)totSecs * winLen;
-                float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
-                float grainWidthPixels = (grainSizeSeconds / visSecs) * area.getWidth();
-                grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
+                if (isPly) {
+                    // Full Loop ON = usa el zoom actual de la capa entero (winStart..
+                    // winStart+winLen, o sea "toda la pantalla" tal cual esta zoomeada),
+                    // sin arrastre. OFF = 2 bordes propios, independientes del zoom,
+                    // arrastrables (ver mouseDown/Drag).
+                    auto fullLoopParam = audioProcessor.apvts.getRawParameterValue(prefix + "FULL_LOOP");
+                    bool fullLoop = fullLoopParam && fullLoopParam->load() >= 0.5f;
 
-                juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f), area.getY(), grainWidthPixels, area.getHeight());
-                juce::Path grainPath;
-                grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
+                    float loopStartR = winStart, loopEndR = winStart + winLen;
+                    if (!fullLoop) {
+                        if (prefix == "L1_") { loopStartR = audioProcessor.loopStartRatioL1.load(); loopEndR = audioProcessor.loopEndRatioL1.load(); }
+                        else if (prefix == "L2_") { loopStartR = audioProcessor.loopStartRatioL2.load(); loopEndR = audioProcessor.loopEndRatioL2.load(); }
+                        else if (prefix == "L3_") { loopStartR = audioProcessor.loopStartRatioL3.load(); loopEndR = audioProcessor.loopEndRatioL3.load(); }
+                        else if (prefix == "L4_") { loopStartR = audioProcessor.loopStartRatioL4.load(); loopEndR = audioProcessor.loopEndRatioL4.load(); }
+                    }
 
-                for (float x = 0; x <= grainWindow.getWidth(); x += 1.0f) {
-                    float progress = x / grainWindow.getWidth();
-                    float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
-                    float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
-                    float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
-                    float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
-                    grainPath.lineTo(grainWindow.getX() + x, yPos);
+                    // Los bordes se dibujan dentro de la vista actual (zoom) de la
+                    // capa, igual que el cabezal blanco de mas abajo -- cuando Full
+                    // esta ON esto siempre da los 2 bordes de "area" (toda la
+                    // pantalla), porque loopStartR/loopEndR SON el zoom actual.
+                    auto ratioToPixel = [&](float r) -> float {
+                        double timeSecs = r * totSecs;
+                        return area.getX() + (float)(((timeSecs - startT) / visSecs) * area.getWidth());
+                        };
+                    float leftX = ratioToPixel(loopStartR);
+                    float rightX = ratioToPixel(loopEndR);
+
+                    juce::Rectangle<float> loopRect(leftX, (float)area.getY(), rightX - leftX, (float)area.getHeight());
+                    g.setColour(color.withAlpha(0.18f * drawAlpha));
+                    g.fillRect(loopRect);
+
+                    // Bordes agarrables: mas gruesos y brillantes cuando se
+                    // pueden arrastrar (Full OFF); finos/atenuados cuando estan
+                    // fijos en los extremos (Full ON).
+                    float edgeThickness = fullLoop ? 1.5f : 3.0f;
+                    float edgeAlpha = (fullLoop ? 0.5f : 0.95f) * drawAlpha;
+                    g.setColour(color.withAlpha(edgeAlpha));
+                    g.drawLine(leftX, (float)area.getY(), leftX, (float)area.getBottom(), edgeThickness);
+                    g.drawLine(rightX, (float)area.getY(), rightX, (float)area.getBottom(), edgeThickness);
+
+                    // Barra blanca central (Full OFF): "Position/Scan" de PLY --
+                    // agarrala para mover los 2 bordes juntos, sin cambiar el
+                    // tamano del loop ya ajustado.
+                    if (!fullLoop) {
+                        float centerX = (leftX + rightX) * 0.5f;
+                        g.setColour(juce::Colours::white.withAlpha(0.85f * drawAlpha));
+                        g.drawLine(centerX, (float)area.getY(), centerX, (float)area.getBottom(), 2.5f);
+                    }
                 }
-                grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
-                grainPath.closeSubPath();
+                else {
+                    float sizeRatio = sizeParam->load();
+                    float shapeValue = shapeParam->load();
+                    float activeAudioSeconds = (float)totSecs * winLen;
+                    float grainSizeSeconds = juce::jmax(0.01f, sizeRatio * activeAudioSeconds);
+                    float grainWidthPixels = (grainSizeSeconds / visSecs) * area.getWidth();
+                    grainWidthPixels = juce::jmax(3.0f, grainWidthPixels);
 
-                g.setColour(color.withAlpha(0.3f * drawAlpha));
-                g.fillPath(grainPath);
-                g.setColour(color.withAlpha(0.8f * drawAlpha));
-                g.strokePath(grainPath, juce::PathStrokeType(1.5f));
+                    juce::Rectangle<float> grainWindow(cursorX - (grainWidthPixels / 2.0f), area.getY(), grainWidthPixels, area.getHeight());
+                    juce::Path grainPath;
+                    grainPath.startNewSubPath(grainWindow.getX(), grainWindow.getBottom());
+
+                    for (float x = 0; x <= grainWindow.getWidth(); x += 1.0f) {
+                        float progress = x / grainWindow.getWidth();
+                        float hann = 0.5f * (1.0f - std::cos(2.0f * juce::MathConstants<float>::pi * progress));
+                        float square = (progress < 0.005f) ? progress / 0.005f : (progress > 0.995f ? (1.0f - progress) / 0.005f : 1.0f);
+                        float amplitude = (hann * (1.0f - shapeValue)) + (square * shapeValue);
+                        float yPos = grainWindow.getBottom() - (amplitude * grainWindow.getHeight());
+                        grainPath.lineTo(grainWindow.getX() + x, yPos);
+                    }
+                    grainPath.lineTo(grainWindow.getRight(), grainWindow.getBottom());
+                    grainPath.closeSubPath();
+
+                    g.setColour(color.withAlpha(0.3f * drawAlpha));
+                    g.fillPath(grainPath);
+                    g.setColour(color.withAlpha(0.8f * drawAlpha));
+                    g.strokePath(grainPath, juce::PathStrokeType(1.5f));
+                }
 
                 g.setColour(juce::Colours::white.withAlpha(0.9f * drawAlpha));
 
-                // PINTAR GRANOS
+                // PINTAR GRANOS (o, en PLY, el unico "grano" [0] = cabezal de lectura del bucle)
                 for (int i = 0; i < synth.getNumVoices(); ++i) {
                     if (auto* voice = dynamic_cast<GranularVoice*>(synth.getVoice(i))) {
                         for (int g_idx = 0; g_idx < 128; ++g_idx) {
@@ -349,8 +406,13 @@ void Granular_SynthAudioProcessorEditor::paint(juce::Graphics& g)
                         }
                     }
                 }
-                g.setColour(juce::Colours::white.withAlpha(isRec ? 0.2f : 1.0f));
-                g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
+
+                // Linea blanca estatica de Position: solo tiene sentido en GRN (en
+                // PLY, Position ya no fija el inicio del bucle, lo hace el zoom).
+                if (!isPly) {
+                    g.setColour(juce::Colours::white.withAlpha(isRec ? 0.2f : 1.0f));
+                    g.drawLine(cursorX, area.getY(), cursorX, area.getBottom(), 2.0f);
+                }
             }
         }
 
@@ -821,9 +883,65 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
             updateModules(layerIndex);
         }
 
-        // Si ya estaba activa y no es click derecho, movemos el cabezal
+        // Si ya estaba activa y no es click derecho: en PLY con Full OFF,
+        // primero comprobamos si el clic agarra uno de los 2 bordes del loop
+        // (arrastrables de forma independiente); si no, comportamiento normal.
         if (wasAlreadyActive && !isPanMode) {
             float clickX = event.getPosition().x - area.getX();
+
+            auto engineModeParam = audioProcessor.apvts.getRawParameterValue(prefix + "ENGINE_MODE");
+            bool isPly = engineModeParam && engineModeParam->load() >= 0.5f;
+            auto fullLoopParam = audioProcessor.apvts.getRawParameterValue(prefix + "FULL_LOOP");
+            bool fullLoop = fullLoopParam && fullLoopParam->load() >= 0.5f;
+
+            if (isPly && !fullLoop) {
+                float loopStartR = 0.0f, loopEndR = 1.0f;
+                double totSecs = 0.0, zF = 1.0, vsR = 0.0;
+                if (prefix == "L1_") { loopStartR = audioProcessor.loopStartRatioL1.load(); loopEndR = audioProcessor.loopEndRatioL1.load(); totSecs = thumbnail.getTotalLength(); zF = zoomFactor; vsR = viewStartRatio; }
+                else if (prefix == "L2_") { loopStartR = audioProcessor.loopStartRatioL2.load(); loopEndR = audioProcessor.loopEndRatioL2.load(); totSecs = thumbnailL2.getTotalLength(); zF = zoomFactorL2; vsR = viewStartRatioL2; }
+                else if (prefix == "L3_") { loopStartR = audioProcessor.loopStartRatioL3.load(); loopEndR = audioProcessor.loopEndRatioL3.load(); totSecs = thumbnailL3.getTotalLength(); zF = zoomFactorL3; vsR = viewStartRatioL3; }
+                else if (prefix == "L4_") { loopStartR = audioProcessor.loopStartRatioL4.load(); loopEndR = audioProcessor.loopEndRatioL4.load(); totSecs = thumbnailL4.getTotalLength(); zF = zoomFactorL4; vsR = viewStartRatioL4; }
+
+                // Los bordes se dibujan/agarran dentro de la vista actual (zoom
+                // de esa capa), igual que en drawLayer -- no del 0..width crudo.
+                double visSecs = totSecs / zF;
+                double startT = vsR * totSecs;
+                auto ratioToPx = [&](float r) -> float {
+                    double timeSecs = r * totSecs;
+                    return (float)(((timeSecs - startT) / visSecs) * area.getWidth());
+                    };
+                auto pxToRatio = [&](float px) -> float {
+                    double timeSecs = startT + ((double)px / (double)area.getWidth()) * visSecs;
+                    return juce::jlimit(0.0f, 1.0f, (float)(timeSecs / totSecs));
+                    };
+
+                const float edgeTolerancePx = 8.0f;
+                float leftPx = ratioToPx(loopStartR);
+                float rightPx = ratioToPx(loopEndR);
+                float centerPx = (leftPx + rightPx) * 0.5f;
+
+                if (std::abs(clickX - leftPx) <= edgeTolerancePx) {
+                    loopEdgeDragLayer = layerIndex; loopEdgeDragSide = 1;
+                    repaint();
+                    return;
+                }
+                if (std::abs(clickX - rightPx) <= edgeTolerancePx) {
+                    loopEdgeDragLayer = layerIndex; loopEdgeDragSide = 2;
+                    repaint();
+                    return;
+                }
+                if (std::abs(clickX - centerPx) <= edgeTolerancePx) {
+                    // Barra blanca central: mueve los 2 bordes juntos (mismo
+                    // tamano de loop), acotado a lo que quepa en el zoom actual.
+                    loopEdgeDragLayer = layerIndex; loopEdgeDragSide = 3;
+                    loopDragStartMouseRatio = pxToRatio(clickX);
+                    loopDragStartLoopStart = loopStartR;
+                    loopDragStartLoopEnd = loopEndR;
+                    repaint();
+                    return;
+                }
+            }
+
             // ratioInScreen es directamente el POSITION que espera tu motor granular
             float ratioInScreen = juce::jlimit(0.0f, 1.0f, clickX / (float)area.getWidth());
 
@@ -859,6 +977,63 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
     auto layer3Area = bounds.removeFromTop(layerHeight);
     auto layer4Area = bounds.removeFromTop(layerHeight);
 
+    // Arrastrando un borde de loop en PLY (Full OFF): el ratio se calcula
+    // dentro de la vista actual (zoom) de esa capa, igual que en drawLayer.
+    if (loopEdgeDragLayer != 0) {
+        juce::Rectangle<int>* dragArea = nullptr;
+        std::atomic<float>* startAtomic = nullptr;
+        std::atomic<float>* endAtomic = nullptr;
+        std::atomic<float>* centerAtomic = nullptr;
+        double totSecs = 0.0, zF = 1.0, vsR = 0.0;
+
+        if (loopEdgeDragLayer == 1) { dragArea = &layer1Area; startAtomic = &audioProcessor.loopStartRatioL1; endAtomic = &audioProcessor.loopEndRatioL1; centerAtomic = &audioProcessor.loopCenterRatioL1; totSecs = thumbnail.getTotalLength(); zF = zoomFactor; vsR = viewStartRatio; }
+        else if (loopEdgeDragLayer == 2) { dragArea = &layer2Area; startAtomic = &audioProcessor.loopStartRatioL2; endAtomic = &audioProcessor.loopEndRatioL2; centerAtomic = &audioProcessor.loopCenterRatioL2; totSecs = thumbnailL2.getTotalLength(); zF = zoomFactorL2; vsR = viewStartRatioL2; }
+        else if (loopEdgeDragLayer == 3) { dragArea = &layer3Area; startAtomic = &audioProcessor.loopStartRatioL3; endAtomic = &audioProcessor.loopEndRatioL3; centerAtomic = &audioProcessor.loopCenterRatioL3; totSecs = thumbnailL3.getTotalLength(); zF = zoomFactorL3; vsR = viewStartRatioL3; }
+        else if (loopEdgeDragLayer == 4) { dragArea = &layer4Area; startAtomic = &audioProcessor.loopStartRatioL4; endAtomic = &audioProcessor.loopEndRatioL4; centerAtomic = &audioProcessor.loopCenterRatioL4; totSecs = thumbnailL4.getTotalLength(); zF = zoomFactorL4; vsR = viewStartRatioL4; }
+
+        if (dragArea != nullptr && totSecs > 0.0) {
+            const float minGap = 0.02f;
+            double visSecs = totSecs / zF;
+            double startT = vsR * totSecs;
+
+            // Los bordes (y la barra central) no pueden salir de lo que hay
+            // zoomeado ahora mismo -- si chocan con el limite del zoom, hay
+            // que hacer pan (boton derecho) para poder seguir moviendolos.
+            float viewStart = (float)vsR;
+            float viewEnd = juce::jlimit(0.0f, 1.0f, (float)(vsR + (1.0 / zF)));
+
+            float clickX = event.getPosition().x - dragArea->getX();
+            double timeSecs = startT + ((double)clickX / (double)dragArea->getWidth()) * visSecs;
+            float ratio = juce::jlimit(viewStart, viewEnd, (float)(timeSecs / totSecs));
+
+            if (loopEdgeDragSide == 1) {
+                ratio = juce::jmin(ratio, endAtomic->load() - minGap);
+                startAtomic->store(juce::jmax(viewStart, ratio));
+            }
+            else if (loopEdgeDragSide == 2) {
+                ratio = juce::jmax(ratio, startAtomic->load() + minGap);
+                endAtomic->store(juce::jmin(viewEnd, ratio));
+            }
+            else if (loopEdgeDragSide == 3) {
+                // Barra blanca central: desplaza los 2 bordes juntos (mismo
+                // tamano), acotado para que ninguno se salga del zoom actual.
+                float currentRatio = juce::jlimit(0.0f, 1.0f, (float)(timeSecs / totSecs));
+                float delta = currentRatio - loopDragStartMouseRatio;
+                float minDelta = viewStart - loopDragStartLoopStart;
+                float maxDelta = viewEnd - loopDragStartLoopEnd;
+                delta = juce::jlimit(minDelta, maxDelta, delta);
+                startAtomic->store(loopDragStartLoopStart + delta);
+                endAtomic->store(loopDragStartLoopEnd + delta);
+            }
+            // El centro se recalcula siempre que se toca a mano un borde o la
+            // barra central, para que el knob Size expanda/encoja desde aqui.
+            if (centerAtomic != nullptr)
+                centerAtomic->store((startAtomic->load() + endAtomic->load()) * 0.5f);
+            repaint();
+        }
+        return;
+    }
+
     int deltaX = event.getPosition().x - lastDragX;
     lastDragX = event.getPosition().x;
 
@@ -890,6 +1065,42 @@ void Granular_SynthAudioProcessorEditor::mouseDrag(const juce::MouseEvent& event
     else if (activeLayer == 2) handleLayerDrag(layer2Area, "L2_", viewStartRatioL2, zoomFactorL2, audioProcessor.windowStartRatioL2);
     else if (activeLayer == 3) handleLayerDrag(layer3Area, "L3_", viewStartRatioL3, zoomFactorL3, audioProcessor.windowStartRatioL3);
     else if (activeLayer == 4) handleLayerDrag(layer4Area, "L4_", viewStartRatioL4, zoomFactorL4, audioProcessor.windowStartRatioL4);
+}
+
+void Granular_SynthAudioProcessorEditor::mouseUp(const juce::MouseEvent&)
+{
+    loopEdgeDragLayer = 0;
+    loopEdgeDragSide = 0;
+}
+
+void Granular_SynthAudioProcessorEditor::applySizeToPlyLoop(const juce::String& parameterID, float sizeRatio)
+{
+    juce::String prefix;
+    std::atomic<float>* startAtomic = nullptr;
+    std::atomic<float>* endAtomic = nullptr;
+    std::atomic<float>* centerAtomic = nullptr;
+    double zF = 1.0, vsR = 0.0;
+
+    if (parameterID.startsWith("L1_")) { prefix = "L1_"; startAtomic = &audioProcessor.loopStartRatioL1; endAtomic = &audioProcessor.loopEndRatioL1; centerAtomic = &audioProcessor.loopCenterRatioL1; zF = zoomFactor; vsR = viewStartRatio; }
+    else if (parameterID.startsWith("L2_")) { prefix = "L2_"; startAtomic = &audioProcessor.loopStartRatioL2; endAtomic = &audioProcessor.loopEndRatioL2; centerAtomic = &audioProcessor.loopCenterRatioL2; zF = zoomFactorL2; vsR = viewStartRatioL2; }
+    else if (parameterID.startsWith("L3_")) { prefix = "L3_"; startAtomic = &audioProcessor.loopStartRatioL3; endAtomic = &audioProcessor.loopEndRatioL3; centerAtomic = &audioProcessor.loopCenterRatioL3; zF = zoomFactorL3; vsR = viewStartRatioL3; }
+    else if (parameterID.startsWith("L4_")) { prefix = "L4_"; startAtomic = &audioProcessor.loopStartRatioL4; endAtomic = &audioProcessor.loopEndRatioL4; centerAtomic = &audioProcessor.loopCenterRatioL4; zF = zoomFactorL4; vsR = viewStartRatioL4; }
+    else return;
+
+    auto engineModeParam = audioProcessor.apvts.getRawParameterValue(prefix + "ENGINE_MODE");
+    bool isPly = engineModeParam && engineModeParam->load() >= 0.5f;
+    if (!isPly) return;
+
+    // Igual que GRN (Size relativo al zoom actual, no al sample entero):
+    // ancho 0 = los 2 bordes pegados a la barra central; ancho maximo = todo
+    // lo que haya visible ahora mismo (winLen).
+    float viewStart = (float)vsR;
+    float viewEnd = juce::jlimit(0.0f, 1.0f, (float)(vsR + (1.0 / zF)));
+    float center = centerAtomic->load();
+    float widthRatio = juce::jlimit(0.0f, 1.0f, sizeRatio) * (float)(1.0 / zF);
+
+    startAtomic->store(juce::jlimit(viewStart, viewEnd, center - widthRatio * 0.5f));
+    endAtomic->store(juce::jlimit(viewStart, viewEnd, center + widthRatio * 0.5f));
 }
 
 void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroadcaster* source)

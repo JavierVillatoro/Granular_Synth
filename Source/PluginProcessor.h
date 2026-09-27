@@ -144,6 +144,10 @@ public:
         return candidates.isEmpty() ? juce::String("Desconocida (Abre el WiFi/USB)") : candidates[0];
     }
 
+    // Para el modo PLAY (loop sincronizado a BPM) en GranularVoice: ya
+    // trackea el tempo real (host o manual), asi que se expone de solo lectura.
+    double getCurrentBPM() const { return currentBPM; }
+
     juce::AudioProcessorValueTreeState apvts;
 
     // --- LOS 4 JEFES ---
@@ -191,6 +195,23 @@ public:
 
     std::atomic<float> windowStartRatioL4{ 0.0f };
     std::atomic<float> windowLengthRatioL4{ 1.0f };
+
+    // --- BORDES DE LOOP EN MODO PLY (independientes del zoom/pan de GRN) ---
+    // Se arrastran directamente sobre la forma de onda (ver PluginEditor.cpp,
+    // mouseDown/mouseDrag); "Full Loop" (L{n}_FULL_LOOP) los ignora y usa
+    // siempre 0..1 en su lugar (ver GranularVoice.cpp).
+    std::atomic<float> loopStartRatioL1{ 0.0f }, loopEndRatioL1{ 1.0f };
+    std::atomic<float> loopStartRatioL2{ 0.0f }, loopEndRatioL2{ 1.0f };
+    std::atomic<float> loopStartRatioL3{ 0.0f }, loopEndRatioL3{ 1.0f };
+    std::atomic<float> loopStartRatioL4{ 0.0f }, loopEndRatioL4{ 1.0f };
+
+    // Centro del loop (punto fijo alrededor del cual expande/encoge el knob
+    // Size): se actualiza al arrastrar bordes/barra central a mano, y el knob
+    // Size lo usa para recalcular ambos bordes de forma simetrica.
+    std::atomic<float> loopCenterRatioL1{ 0.5f };
+    std::atomic<float> loopCenterRatioL2{ 0.5f };
+    std::atomic<float> loopCenterRatioL3{ 0.5f };
+    std::atomic<float> loopCenterRatioL4{ 0.5f };
 
     std::vector<LfoNode> savedLfoNodes;
     bool isLfoSaved = false;

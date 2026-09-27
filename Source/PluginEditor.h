@@ -44,6 +44,7 @@ public:
 
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
+    void mouseUp(const juce::MouseEvent& event) override;
     //void mouseDoubleClick(const juce::MouseEvent& event) override;
 
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
@@ -57,9 +58,17 @@ public:
             parameterID.contains("SHAPE") || parameterID.contains("MUTE") ||
             parameterID.contains("SOLO") || parameterID.contains("REC")) // <-- �A�ADIDO "REC"!
         {
-            juce::MessageManager::callAsync([this] { repaint(); });
+            juce::MessageManager::callAsync([this, parameterID, newValue] {
+                if (parameterID.contains("GRAIN_SIZE"))
+                    applySizeToPlyLoop(parameterID, newValue);
+                repaint();
+                });
         }
     }
+
+    // El knob Size (GRAIN_SIZE) en modo PLY expande/encoge los 2 bordes del
+    // loop de forma simetrica alrededor del centro guardado (loopCenterRatio).
+    void applySizeToPlyLoop(const juce::String& parameterID, float sizeRatio);
 
     void mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel) override;
 
@@ -123,7 +132,20 @@ private:
 
     int lastDragX = 0;
     int activeLayer = 1;
-    
+
+    // Arrastre de bordes de loop en modo PLY (Full Loop OFF): 0 = ninguno,
+    // 1 = izquierdo, 2 = derecho, 3 = barra blanca central (mueve los 2 bordes
+    // juntos, sin cambiar el tamano). Independiente del zoom/pan de GRN.
+    int loopEdgeDragLayer = 0;
+    int loopEdgeDragSide = 0;
+
+    // Solo para el lado 3 (barra central): ratio bajo el raton y bordes del
+    // loop en el momento de empezar el arrastre, para mover ambos a la vez
+    // por delta en vez de por posicion absoluta.
+    float loopDragStartMouseRatio = 0.0f;
+    float loopDragStartLoopStart = 0.0f;
+    float loopDragStartLoopEnd = 0.0f;
+
     bool ignoreDragForPosition = false;
 
     juce::Rectangle<int> matrixArea;
