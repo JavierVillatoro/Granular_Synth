@@ -38,13 +38,13 @@ The project includes a custom-built mobile application that acts as a wireless r
 <tr>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_menu.jpeg" alt="Engine module menu" width="280"><br>
+  <img src="Images/App_cut_menu.jpeg" alt="Engine module menu" width="280"><br>
   <sub><b>Module menu</b><br>Scrollable picker for the 6 engine pages: Mixer, Filter, Granular, Pitch, Voices, Recorder.</sub>
   <br><br>
 </td>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_L1_Mixer.jpeg" alt="Mixer page - Layer 1" width="280"><br>
+  <img src="Images/App_cut_L1_Mixer.jpeg" alt="Mixer page - Layer 1" width="280"><br>
   <sub><b>Mixer &#8212; Layer 1 (cyan)</b><br>Volume fader plus a 4-band EQ (Low / Mid-L / Mid-H / High) with a live EQ curve, mirroring the plugin's mixer module.</sub>
   <br><br>
 </td>
@@ -52,13 +52,13 @@ The project includes a custom-built mobile application that acts as a wireless r
 <tr>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_L4_Filter.jpeg" alt="Filter page - Layer 4" width="280"><br>
+  <img src="Images/App_cut_L4_Filter.jpeg" alt="Filter page - Layer 4" width="280"><br>
   <sub><b>Filter &#8212; Layer 4 (lime)</b><br>High-Pass / Low-Pass cutoff and resonance sliders, drawing the same filter curve shown in the plugin's Filter module.</sub>
   <br><br>
 </td>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_L4_Recorder.jpeg" alt="Recorder library page - Layer 4" width="280"><br>
+  <img src="Images/App_cut_L4_Recorder.jpeg" alt="Recorder library page - Layer 4" width="280"><br>
   <sub><b>Recorder library &#8212; Layer 4 (lime)</b><br>Every take is saved locally with its own name; play it back, or send it straight to the target layer over WiFi.</sub>
   <br><br>
 </td>
@@ -66,13 +66,13 @@ The project includes a custom-built mobile application that acts as a wireless r
 <tr>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_L2_Voices.jpeg" alt="Voices page - Layer 2" width="280"><br>
+  <img src="Images/App_cut_L2_Voices.jpeg" alt="Voices page - Layer 2" width="280"><br>
   <sub><b>Voices &#8212; Layer 2 (magenta)</b><br>4 independent XY pads (V1&#8211;V4) with mix bars, for the formant/"Monk" voice engine.</sub>
   <br><br>
 </td>
 <td align="center" valign="top" width="50%">
   <br><br>
-  <img src="Images/App_L3_Recording.jpeg" alt="Recording while on the Granular page - Layer 3" width="280"><br>
+  <img src="Images/App_cut_L3_Recording.jpeg" alt="Recording while on the Granular page - Layer 3" width="280"><br>
   <sub><b>Granular / recording in the background &#8212; Layer 3 (orange)</b><br>Recording (top status-bar mic icon) keeps running no matter which engine page you're browsing &#8212; here, voice is being captured for Layer 3 while viewing the Granular/Spray page.</sub>
   <br><br>
 </td>
