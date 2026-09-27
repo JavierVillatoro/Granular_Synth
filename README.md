@@ -51,8 +51,8 @@ The project includes a custom-built mobile application that acts as a wireless r
   <sub><b>Filter &#8212; Layer 4 (lime)</b><br>High-Pass / Low-Pass cutoff and resonance sliders, drawing the same filter curve shown in the plugin's Filter module.</sub>
 </td>
 <td align="center" valign="top" width="50%">
-  <img src="Images/App_L3_Recording.jpeg" alt="Recording while on the Granular page - Layer 3" width="280"><br>
-  <sub><b>Granular / recording in the background &#8212; Layer 3 (orange)</b><br>Recording (top status-bar mic icon) keeps running no matter which engine page you're browsing &#8212; here, voice is being captured for Layer 3 while viewing the Granular/Spray page.</sub>
+  <img src="Images/App_L4_Recorder.jpeg" alt="Recorder library page - Layer 4" width="280"><br>
+  <sub><b>Recorder library &#8212; Layer 4 (lime)</b><br>Every take is saved locally with its own name; play it back, or send it straight to the target layer over WiFi.</sub>
 </td>
 </tr>
 <tr>
@@ -61,8 +61,8 @@ The project includes a custom-built mobile application that acts as a wireless r
   <sub><b>Voices &#8212; Layer 2 (magenta)</b><br>4 independent XY pads (V1&#8211;V4) with mix bars, for the formant/"Monk" voice engine.</sub>
 </td>
 <td align="center" valign="top" width="50%">
-  <img src="Images/App_L4_Recorder.jpeg" alt="Recorder library page - Layer 4" width="280"><br>
-  <sub><b>Recorder library &#8212; Layer 4 (lime)</b><br>Every take is saved locally with its own name; play it back, or send it straight to the target layer over WiFi.</sub>
+  <img src="Images/App_L3_Recording.jpeg" alt="Recording while on the Granular page - Layer 3" width="280"><br>
+  <sub><b>Granular / recording in the background &#8212; Layer 3 (orange)</b><br>Recording (top status-bar mic icon) keeps running no matter which engine page you're browsing &#8212; here, voice is being captured for Layer 3 while viewing the Granular/Spray page.</sub>
 </td>
 </tr>
 </table>
