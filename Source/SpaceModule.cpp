@@ -39,19 +39,6 @@ SpaceModule::SpaceModule(juce::AudioProcessorValueTreeState& apvts, juce::String
     mixLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
     addAndMakeVisible(mixLabel);
 
-    juce::Colour titaniumColor = juce::Colour(0xffd0d0d0);
-    auto setKnobPlatino = [&](juce::Slider& k) {
-        k.setColour(juce::Slider::rotarySliderOutlineColourId, titaniumColor.withAlpha(0.2f));
-        k.setColour(juce::Slider::rotarySliderFillColourId, titaniumColor.withAlpha(0.8f));
-        k.setColour(juce::Slider::thumbColourId, titaniumColor);
-        };
-
-    setKnobPlatino(sizeKnob);
-    setKnobPlatino(fbackKnob);
-
-    sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_SIZE", sizeKnob);
-    fbackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "SPACE_FBACK", fbackKnob);
-
     setLayer(1);
 }
 
@@ -85,10 +72,18 @@ void SpaceModule::setLayer(int layerIndex)
         dotColor = juce::Colours::lightgrey.withAlpha(0.9f);
     }
 
-    // Solo cambiamos el color del anillo del Mix, NO de la letra
+    // Size, Feedback y Mix se colorean con el color de la capa activa
+    sizeKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    sizeKnob.setColour(juce::Slider::thumbColourId, dotColor);
+    fbackKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
+    fbackKnob.setColour(juce::Slider::thumbColourId, dotColor);
     mixKnob.setColour(juce::Slider::rotarySliderFillColourId, layerColor);
     mixKnob.setColour(juce::Slider::thumbColourId, dotColor);
 
+    sizeAttach.reset();
+    sizeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPACE_SIZE", sizeKnob);
+    fbackAttach.reset();
+    fbackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPACE_FBACK", fbackKnob);
     mixAttach.reset();
     mixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvtsRef, layerPrefix + "SPACE_MIX", mixKnob);
 }

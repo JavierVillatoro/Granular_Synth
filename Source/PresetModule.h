@@ -24,6 +24,8 @@ public:
     // Función para que el Editor le avise cuando el usuario cambia de capa
     void setLayer(int layer);
 
+    void refreshFromProcessor();
+
 private:
     Granular_SynthAudioProcessor& audioProcessor;
 

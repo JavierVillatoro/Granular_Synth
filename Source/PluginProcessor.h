@@ -13,6 +13,14 @@
 #include "LfoModule.h"
 #include "TcpReceiver.h"
 
+#if JUCE_WINDOWS
+ #include <winsock2.h>
+ #include <ws2tcpip.h>
+ #include <iphlpapi.h>
+ #pragma comment(lib, "iphlpapi.lib")
+ #pragma comment(lib, "ws2_32.lib")
+#endif
+
 class Granular_SynthAudioProcessor : public juce::AudioProcessor,
                                      public juce::AudioProcessorValueTreeState::Listener,
                                      public juce::ChangeBroadcaster,
@@ -23,6 +31,14 @@ class Granular_SynthAudioProcessor : public juce::AudioProcessor,
 public:
     // Candado
     juce::CriticalSection audioMutex;
+
+    // --- Notas con tono variable disparadas por OSC desde el remoto (seccion
+    // MIDI de la app) --- El callback OSC corre en el hilo de mensajes, pero
+    // hay que inyectar el evento en processBlock() (hilo de audio), asi que
+    // se encola aqui bajo lock y se vacia al principio de cada bloque.
+    struct PendingNoteEvent { int layerIndex; int pitch; bool isOn; };
+    juce::CriticalSection noteQueueLock;
+    std::vector<PendingNoteEvent> pendingNoteEvents;
 
     Granular_SynthAudioProcessor();
     ~Granular_SynthAudioProcessor() override;
@@ -53,6 +69,12 @@ public:
     void deletePreset(int presetIndex);
     bool doesPresetExist(int presetIndex);
     void initSynth();
+
+    // Indice del preset actualmente cargado (-1 = ninguno / init). Vive aqui
+    // (no solo en PresetModule.cpp, que es UI de escritorio) para poder
+    // notificarselo tambien al remoto Flutter por OSC -- ver broadcastPresetStatus().
+    int loadedPresetIndex = -1;
+    void broadcastPresetStatus();
 
     // --- SISTEMA DE MODULACIÓN (MATRIX GRID) ---
     // 6 Fuentes fijas: 0=Vel, 1=ModWheel, 2=Aftertouch, 3=Env2, 4=LFO1, 5=LFO2
@@ -100,6 +122,55 @@ public:
     
     juce::String getLocalIPAddress()
     {
+#if JUCE_WINDOWS
+        // Adaptadores virtuales (VMware, VirtualBox, Hyper-V...) tambien caen
+        // a veces en el rango 192.168.x.x, asi que la lista negra de abajo no
+        // basta (cambia segun que software de virtualizacion tengas instalado
+        // y la subred que se le asigne). La unica senal fiable es: el
+        // adaptador REAL (WiFi/Ethernet) tiene puerta de enlace (gateway);
+        // los adaptadores host-only/NAT virtuales nunca la tienen.
+        {
+            ULONG bufLen = 15000;
+            std::vector<BYTE> buffer(bufLen);
+            auto* addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+            // GAA_FLAG_INCLUDE_GATEWAYS es imprescindible: sin el, Windows NO
+            // rellena FirstGatewayAddress en NINGUN adaptador (ni siquiera el
+            // real), asi que la comprobacion de abajo los descartaria todos.
+            ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS;
+
+            DWORD result = GetAdaptersAddresses(AF_INET, flags, nullptr, addresses, &bufLen);
+            if (result == ERROR_BUFFER_OVERFLOW)
+            {
+                buffer.resize(bufLen);
+                addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(buffer.data());
+                result = GetAdaptersAddresses(AF_INET, flags, nullptr, addresses, &bufLen);
+            }
+
+            if (result == NO_ERROR)
+            {
+                for (auto* adapter = addresses; adapter != nullptr; adapter = adapter->Next)
+                {
+                    if (adapter->OperStatus != IfOperStatusUp) continue;
+                    if (adapter->FirstGatewayAddress == nullptr) continue; // sin gateway -> virtual/aislado
+
+                    for (auto* ua = adapter->FirstUnicastAddress; ua != nullptr; ua = ua->Next)
+                    {
+                        auto* sockAddr = reinterpret_cast<sockaddr_in*>(ua->Address.lpSockaddr);
+                        char ipStr[INET_ADDRSTRLEN]{};
+                        if (inet_ntop(AF_INET, &(sockAddr->sin_addr), ipStr, INET_ADDRSTRLEN) != nullptr)
+                        {
+                            juce::String ip(ipStr);
+                            if (ip.isNotEmpty() && ip != "127.0.0.1")
+                                return ip;
+                        }
+                    }
+                }
+            }
+            // Si ningun adaptador tiene gateway (raro: ninguna red real
+            // conectada), caemos al metodo heuristico de siempre, abajo.
+        }
+#endif
+
         auto allIPs = juce::IPAddress::getAllAddresses();
 
         // Adaptadores fantasma conocidos que NUNCA queremos devolver

@@ -145,6 +145,14 @@ void PresetModule::resized()
     }
 }
 
+void PresetModule::refreshFromProcessor()
+{
+    for (int i = 0; i < 16; ++i)
+        presetHasData[i] = audioProcessor.doesPresetExist(i);
+    loadedPresetIndex = audioProcessor.loadedPresetIndex;
+    updatePresetButtonColors();
+}
+
 void PresetModule::setLayer(int layer)
 {
     activeLayer = layer;

@@ -240,6 +240,15 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
         }
     }
 
+    // Vaciamos la cola de notas OSC (seccion MIDI del remoto) una vez por
+    // bloque; se reparten por capa mas abajo, igual de simple que el PLAY
+    // sintetico que ya existia.
+    std::vector<PendingNoteEvent> notesThisBlock;
+    {
+        const juce::ScopedLock sl(noteQueueLock);
+        notesThisBlock.swap(pendingNoteEvents);
+    }
+
     // ==========================================================
     // --- LÓGICA DE CAPA 1 (CYAN) ---
     // ==========================================================
@@ -259,6 +268,12 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     if (isPlayOnL1 && !lastPlayState) processedMidiL1.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
     else if (!isPlayOnL1 && lastPlayState) processedMidiL1.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayState = isPlayOnL1;
+
+    for (auto& ev : notesThisBlock)
+        if (ev.layerIndex == 1 && isMidiOnL1) {
+            if (isHoldOnL1 && !ev.isOn) continue; // igual que el MIDI de host: con HOLD activo no se sueltan notas
+            processedMidiL1.addEvent(ev.isOn ? juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8)127) : juce::MidiMessage::noteOff(1, ev.pitch), 0);
+        }
 
     if (!isHoldOnL1 && lastHoldState) synthL1.allNotesOff(0, true);
     lastHoldState = isHoldOnL1;
@@ -283,6 +298,12 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     else if (!isPlayOnL2 && lastPlayStateL2) processedMidiL2.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayStateL2 = isPlayOnL2;
 
+    for (auto& ev : notesThisBlock)
+        if (ev.layerIndex == 2 && isMidiOnL2) {
+            if (isHoldOnL2 && !ev.isOn) continue;
+            processedMidiL2.addEvent(ev.isOn ? juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8)127) : juce::MidiMessage::noteOff(1, ev.pitch), 0);
+        }
+
     if (!isHoldOnL2 && lastHoldStateL2) synthL2.allNotesOff(0, true);
     lastHoldStateL2 = isHoldOnL2;
 
@@ -306,6 +327,12 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     else if (!isPlayOnL3 && lastPlayStateL3) processedMidiL3.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayStateL3 = isPlayOnL3;
 
+    for (auto& ev : notesThisBlock)
+        if (ev.layerIndex == 3 && isMidiOnL3) {
+            if (isHoldOnL3 && !ev.isOn) continue;
+            processedMidiL3.addEvent(ev.isOn ? juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8)127) : juce::MidiMessage::noteOff(1, ev.pitch), 0);
+        }
+
     if (!isHoldOnL3 && lastHoldStateL3) synthL3.allNotesOff(0, true);
     lastHoldStateL3 = isHoldOnL3;
 
@@ -328,6 +355,12 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
     if (isPlayOnL4 && !lastPlayStateL4) processedMidiL4.addEvent(juce::MidiMessage::noteOn(1, 60, (juce::uint8)127), 0);
     else if (!isPlayOnL4 && lastPlayStateL4) processedMidiL4.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
     lastPlayStateL4 = isPlayOnL4;
+
+    for (auto& ev : notesThisBlock)
+        if (ev.layerIndex == 4 && isMidiOnL4) {
+            if (isHoldOnL4 && !ev.isOn) continue;
+            processedMidiL4.addEvent(ev.isOn ? juce::MidiMessage::noteOn(1, ev.pitch, (juce::uint8)127) : juce::MidiMessage::noteOff(1, ev.pitch), 0);
+        }
 
     if (!isHoldOnL4 && lastHoldStateL4) synthL4.allNotesOff(0, true);
     lastHoldStateL4 = isHoldOnL4;
@@ -497,9 +530,9 @@ void Granular_SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer
                 }
             }
 
-            // ESPACIO REVERBERANTE GLOBAL
-            float spaceSize = apvts.getRawParameterValue("SPACE_SIZE")->load();
-            float spaceFback = apvts.getRawParameterValue("SPACE_FBACK")->load();
+            // ESPACIO REVERBERANTE (Size/Fback por capa)
+            float spaceSize = apvts.getRawParameterValue(prefix + "SPACE_SIZE")->load();
+            float spaceFback = apvts.getRawParameterValue(prefix + "SPACE_FBACK")->load();
 
             juce::Reverb::Parameters params;
             params.roomSize = spaceSize;
@@ -673,9 +706,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
     params.push_back(std::make_unique<juce::AudioParameterFloat>("MASTER_VOL", "Master Vol", juce::NormalisableRange<float>(-60.0f, 12.0f, 0.1f, 2.0f), 0.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("LIMITER_THRESH", "Limiter", juce::NormalisableRange<float>(-6.0f, 0.0f, 0.1f), -0.3f));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_SIZE", "Reverb Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("SPACE_FBACK", "Reverb Fback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
-
     params.push_back(std::make_unique<juce::AudioParameterFloat>("MANUAL_BPM", "BPM", juce::NormalisableRange<float>(20.0f, 300.0f, 0.1f), 120.0f));
     params.push_back(std::make_unique<juce::AudioParameterBool>("SYNC_TO_DAW", "DAW Sync", true));
 
@@ -743,6 +773,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Granular_SynthAudioProcessor
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_DIST_MIX", "Dist Mix", juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f), 0.0f));
             params.push_back(std::make_unique<juce::AudioParameterChoice>(prefix + "_DIST_TYPE", "Type", juce::StringArray{ "Soft Clip", "Hard Clip", "Foldback", "Bitcrush" }, 0));
             params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPACE_MIX", "Reverb Mix", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.3f));
+            // Size/Fback del reverb ahora son por capa (antes eran globales,
+            // compartidos entre las 4 capas).
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPACE_SIZE", "Reverb Size", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.8f));
+            params.push_back(std::make_unique<juce::AudioParameterFloat>(prefix + "_SPACE_FBACK", "Reverb Fback", juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f), 0.5f));
 
             // FX: 4 choral voices
             for (int v = 1; v <= 4; ++v) {
@@ -967,7 +1001,99 @@ void Granular_SynthAudioProcessor::oscMessageReceived(const juce::OSCMessage& me
         return;
     }
 
-    // 2. MAPEO DE PARÁMETROS NORMALES
+    // 2. NOTAS CON TONO VARIABLE (seccion MIDI del remoto): /L{n}_NOTE_ON o
+    // /L{n}_NOTE_OFF + 1 argumento (el pitch 0-127). No son parametros APVTS
+    // persistentes, son eventos puntuales -> se encolan para processBlock().
+    if (message.size() == 1 && (address.endsWith("_NOTE_ON") || address.endsWith("_NOTE_OFF")))
+    {
+        bool isOn = address.endsWith("_NOTE_ON");
+        juce::String layerPrefix = address.substring(1, 3); // "L1".."L4"
+
+        int layerIndex = 0;
+        if (layerPrefix == "L1") layerIndex = 1;
+        else if (layerPrefix == "L2") layerIndex = 2;
+        else if (layerPrefix == "L3") layerIndex = 3;
+        else if (layerPrefix == "L4") layerIndex = 4;
+
+        if (layerIndex > 0)
+        {
+            int pitch = 0;
+            if (message[0].isFloat32()) pitch = (int)message[0].getFloat32();
+            else if (message[0].isInt32()) pitch = message[0].getInt32();
+            pitch = juce::jlimit(0, 127, pitch);
+
+            const juce::ScopedLock sl(noteQueueLock);
+            pendingNoteEvents.push_back({ layerIndex, pitch, isOn });
+        }
+        return;
+    }
+
+    // 2.5. VENTANA DE LOOP EN MODO PLY (página "Play" del remoto): /L{n}_LOOP_START
+    // o /L{n}_LOOP_END + 1 argumento (ratio 0-1 sobre la muestra entera). Escriben
+    // directamente los mismos atomics que el arrastre de ratón en el plugin (ver
+    // mouseDrag en PluginEditor.cpp) - no son parámetros APVTS.
+    if (message.size() == 1 && (address.endsWith("_LOOP_START") || address.endsWith("_LOOP_END")))
+    {
+        bool isStart = address.endsWith("_LOOP_START");
+        juce::String layerPrefix = address.substring(1, 3); // "L1".."L4"
+
+        float ratio = 0.0f;
+        if (message[0].isFloat32()) ratio = message[0].getFloat32();
+        else if (message[0].isInt32()) ratio = (float)message[0].getInt32();
+        ratio = juce::jlimit(0.0f, 1.0f, ratio);
+
+        const float minGap = 0.02f;
+        std::atomic<float>* startAtomic = nullptr;
+        std::atomic<float>* endAtomic = nullptr;
+        std::atomic<float>* centerAtomic = nullptr;
+
+        if (layerPrefix == "L1") { startAtomic = &loopStartRatioL1; endAtomic = &loopEndRatioL1; centerAtomic = &loopCenterRatioL1; }
+        else if (layerPrefix == "L2") { startAtomic = &loopStartRatioL2; endAtomic = &loopEndRatioL2; centerAtomic = &loopCenterRatioL2; }
+        else if (layerPrefix == "L3") { startAtomic = &loopStartRatioL3; endAtomic = &loopEndRatioL3; centerAtomic = &loopCenterRatioL3; }
+        else if (layerPrefix == "L4") { startAtomic = &loopStartRatioL4; endAtomic = &loopEndRatioL4; centerAtomic = &loopCenterRatioL4; }
+
+        if (startAtomic != nullptr)
+        {
+            if (isStart) startAtomic->store(juce::jmin(ratio, endAtomic->load() - minGap));
+            else endAtomic->store(juce::jmax(ratio, startAtomic->load() + minGap));
+            centerAtomic->store((startAtomic->load() + endAtomic->load()) * 0.5f);
+        }
+        return;
+    }
+
+    // 2.6. SISTEMA DE PRESETS (página "Presets" del remoto): acciones globales
+    // (no por capa) que llaman directamente a los mismos metodos que ya usan
+    // los botones de PresetModule.cpp en el escritorio.
+    if (address == "/PRESET_SAVE" && message.size() == 1)
+    {
+        int idx = juce::jlimit(0, 15, (int)(message[0].isFloat32() ? message[0].getFloat32() : (float)message[0].getInt32()));
+        savePreset(idx);
+        return;
+    }
+    if (address == "/PRESET_LOAD" && message.size() == 1)
+    {
+        int idx = juce::jlimit(0, 15, (int)(message[0].isFloat32() ? message[0].getFloat32() : (float)message[0].getInt32()));
+        if (doesPresetExist(idx)) loadPreset(idx); else initSynth();
+        return;
+    }
+    if (address == "/PRESET_DELETE" && message.size() == 1)
+    {
+        int idx = juce::jlimit(0, 15, (int)(message[0].isFloat32() ? message[0].getFloat32() : (float)message[0].getInt32()));
+        deletePreset(idx);
+        return;
+    }
+    if (address == "/PRESET_INIT")
+    {
+        initSynth();
+        return;
+    }
+    if (address == "/PRESET_REQUEST_STATUS")
+    {
+        broadcastPresetStatus();
+        return;
+    }
+
+    // 3. MAPEO DE PARÁMETROS NORMALES
     if (message.size() == 1)
     {
         float rawValue = 0.0f;
@@ -1030,6 +1156,9 @@ void Granular_SynthAudioProcessor::savePreset(int presetIndex)
 
         if (state.isValid()) {
             state.writeToStream(stream);
+            loadedPresetIndex = presetIndex;
+            broadcastPresetStatus();
+            juce::MessageManager::callAsync([this]() { sendChangeMessage(); });
             DBG("Preset BINARIO guardado con audio en: " + presetFile.getFullPathName());
         }
         else {
@@ -1081,6 +1210,9 @@ void Granular_SynthAudioProcessor::loadPreset(int presetIndex)
                     }
                 }
 
+                loadedPresetIndex = presetIndex;
+                broadcastPresetStatus();
+
                 // Forzamos a la pantalla a repintarse para mostrar los nuevos datos de la matriz
                 juce::MessageManager::callAsync([this]() { sendChangeMessage(); });
 
@@ -1114,6 +1246,9 @@ void Granular_SynthAudioProcessor::initSynth()
 
     // 3. Arrancamos el reloj (40 ms de espera para evitar el click)
     startTimer(40);
+
+    loadedPresetIndex = -1;
+    broadcastPresetStatus();
 }
 
 bool Granular_SynthAudioProcessor::doesPresetExist(int presetIndex)
@@ -1121,6 +1256,21 @@ bool Granular_SynthAudioProcessor::doesPresetExist(int presetIndex)
     juce::String fileName = "Preset_" + juce::String(presetIndex + 1) + ".gsp";
     juce::File presetFile = getPresetFolder().getChildFile(fileName);
     return presetFile.existsAsFile();
+}
+
+// Avisa al remoto Flutter de que presets (de los 16) tienen datos en disco y
+// cual esta cargado ahora mismo, para que la pagina de Presets pueda pintar
+// los mismos 3 estados visuales que PresetModule.cpp en el escritorio
+// (cargado / tiene datos / vacio). Se llama tras cualquier SAVE/LOAD/INIT/
+// DELETE, venga del propio plugin o del remoto, para que los dos lados
+// nunca se desincronicen.
+void Granular_SynthAudioProcessor::broadcastPresetStatus()
+{
+    juce::OSCMessage msg("/PRESET_STATUS");
+    for (int i = 0; i < 16; ++i)
+        msg.addFloat32(doesPresetExist(i) ? 1.0f : 0.0f);
+    msg.addFloat32((float)loadedPresetIndex);
+    oscSender.send(msg);
 }
 
 void Granular_SynthAudioProcessor::deletePreset(int presetIndex)
@@ -1131,6 +1281,19 @@ void Granular_SynthAudioProcessor::deletePreset(int presetIndex)
     if (presetFile.existsAsFile()) {
         presetFile.deleteFile(); // Destruye el archivo físico
         DBG("Preset eliminado del disco: " + fileName);
+    }
+
+    // Si era el que estaba sonando, vaciamos el sintetizador para que no
+    // quede un audio fantasma (igual que ya hacia el menu contextual de
+    // PresetModule.cpp al borrar desde el escritorio) -- initSynth() ya
+    // notifica al remoto, asi que solo hace falta el broadcast aparte si
+    // el borrado no afecta al preset cargado.
+    if (loadedPresetIndex == presetIndex) {
+        initSynth();
+    }
+    else {
+        broadcastPresetStatus();
+        juce::MessageManager::callAsync([this]() { sendChangeMessage(); });
     }
 }
 

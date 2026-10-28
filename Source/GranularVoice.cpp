@@ -645,9 +645,15 @@ void GranularVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int 
             shimmerL = haloHighpass[0].processSample(0, shimmerL);
             shimmerR = haloHighpass[1].processSample(0, shimmerR);
 
-            // Inyectar el sonido input + feedback a la línea de delay infinita
-            haloDelay.pushSample(0, haloInputL + (shimmerL * haloShimmerVal));
-            haloDelay.pushSample(1, haloInputR + (shimmerR * haloShimmerVal));
+            // Inyectar el sonido input + feedback a la línea de delay infinita.
+            // Saturacion suave (tanh) ANTES de volver a entrar al delay: sin
+            // esto, con Shimmer cerca de 1.0 el bucle de feedback es inestable
+            // (se le sigue sumando señal nueva cada vuelta sobre una ganancia
+            // unitaria) y crece sin limite cuanto mas rato suena, hasta
+            // desbordar -> "se oye roto". El tanh acota cada muestra que
+            // vuelve a entrar sin matar el caracter del shimmer.
+            haloDelay.pushSample(0, std::tanh(haloInputL + (shimmerL * haloShimmerVal)));
+            haloDelay.pushSample(1, std::tanh(haloInputR + (shimmerR * haloShimmerVal)));
 
             haloL = shimmerL;
             haloR = shimmerR;

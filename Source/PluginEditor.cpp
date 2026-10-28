@@ -915,7 +915,10 @@ void Granular_SynthAudioProcessorEditor::mouseDown(const juce::MouseEvent& event
                     return juce::jlimit(0.0f, 1.0f, (float)(timeSecs / totSecs));
                     };
 
-                const float edgeTolerancePx = 8.0f;
+                // Mas generoso que antes (8px costaba mucho acertar justo en
+                // la linea del borde en modo PLY) -- ahora reconoce el click
+                // bastante mas hacia dentro del borde, no solo justo encima.
+                const float edgeTolerancePx = 18.0f;
                 float leftPx = ratioToPx(loopStartR);
                 float rightPx = ratioToPx(loopEndR);
                 float centerPx = (leftPx + rightPx) * 0.5f;
@@ -1157,6 +1160,11 @@ void Granular_SynthAudioProcessorEditor::changeListenerCallback(juce::ChangeBroa
         if (!audioProcessor.isAudioLoadedL2) thumbnailL2.clear();
         if (!audioProcessor.isAudioLoadedL3) thumbnailL3.clear();
         if (!audioProcessor.isAudioLoadedL4) thumbnailL4.clear();
+
+        // --- C: BOTONES DE PRESETS (SAVE/LOAD/INIT/DELETE desde el remoto) ---
+        // El remoto Flutter dispara estas acciones por OSC directamente sobre
+        // el processor; sin esto, los botones de aqui no se enteraban nunca.
+        presetModule.refreshFromProcessor();
 
         repaint();
     }
